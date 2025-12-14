@@ -1,0 +1,11 @@
+2025-12-11 13:22:35 | INFO     | 
+2025-12-11 13:22:35 | INFO     | ============================================================
+2025-12-11 13:22:35 | INFO     | [bold green]Processing:[/bold green] test_images\P2_Fig1c_Paralepidosteus_sp_Acre_5.73um.tif
+2025-12-11 13:22:35 | INFO     | ============================================================
+2025-12-11 13:22:36 | INFO     | [bold]CALIBRATION:[/bold] 0.3300 µm/pixel (profile, 10.0µm bar = 30.3px)
+2025-12-11 13:22:36 | INFO     | [bold]PREPROCESSING:[/bold] CLAHE(clip=0.05, kernel=12) + blur(σ=1.0)
+2025-12-11 13:22:37 | INFO     | [bold]DETECTION:[/bold] Found 41 tubercles
+2025-12-11 13:22:37 | INFO     | [bold]MEASUREMENT:[/bold] Diameter = 6.14 ± 1.42 µm
+2025-12-11 13:22:37 | INFO     | [bold]MEASUREMENT:[/bold] Spacing = 5.44 ± 3.32 µm
+2025-12-11 13:22:37 | INFO     | [bold]CLASSIFICATION:[/bold] [red]Lepisosteus[/red] (confidence: low)
+2025-12-11 13:22:39 | INFO     | [bold]OUTPUT:[/bold] Saved to output_test\20251211_132235

@@ -32,16 +32,30 @@ class Tubercle:
     diameter_um: float
     area_px: float
     circularity: float
+    # Ellipse parameters (optional, populated when using ellipse refinement)
+    major_axis_px: Optional[float] = None
+    minor_axis_px: Optional[float] = None
+    major_axis_um: Optional[float] = None
+    minor_axis_um: Optional[float] = None
+    orientation: Optional[float] = None  # radians, angle of major axis
+    eccentricity: Optional[float] = None  # 0=circle, 1=line
 
     @property
     def radius_px(self) -> float:
-        """Radius in pixels."""
+        """Radius in pixels (equivalent circle radius)."""
         return self.diameter_px / 2
 
     @property
     def radius_um(self) -> float:
-        """Radius in micrometers."""
+        """Radius in micrometers (equivalent circle radius)."""
         return self.diameter_um / 2
+
+    @property
+    def aspect_ratio(self) -> Optional[float]:
+        """Aspect ratio (major/minor), 1.0 for circle."""
+        if self.major_axis_px and self.minor_axis_px and self.minor_axis_px > 0:
+            return self.major_axis_px / self.minor_axis_px
+        return None
 
 
 @dataclass

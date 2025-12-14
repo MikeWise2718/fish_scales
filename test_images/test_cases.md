@@ -10,7 +10,7 @@ This document catalogs images from the reference papers that have **known metric
 
 ## Extracted Test Images
 
-The following 10 test case images have been extracted and are ready for validation:
+The following 13 test case images have been extracted and are ready for validation:
 
 | Filename | Species | Expected Diameter (µm) | Expected Space (µm) |
 |----------|---------|------------------------|---------------------|
@@ -20,6 +20,9 @@ The following 10 test case images have been extracted and are ready for validati
 | `P1_Fig4_Atractosteus_simplex_7.07um.tif` | *Atractosteus simplex* | 7.07 | 2.61 |
 | `P1_Fig5_Lepisosteidae_indet_Portugal_3.82um.tif` | Lepisosteidae indet. | ~3.82 | ~3.82 |
 | `P1_Fig6_Lepisosteidae_indet_Bolivia_4.50um.tif` | Lepisosteidae indet. | ~4.50 | ~4.40 |
+| `P2_Fig1c_Paralepidosteus_sp_Acre_5.73um.tif` | ?*Paralepidosteus* sp. (Acre) | 5.73-5.94 | 6.00-6.25 |
+| `P2_Fig1d_Lepisosteus_platyrhinchus_3.95um.tif` | *Lepisosteus platyrhinchus* | 3.95 | 3.18 |
+| `P2_Fig1e_Polypterus_delhezi_2.19um.tif` | *Polypterus delhezi* | 2.19 | 5.76 |
 | `P2_Pl1_Fig1a_Lepisosteus_platostomus_5.38um.tif` | *Lepisosteus platostomus* | 5.38 | 3.59 |
 | `P2_Pl1_Fig1b_Polypterus_ornatipinnis_2.81um.tif` | *Polypterus ornatipinnis* | 2.81 | 5.97 |
 | `P3_Fig4_Obaichthys_laevis_5.0um.tif` | *Obaichthys? laevis* | 4.73-5.27 | 4.55-4.79 |
@@ -121,7 +124,43 @@ All images are SEM micrographs at **G × 700** or **M × 700** magnification.
 
 ## Test Case Images from Paper 2 (Gayet & Meunier 1993)
 
-### Test Case 2.1: Lepisosteus platostomus (Plate 1, Fig. 1a)
+### Test Case 2.1: ?Paralepidosteus sp. (Fig. 1c)
+- **Figure:** Fig. 1c
+- **Source:** Paper 2 (1993), page 172 (from "Gayet Scales Paralepidotus Markiert.pdf")
+- **Species:** ?*Paralepidosteus* sp.
+- **Age/Locality:** Cretaceous, Acre, Brazil
+- **Magnification:** × 700
+- **Expected Results:**
+  - Tubercle Diameter: **5.73-5.94 µm** (from Table 2, Paper 2 - Paralepidosteus range)
+  - Intertubercular Space: **6.00-6.25 µm** (from Table 2, Paper 2)
+  - Tubercle Arrangement: **REGULAR**
+- **Test Notes:** Paralepidosteus has distinctive large spacing; this is the reference image for `extraction_methodology.png`
+
+### Test Case 2.2: Lepisosteus platyrhinchus (Fig. 1d)
+- **Figure:** Fig. 1d
+- **Source:** Paper 2 (1993), page 172 (from "Gayet Scales Paralepidotus Markiert.pdf")
+- **Species:** *Lepisosteus platyrhinchus*
+- **Age/Locality:** Extant (Recent)
+- **Magnification:** × 700
+- **Expected Results:**
+  - Tubercle Diameter: **3.95 µm** (from Table 2, Paper 2)
+  - Intertubercular Space: **3.18 µm** (from Table 2, Paper 2)
+  - Tubercle Arrangement: **REGULAR**
+- **Test Notes:** Typical *Lepisosteus* pattern with intermediate-sized tubercles
+
+### Test Case 2.3: Polypterus delhezi (Fig. 1e)
+- **Figure:** Fig. 1e
+- **Source:** Paper 2 (1993), page 172 (from "Gayet Scales Paralepidotus Markiert.pdf")
+- **Species:** *Polypterus delhezi*
+- **Age/Locality:** Extant (Recent), Africa
+- **Magnification:** × 700
+- **Expected Results:**
+  - Tubercle Diameter: **2.19 µm** (from Table 3, Paper 2)
+  - Intertubercular Space: **5.76 µm** (from Table 3, Paper 2)
+  - Tubercle Arrangement: **REGULAR**
+- **Test Notes:** Smallest tubercle diameter in the test set; wide spacing typical of Polypteridae
+
+### Test Case 2.4: Lepisosteus platostomus (Plate 1, Fig. 1a)
 - **Figure:** Pl. 1, Fig. 1a
 - **Source:** Paper 2 (1993), Plate 1
 - **Species:** *Lepisosteus platostomus*
@@ -133,7 +172,7 @@ All images are SEM micrographs at **G × 700** or **M × 700** magnification.
   - Tubercle Arrangement: **REGULAR**
 - **Test Notes:** Upper size range for *Lepisosteus*
 
-### Test Case 2.2: Polypterus ornatipinnis (Plate 1, Fig. 1b)
+### Test Case 2.5: Polypterus ornatipinnis (Plate 1, Fig. 1b)
 - **Figure:** Pl. 1, Fig. 1b
 - **Source:** Paper 2 (1993), Plate 1
 - **Species:** *Polypterus ornatipinnis*

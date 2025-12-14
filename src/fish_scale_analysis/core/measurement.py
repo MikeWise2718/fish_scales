@@ -39,64 +39,197 @@ def build_neighbor_graph(tubercles: List[Tubercle]) -> Optional[Delaunay]:
     return tri
 
 
+def filter_to_rng(
+    points: np.ndarray,
+    delaunay_edges: set,
+) -> set:
+    """
+    Filter Delaunay edges to Relative Neighborhood Graph (RNG).
+
+    An edge (a, b) is in the RNG if and only if there is no point c
+    such that:
+        max(dist(a,c), dist(b,c)) < dist(a,b)
+
+    In other words, keep edge (a,b) only if no other point is closer
+    to BOTH a and b than they are to each other.
+
+    Args:
+        points: Array of shape (n, 2) with point coordinates
+        delaunay_edges: Set of (i, j) tuples representing Delaunay edges
+
+    Returns:
+        Set of (i, j) tuples representing RNG edges
+    """
+    n = len(points)
+    rng_edges = set()
+
+    for edge in delaunay_edges:
+        i, j = edge
+        pi, pj = points[i], points[j]
+        dist_ij = np.linalg.norm(pi - pj)
+
+        # Check if any other point violates the RNG condition
+        is_rng_edge = True
+        for k in range(n):
+            if k == i or k == j:
+                continue
+
+            pk = points[k]
+            dist_ik = np.linalg.norm(pi - pk)
+            dist_jk = np.linalg.norm(pj - pk)
+
+            # If point k is closer to both i and j than they are to each other,
+            # then edge (i,j) is not in the RNG
+            if max(dist_ik, dist_jk) < dist_ij:
+                is_rng_edge = False
+                break
+
+        if is_rng_edge:
+            rng_edges.add(edge)
+
+    return rng_edges
+
+
+def filter_to_gabriel(
+    points: np.ndarray,
+    delaunay_edges: set,
+) -> set:
+    """
+    Filter Delaunay edges to Gabriel Graph.
+
+    An edge (a, b) is in the Gabriel Graph if and only if no other point
+    lies inside the circle with diameter ab.
+
+    Gabriel Graph is a superset of RNG (contains more edges).
+
+    Args:
+        points: Array of shape (n, 2) with point coordinates
+        delaunay_edges: Set of (i, j) tuples representing Delaunay edges
+
+    Returns:
+        Set of (i, j) tuples representing Gabriel edges
+    """
+    n = len(points)
+    gabriel_edges = set()
+
+    for edge in delaunay_edges:
+        i, j = edge
+        pi, pj = points[i], points[j]
+
+        # Circle center is midpoint, radius is half the distance
+        center = (pi + pj) / 2
+        radius_sq = np.sum((pi - pj) ** 2) / 4
+
+        # Check if any other point lies inside this circle
+        is_gabriel_edge = True
+        for k in range(n):
+            if k == i or k == j:
+                continue
+
+            pk = points[k]
+            dist_sq = np.sum((pk - center) ** 2)
+
+            if dist_sq < radius_sq:
+                is_gabriel_edge = False
+                break
+
+        if is_gabriel_edge:
+            gabriel_edges.add(edge)
+
+    return gabriel_edges
+
+
 def get_neighbor_edges(
     tubercles: List[Tubercle],
     triangulation: Delaunay,
     calibration: CalibrationData,
+    graph_type: str = "delaunay",
+    max_distance_factor: Optional[float] = None,
 ) -> List[NeighborEdge]:
     """
-    Extract neighbor edges from Delaunay triangulation.
+    Extract neighbor edges from triangulation with optional filtering.
 
     Args:
         tubercles: List of tubercles
         triangulation: Delaunay triangulation
         calibration: Calibration data
+        graph_type: Type of neighbor graph to use:
+            - "delaunay": Full Delaunay triangulation (default, may have long edges)
+            - "gabriel": Gabriel graph (removes edges with points inside diameter circle)
+            - "rng": Relative Neighborhood Graph (most conservative, natural neighbors only)
+        max_distance_factor: If set, filter out edges longer than this factor times
+            the median edge length. E.g., 1.5 removes edges > 1.5× median.
 
     Returns:
         List of NeighborEdge objects
     """
-    edges = []
-    seen_pairs = set()
-
-    # Get all edges from triangulation simplices
+    # Get all unique edges from triangulation
+    all_edges = set()
     for simplex in triangulation.simplices:
-        # Each simplex is a triangle with 3 vertices
         for i in range(3):
             for j in range(i + 1, 3):
-                idx_a, idx_b = simplex[i], simplex[j]
+                edge = tuple(sorted([simplex[i], simplex[j]]))
+                all_edges.add(edge)
 
-                # Avoid duplicates
-                pair = tuple(sorted([idx_a, idx_b]))
-                if pair in seen_pairs:
-                    continue
-                seen_pairs.add(pair)
+    # Get points array
+    points = np.array([t.centroid for t in tubercles])
 
-                tubercle_a = tubercles[idx_a]
-                tubercle_b = tubercles[idx_b]
+    # Filter edges based on graph type
+    if graph_type == "rng":
+        filtered_edges = filter_to_rng(points, all_edges)
+    elif graph_type == "gabriel":
+        filtered_edges = filter_to_gabriel(points, all_edges)
+    else:  # delaunay
+        filtered_edges = all_edges
 
-                # Calculate center-to-center distance
-                dx = tubercle_a.centroid[0] - tubercle_b.centroid[0]
-                dy = tubercle_a.centroid[1] - tubercle_b.centroid[1]
-                center_distance_px = np.sqrt(dx**2 + dy**2)
-                center_distance_um = center_distance_px * calibration.um_per_pixel
+    # Calculate distances for all filtered edges
+    edge_data = []
+    for idx_a, idx_b in filtered_edges:
+        tubercle_a = tubercles[idx_a]
+        tubercle_b = tubercles[idx_b]
 
-                # Calculate edge-to-edge distance (intertubercular space)
-                edge_distance_px = (
-                    center_distance_px
-                    - tubercle_a.radius_px
-                    - tubercle_b.radius_px
-                )
-                edge_distance_um = edge_distance_px * calibration.um_per_pixel
+        # Calculate center-to-center distance
+        dx = tubercle_a.centroid[0] - tubercle_b.centroid[0]
+        dy = tubercle_a.centroid[1] - tubercle_b.centroid[1]
+        center_distance_px = np.sqrt(dx**2 + dy**2)
+        center_distance_um = center_distance_px * calibration.um_per_pixel
 
-                edge = NeighborEdge(
-                    tubercle_a_id=tubercle_a.id,
-                    tubercle_b_id=tubercle_b.id,
-                    center_distance_px=float(center_distance_px),
-                    center_distance_um=float(center_distance_um),
-                    edge_distance_px=float(edge_distance_px),
-                    edge_distance_um=float(edge_distance_um),
-                )
-                edges.append(edge)
+        # Calculate edge-to-edge distance (intertubercular space)
+        edge_distance_px = (
+            center_distance_px
+            - tubercle_a.radius_px
+            - tubercle_b.radius_px
+        )
+        edge_distance_um = edge_distance_px * calibration.um_per_pixel
+
+        edge_data.append({
+            'tubercle_a': tubercle_a,
+            'tubercle_b': tubercle_b,
+            'center_distance_px': center_distance_px,
+            'center_distance_um': center_distance_um,
+            'edge_distance_px': edge_distance_px,
+            'edge_distance_um': edge_distance_um,
+        })
+
+    # Apply max distance filter based on median
+    if max_distance_factor is not None and edge_data:
+        distances = [e['center_distance_px'] for e in edge_data]
+        median_dist = np.median(distances)
+        max_dist = median_dist * max_distance_factor
+        edge_data = [e for e in edge_data if e['center_distance_px'] <= max_dist]
+
+    # Convert to NeighborEdge objects
+    edges = []
+    for e in edge_data:
+        edge = NeighborEdge(
+            tubercle_a_id=e['tubercle_a'].id,
+            tubercle_b_id=e['tubercle_b'].id,
+            center_distance_px=float(e['center_distance_px']),
+            center_distance_um=float(e['center_distance_um']),
+            edge_distance_px=float(e['edge_distance_px']),
+            edge_distance_um=float(e['edge_distance_um']),
+        )
+        edges.append(edge)
 
     return edges
 
@@ -142,6 +275,60 @@ def measure_intertubercular_spaces(
 
     # Filter to positive distances above threshold
     spaces = [e.edge_distance_um for e in edges if e.edge_distance_um >= min_space_um]
+
+    if not spaces:
+        return [], 0.0, 0.0
+
+    mean_space = float(np.mean(spaces))
+    std_space = float(np.std(spaces))
+
+    return spaces, mean_space, std_space
+
+
+def measure_nearest_neighbor_spacing(
+    tubercles: List[Tubercle],
+    calibration: CalibrationData,
+    min_space_um: float = 0.0,
+) -> Tuple[List[float], float, float]:
+    """
+    Calculate intertubercular space using nearest-neighbor distances.
+
+    This matches the methodology used in Gayet & Meunier papers, where
+    spacing is measured between immediately adjacent tubercles only.
+
+    Args:
+        tubercles: List of detected tubercles
+        calibration: Calibration data for unit conversion
+        min_space_um: Minimum space to include (filters overlapping tubercles)
+
+    Returns:
+        Tuple of (list of spaces, mean, std)
+    """
+    if len(tubercles) < 2:
+        return [], 0.0, 0.0
+
+    from scipy.spatial import cKDTree
+
+    # Get positions and radii
+    positions = np.array([t.centroid for t in tubercles])
+    radii_um = np.array([t.radius_px * calibration.um_per_pixel for t in tubercles])
+
+    # Build KD-tree for nearest neighbor queries
+    tree = cKDTree(positions)
+
+    # Find nearest neighbor for each tubercle
+    distances_px, indices = tree.query(positions, k=2)  # k=2 because first is self
+    nn_indices = indices[:, 1]
+    nn_dists_px = distances_px[:, 1]
+    nn_center_dists_um = nn_dists_px * calibration.um_per_pixel
+
+    # Calculate edge-to-edge distance for each nearest neighbor pair
+    spaces = []
+    for i in range(len(tubercles)):
+        j = nn_indices[i]
+        edge_dist = nn_center_dists_um[i] - radii_um[i] - radii_um[j]
+        if edge_dist >= min_space_um:
+            spaces.append(float(edge_dist))
 
     if not spaces:
         return [], 0.0, 0.0
@@ -209,6 +396,9 @@ def measure_metrics(
     tubercles: List[Tubercle],
     calibration: CalibrationData,
     image_path: str = "",
+    graph_type: str = "delaunay",
+    max_distance_factor: Optional[float] = None,
+    spacing_method: str = "nearest",
 ) -> MeasurementResult:
     """
     Calculate all metrics for detected tubercles.
@@ -217,6 +407,16 @@ def measure_metrics(
         tubercles: List of detected tubercles
         calibration: Calibration data
         image_path: Path to source image (for record keeping)
+        graph_type: Type of neighbor graph for spacing calculation:
+            - "delaunay": Full Delaunay triangulation (default)
+            - "gabriel": Gabriel graph (fewer long edges)
+            - "rng": Relative Neighborhood Graph (most conservative)
+        max_distance_factor: If set, filter out edges longer than this factor
+            times the median edge length. E.g., 1.5 removes outliers > 1.5× median.
+        spacing_method: Method for calculating intertubercular spacing:
+            - "nearest": Use nearest-neighbor distances only (matches Gayet & Meunier
+              methodology - recommended for comparison with published values)
+            - "graph": Use all edges from the neighbor graph
 
     Returns:
         MeasurementResult with all metrics
@@ -226,7 +426,9 @@ def measure_metrics(
 
     # Get neighbor edges
     if triangulation is not None:
-        edges = get_neighbor_edges(tubercles, triangulation, calibration)
+        edges = get_neighbor_edges(
+            tubercles, triangulation, calibration, graph_type, max_distance_factor
+        )
     else:
         edges = []
 
@@ -234,7 +436,14 @@ def measure_metrics(
     diameters, mean_diam, std_diam = measure_diameters(tubercles)
 
     # Measure intertubercular spaces
-    spaces, mean_space, std_space = measure_intertubercular_spaces(edges)
+    if spacing_method == "nearest":
+        # Use nearest-neighbor method (matches paper methodology)
+        spaces, mean_space, std_space = measure_nearest_neighbor_spacing(
+            tubercles, calibration
+        )
+    else:
+        # Use graph-based method (all edges from triangulation)
+        spaces, mean_space, std_space = measure_intertubercular_spaces(edges)
 
     # Classify genus
     if tubercles:

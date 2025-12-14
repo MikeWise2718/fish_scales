@@ -11,7 +11,13 @@
       "Bash(uv pip list:*)",
       "Bash(uv run pytest:*)",
       "Bash(uv run python:*)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(for min_d in 5.0 5.5 6.0 6.5 7.0)",
+      "Bash(do echo \"=== min_diameter=$min_d ===\")",
+      "Bash(done)",
+      "Bash(python:*)",
+      "Bash(for img in test_images/P1_Fig4_Atractosteus_simplex_7.07um.tif test_images/P2_Pl1_Fig1a_Lepisosteus_platostomus_5.38um.tif)",
+      "Bash(do echo \"=== $img ===\")"
     ]
   }
 }

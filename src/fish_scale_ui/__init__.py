@@ -1,0 +1,3 @@
+"""Fish Scale Measurement UI - Flask web application."""
+
+__version__ = "0.1.0"

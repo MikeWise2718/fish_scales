@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Fish Scale Measurement - Workspace{% endblock %}
+
+{% block content %}
+<div class="workspace">
+    <!-- Left Panel: Image Display -->
+    <div class="image-panel">
+        <div class="image-container" id="imageContainer">
+            <div class="image-wrapper" id="imageWrapper">
+                <img id="mainImage" src="" alt="Main Image" style="display: none;">
+                <canvas id="overlayCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Toolbar below image -->
+        <div class="image-toolbar">
+            <button type="button" class="btn btn-secondary" id="newImageBtn" title="Load new image">
+                New Image
+            </button>
+            <div class="toolbar-separator"></div>
+            <button type="button" class="btn btn-icon" id="rotateLeftBtn" title="Rotate left 90 degrees">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6"/>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="rotateRightBtn" title="Rotate right 90 degrees">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </button>
+            <div class="toolbar-separator"></div>
+            <button type="button" class="btn btn-icon" id="zoomInBtn" title="Zoom in (+)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <line x1="11" y1="8" x2="11" y2="14"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="zoomOutBtn" title="Zoom out (-)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="zoomFitBtn" title="Zoom to fit (0)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+            </button>
+            <span class="zoom-level" id="zoomLevel">100%</span>
+            <div class="toolbar-spacer"></div>
+            <button type="button" class="btn btn-primary" id="saveSloBtn">Save SLO</button>
+        </div>
+    </div>
+
+    <!-- Right Panel: Tabs -->
+    <div class="tabs-panel">
+        <div class="tab-headers">
+            <button class="tab-header" data-tab="extraction">Extraction</button>
+            <button class="tab-header" data-tab="configure">Configure</button>
+            <button class="tab-header" data-tab="edit">Edit</button>
+            <button class="tab-header" data-tab="data">Data</button>
+            <button class="tab-header active" data-tab="log">Log</button>
+            <button class="tab-header" data-tab="settings">Settings</button>
+            <button class="tab-header" data-tab="about">About</button>
+        </div>
+
+        <div class="tab-content">
+            <!-- Extraction Tab -->
+            <div class="tab-pane" data-tab="extraction">
+                <h2>Extraction</h2>
+                <p class="tab-placeholder">Extract tubercles and connections from the image.</p>
+                <button type="button" class="btn btn-primary" disabled>Extract Tubercles and Connections</button>
+                <p class="hint">(Coming in Phase 2)</p>
+            </div>
+
+            <!-- Configure Tab -->
+            <div class="tab-pane" data-tab="configure">
+                <h2>Configure</h2>
+                <p class="tab-placeholder">Set extraction parameters.</p>
+                <p class="hint">(Coming in Phase 2)</p>
+            </div>
+
+            <!-- Edit Tab -->
+            <div class="tab-pane" data-tab="edit">
+                <h2>Edit</h2>
+                <p class="tab-placeholder">Manual editing of tubercles and connections.</p>
+                <p class="hint">(Coming in Phase 3)</p>
+            </div>
+
+            <!-- Data Tab -->
+            <div class="tab-pane" data-tab="data">
+                <h2>Data</h2>
+                <p class="tab-placeholder">View tubercle and connection data tables.</p>
+                <p class="hint">(Coming in Phase 2)</p>
+            </div>
+
+            <!-- Log Tab -->
+            <div class="tab-pane active" data-tab="log">
+                <h2>Log</h2>
+                <div class="log-container">
+                    <table class="log-table" id="logTable">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Event</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="tab-pane" data-tab="settings">
+                <h2>Settings</h2>
+                <div class="settings-content">
+                    <div class="settings-section">
+                        <h3>Navigation</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="scrollWheelZoom" checked>
+                                <span>Enable scroll wheel zoom</span>
+                            </label>
+                            <p class="setting-hint">When disabled, use the zoom buttons or keyboard shortcuts (+/-) instead.</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Display</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="showOverlayGrid" disabled>
+                                <span>Show overlay grid</span>
+                            </label>
+                            <p class="setting-hint">(Coming soon)</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button type="button" class="btn btn-secondary" id="resetSettingsBtn">Reset to Defaults</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- About Tab -->
+            <div class="tab-pane" data-tab="about">
+                <h2>About</h2>
+                <div class="about-content">
+                    <h3>Fish Scale Measurement</h3>
+                    <p>Tubercle diameter and intertubercular space extraction from SEM images of ganoid fish scales.</p>
+
+                    <table class="about-table">
+                        <tr>
+                            <td>Application Version</td>
+                            <td>{{ version_info.app_version }}</td>
+                        </tr>
+                        <tr>
+                            <td>Python Version</td>
+                            <td>{{ version_info.python_version }}</td>
+                        </tr>
+                        <tr>
+                            <td>NumPy</td>
+                            <td>{{ version_info.numpy_version }}</td>
+                        </tr>
+                        <tr>
+                            <td>SciPy</td>
+                            <td>{{ version_info.scipy_version }}</td>
+                        </tr>
+                        <tr>
+                            <td>scikit-image</td>
+                            <td>{{ version_info.skimage_version }}</td>
+                        </tr>
+                        <tr>
+                            <td>Flask</td>
+                            <td>{{ version_info.flask_version }}</td>
+                        </tr>
+                        <tr>
+                            <td>Git Commit</td>
+                            <td>{{ version_info.git_hash }}</td>
+                        </tr>
+                        <tr>
+                            <td>Build Date</td>
+                            <td>{{ version_info.git_date }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calibration Section -->
+        <div class="calibration-section">
+            <h3>Calibration</h3>
+            <div class="calibration-display">
+                <span id="calibrationValue">Not set</span>
+                <span id="calibrationWarning" class="warning-badge" style="display: none;">Auto-estimated</span>
+            </div>
+
+            <div class="calibration-controls">
+                <div class="calibration-method">
+                    <label>Scale bar measurement:</label>
+                    <div class="calibration-inputs">
+                        <input type="number" id="scaleUm" placeholder="µm" min="0" step="0.1">
+                        <span>=</span>
+                        <input type="number" id="scalePx" placeholder="pixels" min="1" step="1">
+                        <button type="button" class="btn btn-sm" id="applyCalibrationBtn">Apply</button>
+                    </div>
+                </div>
+
+                <div class="calibration-method">
+                    <label>Or measure on image:</label>
+                    <button type="button" class="btn btn-sm" id="measureScaleBtn">Draw Scale Bar</button>
+                    <span id="measureStatus" class="measure-status"></span>
+                </div>
+
+                <div class="calibration-method">
+                    <label>Direct input:</label>
+                    <div class="calibration-inputs">
+                        <input type="number" id="umPerPx" placeholder="µm/pixel" min="0" step="0.001">
+                        <button type="button" class="btn btn-sm" id="applyDirectBtn">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for prompts -->
+<div class="modal-overlay" id="modalOverlay" style="display: none;">
+    <div class="modal" id="modal">
+        <div class="modal-header" id="modalHeader">Prompt</div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer" id="modalFooter"></div>
+    </div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container" id="toastContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+<script src="{{ url_for('static', filename='js/image.js') }}"></script>
+<script src="{{ url_for('static', filename='js/calibration.js') }}"></script>
+<script>
+    // Initialize workspace when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get image URL from query params
+        const params = new URLSearchParams(window.location.search);
+        const imgUrl = params.get('img');
+
+        if (imgUrl) {
+            window.imageViewer.loadImage(imgUrl);
+        }
+
+        // Load initial log
+        window.app.loadLog();
+    });
+</script>
+{% endblock %}

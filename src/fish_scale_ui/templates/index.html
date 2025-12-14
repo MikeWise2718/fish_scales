@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Fish Scale Measurement - Load Image{% endblock %}
+
+{% block content %}
+<div class="loading-screen">
+    <div class="loading-container">
+        <h1>Fish Scale Measurement</h1>
+        <p class="subtitle">Tubercle diameter and intertubercular space extraction from SEM images</p>
+
+        <div class="upload-zone" id="dropZone">
+            <div class="upload-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+            </div>
+            <p class="upload-text">Drag and drop an image here</p>
+            <p class="upload-or">or</p>
+            <button type="button" class="btn btn-primary" id="browseBtn">Browse Files</button>
+            <input type="file" id="fileInput" accept=".tif,.tiff,.jpeg,.jpg,.png" hidden>
+            <p class="upload-formats">Supported formats: TIF, TIFF, JPEG, JPG, PNG</p>
+        </div>
+
+        {% if recent_images %}
+        <div class="recent-images">
+            <h2>Recent Images</h2>
+            <ul class="recent-list">
+                {% for img in recent_images %}
+                <li class="recent-item" data-path="{{ img.path }}">
+                    <span class="recent-filename">{{ img.filename }}</span>
+                    <span class="recent-date">{{ img.opened_at[:10] }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <span>Loading image...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const browseBtn = document.getElementById('browseBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+
+    function showError(msg) {
+        errorMessage.textContent = msg;
+        errorMessage.style.display = 'block';
+        setTimeout(() => { errorMessage.style.display = 'none'; }, 5000);
+    }
+
+    function showLoading(show) {
+        loadingIndicator.style.display = show ? 'flex' : 'none';
+    }
+
+    function uploadFile(file) {
+        showLoading(true);
+        errorMessage.style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            showLoading(false);
+            if (data.error) {
+                showError(data.error);
+            } else {
+                window.location.href = '/workspace?img=' + encodeURIComponent(data.url);
+            }
+        })
+        .catch(err => {
+            showLoading(false);
+            showError('Failed to upload image: ' + err.message);
+        });
+    }
+
+    function loadRecent(path) {
+        showLoading(true);
+        errorMessage.style.display = 'none';
+
+        fetch('/api/load-recent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: path })
+        })
+        .then(response => response.json())
+        .then(data => {
+            showLoading(false);
+            if (data.error) {
+                showError(data.error);
+            } else {
+                window.location.href = '/workspace?img=' + encodeURIComponent(data.url);
+            }
+        })
+        .catch(err => {
+            showLoading(false);
+            showError('Failed to load image: ' + err.message);
+        });
+    }
+
+    // Browse button click
+    browseBtn.addEventListener('click', () => fileInput.click());
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            uploadFile(e.target.files[0]);
+        }
+    });
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            uploadFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    // Recent images click
+    document.querySelectorAll('.recent-item').forEach(item => {
+        item.addEventListener('click', () => {
+            loadRecent(item.dataset.path);
+        });
+    });
+})();
+</script>
+{% endblock %}

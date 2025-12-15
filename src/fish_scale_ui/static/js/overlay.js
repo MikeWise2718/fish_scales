@@ -128,12 +128,25 @@ window.overlay = (function() {
         render();
     }
 
-    // Set data
+    // Set data (preserves selection if selected item still exists)
     function setData(newTubercles, newEdges) {
         tubercles = newTubercles || [];
         edges = newEdges || [];
-        selectedTubId = null;
-        selectedEdgeIdx = null;
+
+        // Preserve selection only if the selected item still exists in new data
+        if (selectedTubId !== null) {
+            const stillExists = tubercles.some(t => t.id === selectedTubId);
+            if (!stillExists) {
+                selectedTubId = null;
+            }
+        }
+        if (selectedEdgeIdx !== null) {
+            // Edge index may have changed, so clear it if out of bounds
+            if (selectedEdgeIdx >= edges.length) {
+                selectedEdgeIdx = null;
+            }
+        }
+
         render();
     }
 
@@ -370,7 +383,7 @@ window.overlay = (function() {
             return;
         }
 
-        // Check for tubercle click (closest center) - only if tubes are visible
+        // Check for both tubercle and edge clicks, select whichever is closer
         let closestTub = null;
         let closestTubDist = Infinity;
 
@@ -387,11 +400,6 @@ window.overlay = (function() {
             });
         }
 
-        if (closestTub) {
-            selectTubercle(closestTub.id);
-            return;
-        }
-
         // Check for edge click (within threshold of line) - only if links are visible
         const clickThreshold = 10;
         let closestEdge = null;
@@ -405,6 +413,28 @@ window.overlay = (function() {
                     closestEdge = idx;
                 }
             });
+        }
+
+        // Select whichever is more appropriate
+        if (closestTub && closestEdge !== null) {
+            // Both are valid - if click is inside the tubercle radius, prefer tubercle
+            // Only prefer edge if click is outside the tubercle but within the extended hit area
+            if (closestTubDist <= closestTub.radius_px) {
+                // Click is inside tubercle - select tubercle
+                selectTubercle(closestTub.id);
+            } else if (closestEdgeDist < closestTubDist * 0.5) {
+                // Click is outside tubercle but much closer to edge - select edge
+                selectEdge(closestEdge);
+            } else {
+                // Default to tubercle
+                selectTubercle(closestTub.id);
+            }
+            return;
+        }
+
+        if (closestTub) {
+            selectTubercle(closestTub.id);
+            return;
         }
 
         if (closestEdge !== null) {

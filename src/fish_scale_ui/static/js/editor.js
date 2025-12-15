@@ -10,6 +10,8 @@ window.editor = (function() {
         ADD_TUB: 'add_tub',
         ADD_ITC: 'add_itc',
         MOVE: 'move',
+        DELETE_MULTI_TUB: 'delete_multi_tub',
+        DELETE_MULTI_ITC: 'delete_multi_itc',
     };
 
     // Current state
@@ -74,11 +76,13 @@ window.editor = (function() {
         updateModeUI();
 
         // Auto-enable toggles if needed
-        if (mode === EditMode.ADD_TUB || mode === EditMode.MOVE) {
+        if (mode === EditMode.ADD_TUB || mode === EditMode.MOVE || mode === EditMode.DELETE_MULTI_TUB) {
             ensureTubesVisible();
-        } else if (mode === EditMode.ADD_ITC) {
+        } else if (mode === EditMode.ADD_ITC || mode === EditMode.DELETE_MULTI_ITC) {
             ensureLinksVisible();
-            ensureTubesVisible(); // Need to see tubes to click them
+            if (mode === EditMode.ADD_ITC) {
+                ensureTubesVisible(); // Need to see tubes to click them
+            }
         }
 
         // Update cursor
@@ -153,6 +157,8 @@ window.editor = (function() {
         const addTubBtn = document.getElementById('addTubBtn');
         const addItcBtn = document.getElementById('addItcBtn');
         const moveBtn = document.getElementById('moveBtn');
+        const deleteMultipleTubBtn = document.getElementById('deleteMultipleTubBtn');
+        const deleteMultipleItcBtn = document.getElementById('deleteMultipleItcBtn');
 
         if (addTubBtn) {
             addTubBtn.classList.toggle('active', currentMode === EditMode.ADD_TUB);
@@ -162,6 +168,12 @@ window.editor = (function() {
         }
         if (moveBtn) {
             moveBtn.classList.toggle('active', currentMode === EditMode.MOVE);
+        }
+        if (deleteMultipleTubBtn) {
+            deleteMultipleTubBtn.classList.toggle('active', currentMode === EditMode.DELETE_MULTI_TUB);
+        }
+        if (deleteMultipleItcBtn) {
+            deleteMultipleItcBtn.classList.toggle('active', currentMode === EditMode.DELETE_MULTI_ITC);
         }
 
         // Update status
@@ -178,6 +190,12 @@ window.editor = (function() {
                     break;
                 case EditMode.MOVE:
                     statusEl.textContent = 'Click destination to move selected tubercle';
+                    break;
+                case EditMode.DELETE_MULTI_TUB:
+                    statusEl.textContent = 'Click tubercles to delete them';
+                    break;
+                case EditMode.DELETE_MULTI_ITC:
+                    statusEl.textContent = 'Click connections to delete them';
                     break;
                 default:
                     statusEl.textContent = '';
@@ -202,6 +220,10 @@ window.editor = (function() {
             case EditMode.MOVE:
                 container.style.cursor = 'move';
                 break;
+            case EditMode.DELETE_MULTI_TUB:
+            case EditMode.DELETE_MULTI_ITC:
+                container.style.cursor = 'crosshair';
+                break;
             default:
                 container.style.cursor = '';
         }
@@ -221,7 +243,85 @@ window.editor = (function() {
             case EditMode.MOVE:
                 handleMoveClick(x, y);
                 break;
+            case EditMode.DELETE_MULTI_TUB:
+                handleDeleteMultiTubClick(x, y);
+                break;
+            case EditMode.DELETE_MULTI_ITC:
+                handleDeleteMultiItcClick(x, y);
+                break;
         }
+    }
+
+    /**
+     * Handle click for delete multiple tubercles mode
+     */
+    function handleDeleteMultiTubClick(x, y) {
+        const clickedTub = findTubercleAt(x, y);
+        if (clickedTub) {
+            deleteTubercle(clickedTub.id, true); // Skip confirmation
+        }
+    }
+
+    /**
+     * Handle click for delete multiple connections mode
+     */
+    function handleDeleteMultiItcClick(x, y) {
+        const clickedEdge = findEdgeAt(x, y);
+        if (clickedEdge) {
+            deleteEdge(clickedEdge, true); // Skip confirmation
+        }
+    }
+
+    /**
+     * Find edge at position
+     */
+    function findEdgeAt(x, y) {
+        const clickThreshold = 10;
+        let closestEdge = null;
+        let closestDist = Infinity;
+
+        edges.forEach(edge => {
+            const dist = pointToLineDistance(x, y, edge.x1, edge.y1, edge.x2, edge.y2);
+            if (dist < clickThreshold && dist < closestDist) {
+                closestDist = dist;
+                closestEdge = edge;
+            }
+        });
+
+        return closestEdge;
+    }
+
+    /**
+     * Distance from point to line segment
+     */
+    function pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+
+        if (lenSq !== 0) param = dot / lenSq;
+
+        let xx, yy;
+
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     /**
@@ -353,7 +453,7 @@ window.editor = (function() {
         }
 
         moveTubercle(selectedTub.id, x, y);
-        setMode(EditMode.NONE);
+        // Stay in Move mode for moving multiple tubercles
     }
 
     /**
@@ -921,6 +1021,27 @@ window.editor = (function() {
     }
 
     /**
+     * Update delete multiple buttons enabled state
+     */
+    function updateDeleteMultipleButtons(enabled) {
+        const deleteMultipleTubBtn = document.getElementById('deleteMultipleTubBtn');
+        const deleteMultipleItcBtn = document.getElementById('deleteMultipleItcBtn');
+
+        if (deleteMultipleTubBtn) {
+            deleteMultipleTubBtn.disabled = !enabled;
+            if (!enabled && currentMode === EditMode.DELETE_MULTI_TUB) {
+                setMode(EditMode.NONE);
+            }
+        }
+        if (deleteMultipleItcBtn) {
+            deleteMultipleItcBtn.disabled = !enabled;
+            if (!enabled && currentMode === EditMode.DELETE_MULTI_ITC) {
+                setMode(EditMode.NONE);
+            }
+        }
+    }
+
+    /**
      * Initialize
      */
     function init() {
@@ -978,9 +1099,46 @@ window.editor = (function() {
             });
         }
 
-        const deleteBtn = document.getElementById('deleteBtn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', deleteSelected);
+        const deleteTubBtn = document.getElementById('deleteTubBtn');
+        if (deleteTubBtn) {
+            deleteTubBtn.addEventListener('click', () => {
+                const selectedTub = window.overlay?.getSelectedTubercle();
+                if (selectedTub) {
+                    deleteTubercle(selectedTub.id);
+                }
+            });
+        }
+
+        const deleteItcBtn = document.getElementById('deleteItcBtn');
+        if (deleteItcBtn) {
+            deleteItcBtn.addEventListener('click', () => {
+                const selectedEdge = window.overlay?.getSelectedEdge();
+                if (selectedEdge) {
+                    deleteEdge(selectedEdge);
+                }
+            });
+        }
+
+        const deleteMultipleTubBtn = document.getElementById('deleteMultipleTubBtn');
+        if (deleteMultipleTubBtn) {
+            deleteMultipleTubBtn.addEventListener('click', () => {
+                if (currentMode === EditMode.DELETE_MULTI_TUB) {
+                    setMode(EditMode.NONE);
+                } else {
+                    setMode(EditMode.DELETE_MULTI_TUB);
+                }
+            });
+        }
+
+        const deleteMultipleItcBtn = document.getElementById('deleteMultipleItcBtn');
+        if (deleteMultipleItcBtn) {
+            deleteMultipleItcBtn.addEventListener('click', () => {
+                if (currentMode === EditMode.DELETE_MULTI_ITC) {
+                    setMode(EditMode.NONE);
+                } else {
+                    setMode(EditMode.DELETE_MULTI_ITC);
+                }
+            });
         }
 
         const undoBtn = document.getElementById('undoBtn');
@@ -1019,8 +1177,12 @@ window.editor = (function() {
         if (allowDeleteCheck) {
             allowDeleteCheck.addEventListener('change', (e) => {
                 setAllowDeleteWithoutConfirm(e.target.checked);
+                updateDeleteMultipleButtons(e.target.checked);
             });
         }
+
+        // Initialize delete multiple buttons state
+        updateDeleteMultipleButtons(false);
 
         // Update radius slider when selection changes
         document.addEventListener('tubercleSelected', (e) => {
@@ -1047,18 +1209,30 @@ window.editor = (function() {
     function updateSelectionUI() {
         const selectedTub = window.overlay?.getSelectedTubercle();
         const selectedEdge = window.overlay?.getSelectedEdge();
-        const hasSelection = selectedTub || selectedEdge;
 
         // Enable/disable buttons based on selection
-        const deleteBtn = document.getElementById('deleteBtn');
         const moveBtn = document.getElementById('moveBtn');
-        const radiusControls = document.getElementById('radiusControls');
+        const deleteTubBtn = document.getElementById('deleteTubBtn');
+        const deleteItcBtn = document.getElementById('deleteItcBtn');
 
-        if (deleteBtn) deleteBtn.disabled = !hasSelection;
         if (moveBtn) moveBtn.disabled = !selectedTub;
-        if (radiusControls) {
-            radiusControls.style.display = selectedTub ? 'flex' : 'none';
-        }
+        if (deleteTubBtn) deleteTubBtn.disabled = !selectedTub;
+        if (deleteItcBtn) deleteItcBtn.disabled = !selectedEdge;
+
+        // Enable/disable radius controls (always visible, but disabled when no tubercle selected)
+        const radiusSlider = document.getElementById('radiusSlider');
+        const radiusIncBtn = document.getElementById('radiusIncBtn');
+        const radiusDecBtn = document.getElementById('radiusDecBtn');
+        const radiusHintSelect = document.getElementById('radiusHintSelect');
+        const radiusHintUsage = document.getElementById('radiusHintUsage');
+
+        if (radiusSlider) radiusSlider.disabled = !selectedTub;
+        if (radiusIncBtn) radiusIncBtn.disabled = !selectedTub;
+        if (radiusDecBtn) radiusDecBtn.disabled = !selectedTub;
+
+        // Toggle hint messages
+        if (radiusHintSelect) radiusHintSelect.style.display = selectedTub ? 'none' : 'block';
+        if (radiusHintUsage) radiusHintUsage.style.display = selectedTub ? 'block' : 'none';
     }
 
     // Initialize on DOM ready

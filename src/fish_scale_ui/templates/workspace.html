@@ -160,7 +160,17 @@
                     </div>
                 </div>
 
-                <div class="calibration-section-header">Numerical Scale Specification</div>
+                <div class="calibration-section-header">Automatic Scale Specification</div>
+
+                <div class="calibration-method-section">
+                    <h3>Auto-Estimate</h3>
+                    <p class="hint">Use estimated calibration based on 700x magnification (~0.14 µm/pixel).</p>
+                    <div class="estimate-controls">
+                        <button type="button" class="btn btn-secondary" id="applyEstimateBtn">Apply Estimate</button>
+                    </div>
+                </div>
+
+                <div class="calibration-section-header">Manual Scale Specification</div>
 
                 <div class="calibration-method-section">
                     <h3>Scale Bar Measurement</h3>
@@ -190,16 +200,6 @@
                     <div class="measure-controls">
                         <button type="button" class="btn btn-secondary" id="measureScaleBtn">Manually Draw Scale Bar</button>
                         <span id="measureStatus" class="measure-status"></span>
-                    </div>
-                </div>
-
-                <div class="calibration-section-header">Automatic Scale Specification</div>
-
-                <div class="calibration-method-section">
-                    <h3>Auto-Estimate</h3>
-                    <p class="hint">Use estimated calibration based on 700x magnification (~0.14 µm/pixel).</p>
-                    <div class="estimate-controls">
-                        <button type="button" class="btn btn-secondary" id="applyEstimateBtn">Apply Estimate</button>
                     </div>
                 </div>
             </div>
@@ -377,7 +377,7 @@
                 </div>
 
                 <div class="edit-section">
-                    <h3>Modify</h3>
+                    <h3>Modify Tubercle</h3>
                     <div class="edit-buttons">
                         <button type="button" class="btn btn-secondary" id="moveBtn" disabled title="Move selected tubercle">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -390,26 +390,54 @@
                             </svg>
                             Move
                         </button>
-                        <button type="button" class="btn btn-secondary btn-danger" id="deleteBtn" disabled title="Delete selected item (Del)">
+                        <button type="button" class="btn btn-secondary btn-danger" id="deleteTubBtn" disabled title="Delete selected tubercle (Del)">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                             </svg>
-                            Delete
+                            Delete Selected
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-danger" id="deleteMultipleTubBtn" disabled title="Click tubercles to delete them (requires 'Allow delete without confirmation')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Delete Multiple
                         </button>
                     </div>
                 </div>
 
-                <div class="edit-section" id="radiusControls" style="display: none;">
+                <div class="edit-section">
+                    <h3>Modify Connection</h3>
+                    <div class="edit-buttons">
+                        <button type="button" class="btn btn-secondary btn-danger" id="deleteItcBtn" disabled title="Delete selected connection (Del)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Delete Selected
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-danger" id="deleteMultipleItcBtn" disabled title="Click connections to delete them (requires 'Allow delete without confirmation')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Delete Multiple
+                        </button>
+                    </div>
+                </div>
+
+                <div class="edit-section" id="radiusControls">
                     <h3>Radius Adjustment</h3>
-                    <div class="radius-controls">
-                        <button type="button" class="btn btn-icon btn-sm" id="radiusDecBtn" title="Decrease radius">
+                    <p class="hint" id="radiusHintSelect">Select a tubercle to resize</p>
+                    <div class="radius-controls" id="radiusControlsInner">
+                        <button type="button" class="btn btn-icon btn-sm" id="radiusDecBtn" title="Decrease radius" disabled>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
                         </button>
-                        <input type="range" id="radiusSlider" min="2" max="50" step="0.5" value="10">
-                        <button type="button" class="btn btn-icon btn-sm" id="radiusIncBtn" title="Increase radius">
+                        <input type="range" id="radiusSlider" min="2" max="50" step="0.5" value="10" disabled>
+                        <button type="button" class="btn btn-icon btn-sm" id="radiusIncBtn" title="Increase radius" disabled>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"/>
                                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -417,7 +445,7 @@
                         </button>
                         <span id="radiusValue" class="radius-value">10.0px</span>
                     </div>
-                    <p class="hint">Use slider or +/- buttons. Arrow keys nudge by 1px.</p>
+                    <p class="hint" id="radiusHintUsage" style="display: none;">Use slider or +/- buttons. Arrow keys nudge by 1px.</p>
                 </div>
 
                 <div class="edit-section">

@@ -1341,6 +1341,16 @@ body {
     text-align: right;
 }
 
+.radius-controls input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.radius-controls button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Edit Status */
 .edit-status-section {
     margin-top: 1rem;

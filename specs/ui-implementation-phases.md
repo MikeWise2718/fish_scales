@@ -585,7 +585,7 @@ uv run fish-scale-ui --no-browser
 - [ ] Panel resizer allows expanding tabs panel beyond 600px
 - [ ] Save SLO button works in Image tab
 - [ ] Calibration tab is second tab
-- [ ] Calibration tab has three section headers (Numerical, Graphical, Automatic)
+- [x] Calibration tab has three section headers (Automatic, Manual, Graphical)
 - [ ] Section headers have larger font than regular headers
 - [ ] All calibration methods work in Calibration tab
 - [ ] "Manually Draw Scale Bar" button text updated
@@ -715,3 +715,57 @@ All Phase 3 components have been implemented:
 - [x] Statistics update after each edit
 - [x] Log entries for edit operations
 - [x] Table/overlay selection sync during editing
+
+---
+
+## Post-Implementation Tweaks
+
+Small improvements and bug fixes made after initial phase completion.
+
+### Tweak 1: Preserve Selection During Resize (2025-12-15)
+**Issue:** Clicking +/- buttons to resize a tubercle caused the tubercle to become deselected.
+**Cause:** `overlay.setData()` unconditionally cleared selection state.
+**Fix:** Modified `setData()` in `overlay.js` to preserve selection if the selected item still exists in the new data.
+
+### Tweak 2: Radius Controls Always Visible (2025-12-15)
+**Issue:** Radius Adjustment controls were hidden when no tubercle was selected, making the feature hard to discover.
+**Fix:**
+- Controls are now always visible but disabled when no tubercle is selected
+- Shows "Select a tubercle to resize" hint when disabled
+- Disabled controls have reduced opacity (40%) and `not-allowed` cursor
+
+### Tweak 3: Move Mode Persistence (2025-12-15)
+**Issue:** Move mode was deselected after each move operation, requiring user to click Move button again.
+**Fix:** Move mode now stays active after completing a move, allowing multiple tubercles to be moved in succession. Mode only exits when:
+- User clicks Move button again to toggle off
+- User selects a different mode (Add Tubercle, Add Connection)
+- User presses Escape
+- User leaves the Edit tab
+
+### Tweak 4: Calibration Section Reorder (2025-12-15)
+**Issue:** Calibration methods were ordered Numerical, Graphical, Automatic - but Automatic is most commonly used.
+**Fix:** Reordered to: Automatic, Manual (renamed from Numerical), Graphical.
+
+### Tweak 5: Separate Delete Buttons (2025-12-15)
+**Issue:** Single "Delete" button was confusing - unclear what would be deleted.
+**Fix:**
+- Split into two buttons: "Delete Tubercle" and "Delete Connection"
+- Each button only enabled when the corresponding item type is selected
+- Reorganized Edit tab sections: "Modify Tubercle" (Move, Delete Tubercle) and "Modify Connection" (Delete Connection)
+- Keyboard Delete key still works on whatever is selected
+
+### Tweak 6: Improved Selection Priority (2025-12-15)
+**Issue:** When clicking near both a tubercle and a connection, tubercle always won, making it hard to select connections.
+**Fix:** Now compares distances to both:
+- Click inside tubercle radius → always select tubercle
+- Click outside tubercle but edge is much closer (< 50% of tubercle distance) → select edge
+- Otherwise → select tubercle
+
+### Tweak 7: Separate Delete Buttons with Delete Multiple Mode (2025-12-15)
+**Issue:** Single delete button was confusing; needed clearer intentions and faster bulk deletion.
+**Fix:**
+- "Delete Selected" buttons for both Tubercles and Connections (enabled when respective item selected)
+- "Delete Multiple" buttons for both (only enabled when "Allow delete without confirmation" is checked)
+- Delete Multiple mode: click items to delete them immediately without confirmation
+- Status message shows current mode ("Click tubercles to delete them" / "Click connections to delete them")
+- Mode auto-exits if checkbox is unchecked while in delete multiple mode

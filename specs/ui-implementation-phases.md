@@ -769,3 +769,11 @@ Small improvements and bug fixes made after initial phase completion.
 - Delete Multiple mode: click items to delete them immediately without confirmation
 - Status message shows current mode ("Click tubercles to delete them" / "Click connections to delete them")
 - Mode auto-exits if checkbox is unchecked while in delete multiple mode
+
+### Tweak 8: Always-Visible Statistics Bar (2025-12-15)
+**Issue:** Statistics were only visible in the Data tab, requiring tab switching to see counts/measurements.
+**Fix:**
+- Added compact statistics bar below overlay toggles in image panel
+- Shows: TUB count, Mean Diameter ± std, ITC count, Mean Space ± std
+- Updates in real-time when data changes (extraction, edits)
+- Dark theme to match image panel background

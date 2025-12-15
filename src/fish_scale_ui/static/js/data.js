@@ -105,15 +105,38 @@ window.data = (function() {
         document.getElementById('statNTubercles').textContent = stats.n_tubercles ?? '-';
         document.getElementById('statMeanDiameter').textContent =
             stats.mean_diameter_um !== undefined
-                ? `${stats.mean_diameter_um.toFixed(2)} +/- ${stats.std_diameter_um?.toFixed(2) || '0.00'}`
+                ? `${stats.mean_diameter_um.toFixed(2)} ± ${stats.std_diameter_um?.toFixed(2) || '0.00'}`
                 : '-';
         document.getElementById('statNEdges').textContent = stats.n_edges ?? '-';
         document.getElementById('statMeanSpace').textContent =
             stats.mean_space_um !== undefined
-                ? `${stats.mean_space_um.toFixed(2)} +/- ${stats.std_space_um?.toFixed(2) || '0.00'}`
+                ? `${stats.mean_space_um.toFixed(2)} ± ${stats.std_space_um?.toFixed(2) || '0.00'}`
                 : '-';
         document.getElementById('statGenus').textContent = stats.suggested_genus ?? '-';
         document.getElementById('statConfidence').textContent = stats.classification_confidence ?? '-';
+
+        // Also update the always-visible stats bar
+        const statsBarTubercles = document.getElementById('statsBarTubercles');
+        const statsBarDiameter = document.getElementById('statsBarDiameter');
+        const statsBarEdges = document.getElementById('statsBarEdges');
+        const statsBarSpace = document.getElementById('statsBarSpace');
+
+        if (statsBarTubercles) {
+            statsBarTubercles.textContent = stats.n_tubercles ?? '-';
+        }
+        if (statsBarDiameter) {
+            statsBarDiameter.textContent = stats.mean_diameter_um !== undefined
+                ? `${stats.mean_diameter_um.toFixed(2)} ± ${stats.std_diameter_um?.toFixed(2) || '0.00'}`
+                : '-';
+        }
+        if (statsBarEdges) {
+            statsBarEdges.textContent = stats.n_edges ?? '-';
+        }
+        if (statsBarSpace) {
+            statsBarSpace.textContent = stats.mean_space_um !== undefined
+                ? `${stats.mean_space_um.toFixed(2)} ± ${stats.std_space_um?.toFixed(2) || '0.00'}`
+                : '-';
+        }
     }
 
     // Highlight a tubercle row

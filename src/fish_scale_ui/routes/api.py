@@ -18,6 +18,7 @@ _current_image = {
     'filename': None,
     'rotation': 0,
     'calibration': None,
+    'slo_saved': False,  # Track if we've saved SLO this session (skip overwrite warning)
 }
 
 # In-memory storage for extraction results
@@ -110,6 +111,7 @@ def upload_image():
         _current_image['filename'] = file.filename
         _current_image['rotation'] = 0
         _current_image['calibration'] = None
+        _current_image['slo_saved'] = False  # Reset on new image
 
         # Add to recent images
         init_recent_images(current_app.config['APP_ROOT'])
@@ -170,6 +172,7 @@ def load_recent():
         _current_image['filename'] = image_path.name
         _current_image['rotation'] = 0
         _current_image['calibration'] = None
+        _current_image['slo_saved'] = False  # Reset on new image
 
         init_recent_images(current_app.config['APP_ROOT'])
         add_recent_image(str(image_path), image_path.name)
@@ -474,7 +477,14 @@ def save_slo():
                 parameters=parameters,
             )
 
+            # Skip overwrite warning if we've already saved this session
+            if _current_image.get('slo_saved') and result.get('existing_files'):
+                result['existing_files'] = []
+
             if result['success']:
+                # Mark that we've saved this session
+                _current_image['slo_saved'] = True
+
                 # Update server-side cache with active set data
                 active_set = None
                 for s in sets:
@@ -527,7 +537,14 @@ def save_slo():
             parameters=parameters,
         )
 
+        # Skip overwrite warning if we've already saved this session
+        if _current_image.get('slo_saved') and result.get('existing_files'):
+            result['existing_files'] = []
+
         if result['success']:
+            # Mark that we've saved this session
+            _current_image['slo_saved'] = True
+
             # Update server-side cache
             _extraction_data['tubercles'] = tubercles
             _extraction_data['edges'] = edges
@@ -589,6 +606,9 @@ def load_slo():
             # Update calibration if present
             if slo_data.get('calibration'):
                 _current_image['calibration'] = slo_data['calibration']
+
+            # Mark as saved since we loaded existing files
+            _current_image['slo_saved'] = True
 
             log_event('slo_loaded', {
                 'filename': slo_data.get('image_name', 'unknown'),

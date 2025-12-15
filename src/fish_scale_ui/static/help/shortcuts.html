@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keyboard Shortcuts - Fish Scale Measurement</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        h1 { color: var(--primary-color); margin-bottom: 0.5rem; }
+        h2 {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+        a {
+            color: var(--primary-color);
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            background: var(--bg-color);
+            font-weight: 600;
+        }
+        kbd {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            font-family: monospace;
+            font-size: 0.9em;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            box-shadow: 0 1px 0 var(--border-color);
+        }
+        .shortcut-key {
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <a href="javascript:window.close()" class="back-link">Close</a>
+    <h1>Keyboard Shortcuts</h1>
+    <p>Quick reference for all keyboard shortcuts in the Fish Scale Measurement UI.</p>
+
+    <h2 id="general">General</h2>
+    <div class="section">
+        <table>
+            <tr>
+                <th style="width: 150px;">Shortcut</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>F1</kbd> or <kbd>?</kbd></td>
+                <td>Open this keyboard shortcuts help</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+                <td>Save all sets to SLO file</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2 id="sets">Set Management</h2>
+    <div class="section">
+        <table>
+            <tr>
+                <th style="width: 150px;">Shortcut</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Ctrl</kbd> + <kbd>N</kbd></td>
+                <td>Create a new annotation set</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Ctrl</kbd> + <kbd>1</kbd>-<kbd>9</kbd></td>
+                <td>Switch to set 1 through 9</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2 id="editing">Editing</h2>
+    <div class="section">
+        <table>
+            <tr>
+                <th style="width: 150px;">Shortcut</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Ctrl</kbd> + <kbd>Z</kbd></td>
+                <td>Undo last edit operation</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Ctrl</kbd> + <kbd>Y</kbd></td>
+                <td>Redo last undone operation</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Delete</kbd></td>
+                <td>Delete selected tubercle or connection</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Escape</kbd></td>
+                <td>Cancel current operation / Deselect</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>Tab</kbd></td>
+                <td>Cycle through tubercle selection</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2 id="movement">Movement & Sizing</h2>
+    <div class="section">
+        <table>
+            <tr>
+                <th style="width: 150px;">Shortcut</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd></td>
+                <td>Nudge selected tubercle by 1 pixel</td>
+            </tr>
+        </table>
+        <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9em;">
+            <strong>Tip:</strong> Use the radius slider or +/- buttons in the Edit tab to resize tubercles.
+        </p>
+    </div>
+
+    <h2 id="zoom">Zoom & Navigation</h2>
+    <div class="section">
+        <table>
+            <tr>
+                <th style="width: 150px;">Shortcut</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>+</kbd> or <kbd>=</kbd></td>
+                <td>Zoom in</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>-</kbd></td>
+                <td>Zoom out</td>
+            </tr>
+            <tr>
+                <td class="shortcut-key"><kbd>0</kbd></td>
+                <td>Zoom to fit image in view</td>
+            </tr>
+        </table>
+        <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9em;">
+            <strong>Tip:</strong> Scroll wheel zoom can be enabled/disabled in Settings.
+            When disabled, use click-and-drag to pan the image.
+        </p>
+    </div>
+
+    <h2 id="mouse">Mouse Actions</h2>
+    <div class="section">
+        <table>
+            <tr>
+                <th style="width: 150px;">Action</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>Click tubercle</td>
+                <td>Select tubercle (highlights in table)</td>
+            </tr>
+            <tr>
+                <td>Click connection</td>
+                <td>Select connection (highlights in table)</td>
+            </tr>
+            <tr>
+                <td>Click table row</td>
+                <td>Select and pan to item on image</td>
+            </tr>
+            <tr>
+                <td>Scroll wheel</td>
+                <td>Zoom in/out (if enabled in Settings)</td>
+            </tr>
+            <tr>
+                <td>Click + drag</td>
+                <td>Pan image (when zoomed)</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2 id="edit-modes">Edit Mode Actions</h2>
+    <div class="section">
+        <p>When an edit mode is active (via buttons in the Edit tab):</p>
+        <table>
+            <tr>
+                <th style="width: 180px;">Mode</th>
+                <th>Mouse Action</th>
+            </tr>
+            <tr>
+                <td><strong>Add Tubercle</strong></td>
+                <td>Click on image to place new tubercle</td>
+            </tr>
+            <tr>
+                <td><strong>Add Connection</strong></td>
+                <td>Click first tubercle, then click second to connect</td>
+            </tr>
+            <tr>
+                <td><strong>Move</strong></td>
+                <td>Click and drag selected tubercle to new position</td>
+            </tr>
+            <tr>
+                <td><strong>Delete Multiple</strong></td>
+                <td>Click items to delete them (no confirmation)</td>
+            </tr>
+        </table>
+        <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9em;">
+            Press <kbd>Escape</kbd> to exit any edit mode.
+        </p>
+    </div>
+</body>
+</html>

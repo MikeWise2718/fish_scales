@@ -430,7 +430,11 @@ def get_extraction_data():
 
 @api_bp.route('/save-slo', methods=['POST'])
 def save_slo():
-    """Save SLO data to files."""
+    """Save SLO data to files.
+
+    Supports both v1 (legacy) and v2 (multiple sets) formats.
+    v2 format includes 'version': 2 and 'sets': [...] in the request.
+    """
     from fish_scale_ui.services.logging import log_event
     from fish_scale_ui.services.persistence import save_slo as persist_slo
 
@@ -439,8 +443,69 @@ def save_slo():
 
     data = request.get_json() or {}
     force = data.get('force', False)
+    version = data.get('version', 1)
 
-    # Use data from request if provided (for manual edits), otherwise use extraction cache
+    # Check for v2 format (multiple sets)
+    if version == 2 and 'sets' in data:
+        sets = data.get('sets', [])
+        activeSetId = data.get('activeSetId')
+        statistics = data.get('statistics', {})
+        parameters = data.get('parameters', {})
+
+        # Count total tubercles across all sets
+        total_tubercles = sum(len(s.get('tubercles', [])) for s in sets)
+        total_edges = sum(len(s.get('edges', [])) for s in sets)
+
+        # Allow saving even with 0 tubercles for v2 (empty sets are valid)
+        if len(sets) == 0:
+            return jsonify({'error': 'No sets to save'}), 400
+
+        slo_dir = current_app.config['APP_ROOT'] / 'slo'
+
+        try:
+            result = persist_slo(
+                slo_dir=slo_dir,
+                image_name=_current_image['filename'],
+                calibration=_current_image.get('calibration', {}),
+                version=2,
+                sets=sets,
+                activeSetId=activeSetId,
+                statistics=statistics,
+                parameters=parameters,
+            )
+
+            if result['success']:
+                # Update server-side cache with active set data
+                active_set = None
+                for s in sets:
+                    if s.get('id') == activeSetId:
+                        active_set = s
+                        break
+                if not active_set and sets:
+                    active_set = sets[0]
+
+                if active_set:
+                    _extraction_data['tubercles'] = active_set.get('tubercles', [])
+                    _extraction_data['edges'] = active_set.get('edges', [])
+                _extraction_data['statistics'] = statistics
+                _extraction_data['parameters'] = parameters
+                _extraction_data['dirty'] = False
+
+                log_event('slo_saved', {
+                    'filename': _current_image['filename'],
+                    'version': 2,
+                    'n_sets': len(sets),
+                    'n_tubercles': total_tubercles,
+                    'n_edges': total_edges,
+                })
+
+            return jsonify(result)
+
+        except Exception as e:
+            log_event('slo_save_failed', {'error': str(e)})
+            return jsonify({'error': f'Save failed: {str(e)}'}), 500
+
+    # V1 format (legacy)
     tubercles = data.get('tubercles', _extraction_data.get('tubercles', []))
     edges = data.get('edges', _extraction_data.get('edges', []))
     statistics = data.get('statistics', _extraction_data.get('statistics', {}))

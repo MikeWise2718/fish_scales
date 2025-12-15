@@ -11,27 +11,37 @@ def save_slo(
     slo_dir: Path,
     image_name: str,
     calibration: dict,
-    tubercles: list,
-    edges: list,
-    statistics: dict,
-    parameters: dict,
+    tubercles: list = None,
+    edges: list = None,
+    statistics: dict = None,
+    parameters: dict = None,
+    version: int = 1,
+    sets: list = None,
+    activeSetId: str = None,
 ) -> dict:
     """
     Save SLO data to files.
 
-    Creates three files:
-    - <image_name>_tub.csv - Tubercle data
-    - <image_name>_itc.csv - Intertubercular connection data
-    - <image_name>_slo.json - Full SLO data including calibration and parameters
+    Supports two formats:
+    - v1 (legacy): Single set with tubercles and edges at root level
+    - v2 (new): Multiple sets with data in sets array
+
+    Creates:
+    - <image_name>_tub.csv - Tubercle data (from active set in v2)
+    - <image_name>_itc.csv - Intertubercular connection data (from active set in v2)
+    - <image_name>_slo.json - Full SLO data
 
     Args:
         slo_dir: Directory to save files to
         image_name: Base name of the image (without extension)
         calibration: Calibration data dict
-        tubercles: List of tubercle dicts
-        edges: List of edge dicts
+        tubercles: List of tubercle dicts (v1 format)
+        edges: List of edge dicts (v1 format)
         statistics: Statistics dict
         parameters: Extraction parameters dict
+        version: SLO format version (1 or 2)
+        sets: List of set dicts (v2 format)
+        activeSetId: ID of the active set (v2 format)
 
     Returns:
         Dict with success status and file paths
@@ -56,34 +66,66 @@ def save_slo(
     if slo_path.exists():
         existing_files.append(str(slo_path.name))
 
-    # Save TUB CSV
+    # Determine the data to write to CSV (active set for v2, or root level for v1)
+    if version == 2 and sets:
+        # Find the active set to export CSVs
+        active_set = None
+        for s in sets:
+            if s.get('id') == activeSetId:
+                active_set = s
+                break
+        if not active_set and sets:
+            active_set = sets[0]
+
+        csv_tubercles = active_set.get('tubercles', []) if active_set else []
+        csv_edges = active_set.get('edges', []) if active_set else []
+    else:
+        csv_tubercles = tubercles or []
+        csv_edges = edges or []
+
+    # Save TUB CSV (from active set)
     with open(tub_path, 'w', newline='', encoding='utf-8') as f:
-        if tubercles:
+        if csv_tubercles:
             writer = csv.DictWriter(f, fieldnames=['id', 'centroid_x', 'centroid_y',
                                                     'diameter_px', 'diameter_um',
                                                     'radius_px', 'circularity'])
             writer.writeheader()
-            writer.writerows(tubercles)
+            writer.writerows(csv_tubercles)
 
-    # Save ITC CSV
+    # Save ITC CSV (from active set)
     with open(itc_path, 'w', newline='', encoding='utf-8') as f:
-        if edges:
+        if csv_edges:
             writer = csv.DictWriter(f, fieldnames=['id1', 'id2', 'x1', 'y1', 'x2', 'y2',
                                                    'center_distance_um', 'edge_distance_um'])
             writer.writeheader()
-            writer.writerows(edges)
+            writer.writerows(csv_edges)
 
-    # Save SLO JSON
-    slo_data = {
-        'version': '1.0',
-        'created': datetime.now().isoformat(),
-        'image_name': image_name,
-        'calibration': calibration,
-        'parameters': parameters,
-        'statistics': statistics,
-        'tubercles': tubercles,
-        'edges': edges,
-    }
+    # Build SLO JSON data
+    if version == 2:
+        # V2 format with multiple sets
+        slo_data = {
+            'version': 2,
+            'created': datetime.now().isoformat(),
+            'image_name': image_name,
+            'calibration': calibration,
+            'parameters': parameters or {},
+            'statistics': statistics or {},
+            'activeSetId': activeSetId,
+            'sets': sets or [],
+        }
+    else:
+        # V1 format (legacy)
+        slo_data = {
+            'version': '1.0',
+            'created': datetime.now().isoformat(),
+            'image_name': image_name,
+            'calibration': calibration,
+            'parameters': parameters or {},
+            'statistics': statistics or {},
+            'tubercles': tubercles or [],
+            'edges': edges or [],
+        }
+
     with open(slo_path, 'w', encoding='utf-8') as f:
         json.dump(slo_data, f, indent=2)
 

@@ -814,6 +814,12 @@ window.editor = (function() {
      * Mark data as dirty (unsaved changes)
      */
     function markDirty() {
+        // Mark the current set as dirty in the sets module
+        window.sets?.markDirty();
+
+        // Sync data to sets module
+        window.sets?.setCurrentData(tubercles, edges);
+
         // The extraction module tracks dirty state
         // We need to manually trigger it
         const indicator = document.getElementById('unsavedIndicator');

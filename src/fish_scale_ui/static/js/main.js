@@ -211,7 +211,32 @@ window.app = (function() {
                 return;
             }
 
+            // Ctrl+N - New set
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                document.getElementById('addSetBtn')?.click();
+                return;
+            }
+
+            // Ctrl+1-9 - Switch to set 1-9
+            if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
+                e.preventDefault();
+                const setIndex = parseInt(e.key) - 1;
+                const setList = window.sets?.getSetList() || [];
+                if (setIndex < setList.length) {
+                    window.sets?.switchSet(setList[setIndex].id);
+                }
+                return;
+            }
+
             // Ctrl+S to save - handled by extraction.js
+
+            // F1 or ? - Open keyboard shortcuts help
+            if (e.key === 'F1' || (e.key === '?' && !e.ctrlKey)) {
+                e.preventDefault();
+                window.open('/static/help/shortcuts.html', 'shortcuts', 'width=800,height=700');
+                return;
+            }
 
             // Arrow keys - nudge selected tubercle
             if (e.key === 'ArrowUp') {

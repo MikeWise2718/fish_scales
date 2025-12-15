@@ -15,6 +15,7 @@
 
         <!-- Statistics bar (always visible, first row under image) -->
         <div class="stats-bar" id="statsBar">
+            <span class="stats-bar-set-name" id="statsBarSetName">Base</span>
             <div class="stats-bar-item">
                 <span class="stats-bar-label">TUB:</span>
                 <span id="statsBarTubercles" class="stats-bar-value">-</span>
@@ -82,6 +83,44 @@
                 <input type="checkbox" id="toggleScale">
                 <span>Scale</span>
             </label>
+        </div>
+
+        <!-- Set selector bar -->
+        <div class="set-selector-bar" id="setSelector">
+            <div class="set-buttons" id="setButtons">
+                <!-- Set buttons will be populated by JavaScript -->
+            </div>
+            <div class="set-actions">
+                <button type="button" class="btn btn-icon btn-sm" id="addSetBtn" title="Create new set (Ctrl+N)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button type="button" class="btn btn-sm" id="saveSetBtn" title="Save all sets (Ctrl+S)" disabled>
+                    Save
+                </button>
+                <button type="button" class="btn btn-icon btn-sm" id="shortcutsHelpBtn" title="Keyboard shortcuts">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="4" width="20" height="16" rx="2"/>
+                        <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h8"/>
+                    </svg>
+                </button>
+                <div class="set-menu-container">
+                    <button type="button" class="btn btn-icon btn-sm" id="setMenuBtn" title="Set management">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
+                    <div class="set-menu-dropdown" id="setMenuDropdown" style="display: none;">
+                        <button class="set-menu-item" id="renameSetBtn">Rename Set...</button>
+                        <button class="set-menu-item" id="duplicateSetBtn">Duplicate Set...</button>
+                        <hr class="set-menu-divider">
+                        <button class="set-menu-item set-menu-danger" id="deleteSetBtn">Delete Set</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -507,11 +546,15 @@
                 <div class="edit-shortcuts">
                     <h3>Keyboard Shortcuts</h3>
                     <table class="shortcuts-table">
+                        <tr><td><kbd>F1</kbd> or <kbd>?</kbd></td><td>Show all shortcuts</td></tr>
                         <tr><td><kbd>Delete</kbd></td><td>Delete selected</td></tr>
                         <tr><td><kbd>Escape</kbd></td><td>Cancel / Deselect</td></tr>
                         <tr><td><kbd>Tab</kbd></td><td>Cycle selection</td></tr>
                         <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td></tr>
                         <tr><td><kbd>Ctrl+Y</kbd></td><td>Redo</td></tr>
+                        <tr><td><kbd>Ctrl+S</kbd></td><td>Save SLO</td></tr>
+                        <tr><td><kbd>Ctrl+N</kbd></td><td>New set</td></tr>
+                        <tr><td><kbd>Ctrl+1-9</kbd></td><td>Switch to set</td></tr>
                         <tr><td><kbd>Arrow keys</kbd></td><td>Nudge 1px</td></tr>
                     </table>
                 </div>
@@ -801,6 +844,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sets.js') }}"></script>
 <script src="{{ url_for('static', filename='js/image.js') }}"></script>
 <script src="{{ url_for('static', filename='js/calibration.js') }}"></script>
 <script src="{{ url_for('static', filename='js/configure.js') }}"></script>
@@ -809,6 +853,7 @@
 <script src="{{ url_for('static', filename='js/undo.js') }}"></script>
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/extraction.js') }}"></script>
+<script src="{{ url_for('static', filename='js/setUI.js') }}"></script>
 <script>
     // Initialize workspace when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {

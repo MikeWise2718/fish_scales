@@ -4,9 +4,8 @@
 
 window.extraction = (function() {
     let isExtracting = false;
-    let isDirty = false;
-    let currentTubercles = [];
-    let currentEdges = [];
+    // Note: isDirty state is now managed by sets module
+    // currentTubercles/currentEdges are now stored in sets module
 
     // Run extraction
     async function runExtraction() {
@@ -39,9 +38,8 @@ window.extraction = (function() {
                 return;
             }
 
-            // Store current data
-            currentTubercles = result.tubercles;
-            currentEdges = result.edges;
+            // Store data in sets module
+            window.sets.setCurrentData(result.tubercles, result.edges);
 
             // Update overlay
             if (window.overlay) {
@@ -58,18 +56,16 @@ window.extraction = (function() {
                 window.editor.setData(result.tubercles, result.edges);
             }
 
-            // Clear undo history on new extraction
-            if (window.undoManager) {
-                window.undoManager.clear();
-            }
+            // Clear undo/redo for current set
+            window.sets.clearUndoRedo();
 
             // Mark params as extracted
             if (window.configure) {
                 window.configure.markExtracted(result.parameters);
             }
 
-            // Update dirty state
-            isDirty = true;
+            // Mark set as dirty
+            window.sets.markDirty();
             updateDirtyIndicator();
 
             // Dispatch event for editor
@@ -99,11 +95,11 @@ window.extraction = (function() {
         }
     }
 
-    // Save SLO
+    // Save SLO (v2 format with multiple sets)
     async function saveSlo(force = false) {
         try {
-            // Get current data from editor (includes any manual edits)
-            const editorData = window.editor?.getData() || {};
+            // Get all sets data for v2 format
+            const setsData = window.sets.exportForSave();
             const statistics = window.data?.getStatistics() || {};
 
             const response = await fetch('/api/save-slo', {
@@ -111,8 +107,8 @@ window.extraction = (function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     force,
-                    tubercles: editorData.tubercles || currentTubercles,
-                    edges: editorData.edges || currentEdges,
+                    version: 2,
+                    ...setsData,
                     statistics,
                 }),
             });
@@ -133,7 +129,8 @@ window.extraction = (function() {
                 return false;
             }
 
-            isDirty = false;
+            // Mark all sets as clean
+            window.sets.markAllClean();
             updateDirtyIndicator();
             window.app.showToast('SLO saved successfully', 'success');
             window.app.loadLog();
@@ -146,7 +143,7 @@ window.extraction = (function() {
         }
     }
 
-    // Load SLO
+    // Load SLO (supports both v1 and v2 formats)
     async function loadSlo(path = null) {
         try {
             const response = await fetch('/api/load-slo', {
@@ -159,7 +156,8 @@ window.extraction = (function() {
 
             if (result.error) {
                 if (result.error.includes('not found')) {
-                    // No existing SLO - that's OK
+                    // No existing SLO - that's OK, initialize with default set
+                    window.sets.init();
                     return false;
                 }
                 window.app.showToast(result.error, 'error');
@@ -171,14 +169,31 @@ window.extraction = (function() {
                 window.app.showToast('Warning: SLO was saved for a different image', 'warning');
             }
 
+            // Check for v2 format (has sets array)
+            if (result.data?.version === 2 && result.data?.sets) {
+                // V2 format - load multiple sets
+                window.sets.importFromLoad(result.data);
+            } else if (result.data?.tubercles) {
+                // V1 format - convert to single set
+                window.sets.importFromV1(result.data.tubercles, result.data.edges || []);
+            } else {
+                // Empty or invalid - initialize fresh
+                window.sets.init();
+            }
+
+            // Get current set data
+            const currentSet = window.sets.getCurrentSet();
+
             // Update overlay
-            if (window.overlay && result.data) {
-                window.overlay.setData(result.data.tubercles, result.data.edges);
+            if (window.overlay && currentSet) {
+                window.overlay.setData(currentSet.tubercles, currentSet.edges);
             }
 
             // Update data tables
-            if (window.data && result.data) {
-                window.data.setData(result.data.tubercles, result.data.edges, result.data.statistics);
+            if (window.data && currentSet) {
+                // Calculate statistics from current set
+                const stats = calculateStatistics(currentSet.tubercles, currentSet.edges);
+                window.data.setData(currentSet.tubercles, currentSet.edges, stats);
             }
 
             // Update calibration display
@@ -187,16 +202,10 @@ window.extraction = (function() {
             }
 
             // Update editor with loaded data
-            if (window.editor && result.data) {
-                window.editor.setData(result.data.tubercles, result.data.edges);
+            if (window.editor && currentSet) {
+                window.editor.setData(currentSet.tubercles, currentSet.edges);
             }
 
-            // Clear undo history on load
-            if (window.undoManager) {
-                window.undoManager.clear();
-            }
-
-            isDirty = false;
             updateDirtyIndicator();
             window.app.showToast('SLO loaded successfully', 'success');
             window.app.loadLog();
@@ -206,6 +215,48 @@ window.extraction = (function() {
             console.error('Load failed:', err);
             return false;
         }
+    }
+
+    // Calculate statistics from data
+    function calculateStatistics(tubercles, edges) {
+        const n_tubercles = tubercles.length;
+        const n_edges = edges.length;
+
+        let mean_diameter_um = 0;
+        let std_diameter_um = 0;
+        let mean_space_um = 0;
+        let std_space_um = 0;
+
+        if (n_tubercles > 0) {
+            const diameters = tubercles.map(t => t.diameter_um);
+            mean_diameter_um = diameters.reduce((a, b) => a + b, 0) / n_tubercles;
+            if (n_tubercles > 1) {
+                const variance = diameters.reduce((sum, d) =>
+                    sum + Math.pow(d - mean_diameter_um, 2), 0) / (n_tubercles - 1);
+                std_diameter_um = Math.sqrt(variance);
+            }
+        }
+
+        if (n_edges > 0) {
+            const spaces = edges.map(e => e.edge_distance_um);
+            mean_space_um = spaces.reduce((a, b) => a + b, 0) / n_edges;
+            if (n_edges > 1) {
+                const variance = spaces.reduce((sum, s) =>
+                    sum + Math.pow(s - mean_space_um, 2), 0) / (n_edges - 1);
+                std_space_um = Math.sqrt(variance);
+            }
+        }
+
+        return {
+            n_tubercles,
+            n_edges,
+            mean_diameter_um,
+            std_diameter_um,
+            mean_space_um,
+            std_space_um,
+            suggested_genus: '-',
+            classification_confidence: '-',
+        };
     }
 
     // Show overwrite confirmation dialog
@@ -238,6 +289,8 @@ window.extraction = (function() {
 
     // Update dirty indicator
     function updateDirtyIndicator() {
+        const isDirty = window.sets?.anyUnsavedChanges() || false;
+
         // Extraction tab indicator
         const indicator = document.getElementById('unsavedIndicator');
         if (indicator) {
@@ -259,18 +312,18 @@ window.extraction = (function() {
 
     // Check dirty state
     function checkDirty() {
-        return isDirty;
+        return window.sets?.anyUnsavedChanges() || false;
     }
 
     // Confirm navigation with unsaved changes
     function confirmUnsavedChanges() {
-        if (!isDirty) return true;
+        if (!checkDirty()) return true;
         return confirm('You have unsaved changes. Are you sure you want to leave?');
     }
 
     // Mark as dirty (called by editor)
     function markDirty() {
-        isDirty = true;
+        window.sets?.markDirty();
         updateDirtyIndicator();
     }
 

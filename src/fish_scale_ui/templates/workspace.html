@@ -13,7 +13,29 @@
             </div>
         </div>
 
-        <!-- Toolbar below image -->
+        <!-- Statistics bar (always visible, first row under image) -->
+        <div class="stats-bar" id="statsBar">
+            <div class="stats-bar-item">
+                <span class="stats-bar-label">TUB:</span>
+                <span id="statsBarTubercles" class="stats-bar-value">-</span>
+            </div>
+            <div class="stats-bar-item">
+                <span class="stats-bar-label">Ø:</span>
+                <span id="statsBarDiameter" class="stats-bar-value">-</span>
+                <span class="stats-bar-unit">µm</span>
+            </div>
+            <div class="stats-bar-item">
+                <span class="stats-bar-label">ITC:</span>
+                <span id="statsBarEdges" class="stats-bar-value">-</span>
+            </div>
+            <div class="stats-bar-item">
+                <span class="stats-bar-label">Space:</span>
+                <span id="statsBarSpace" class="stats-bar-value">-</span>
+                <span class="stats-bar-unit">µm</span>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
         <div class="image-toolbar">
             <button type="button" class="btn btn-secondary" id="newImageBtn" title="Load new image">
                 New Image
@@ -60,28 +82,6 @@
                 <input type="checkbox" id="toggleScale">
                 <span>Scale</span>
             </label>
-        </div>
-
-        <!-- Statistics bar (always visible) -->
-        <div class="stats-bar" id="statsBar">
-            <div class="stats-bar-item">
-                <span class="stats-bar-label">TUB:</span>
-                <span id="statsBarTubercles" class="stats-bar-value">-</span>
-            </div>
-            <div class="stats-bar-item">
-                <span class="stats-bar-label">Ø:</span>
-                <span id="statsBarDiameter" class="stats-bar-value">-</span>
-                <span class="stats-bar-unit">µm</span>
-            </div>
-            <div class="stats-bar-item">
-                <span class="stats-bar-label">ITC:</span>
-                <span id="statsBarEdges" class="stats-bar-value">-</span>
-            </div>
-            <div class="stats-bar-item">
-                <span class="stats-bar-label">Space:</span>
-                <span id="statsBarSpace" class="stats-bar-value">-</span>
-                <span class="stats-bar-unit">µm</span>
-            </div>
         </div>
     </div>
 

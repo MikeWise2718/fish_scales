@@ -30,7 +30,7 @@
                 {% for img in recent_images %}
                 <li class="recent-item" data-path="{{ img.path }}">
                     <span class="recent-filename">{{ img.filename }}</span>
-                    <span class="recent-date">{{ img.opened_at[:10] }}</span>
+                    <span class="recent-date">{{ img.opened_at[:19] | replace('T', ' ') }}</span>
                 </li>
                 {% endfor %}
             </ul>

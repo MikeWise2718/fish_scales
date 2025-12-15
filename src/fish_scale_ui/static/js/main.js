@@ -108,15 +108,6 @@ window.app = (function() {
             window.location.href = '/';
         });
 
-        // Rotate buttons
-        document.getElementById('rotateLeftBtn').addEventListener('click', () => {
-            window.imageViewer.rotate('left');
-        });
-
-        document.getElementById('rotateRightBtn').addEventListener('click', () => {
-            window.imageViewer.rotate('right');
-        });
-
         // Zoom buttons
         document.getElementById('zoomInBtn').addEventListener('click', () => {
             window.imageViewer.zoomIn();
@@ -130,17 +121,48 @@ window.app = (function() {
             window.imageViewer.zoomToFit();
         });
 
-        // Save SLO button (placeholder for Phase 2)
-        document.getElementById('saveSloBtn').addEventListener('click', () => {
-            showToast('Save SLO coming in Phase 2', 'warning');
-        });
+        // Image tab rotate buttons
+        const rotateLeftBtnTab = document.getElementById('rotateLeftBtnTab');
+        if (rotateLeftBtnTab) {
+            rotateLeftBtnTab.addEventListener('click', () => {
+                window.imageViewer.rotate('left');
+            });
+        }
+
+        const rotateRightBtnTab = document.getElementById('rotateRightBtnTab');
+        if (rotateRightBtnTab) {
+            rotateRightBtnTab.addEventListener('click', () => {
+                window.imageViewer.rotate('right');
+            });
+        }
+
+        // Save SLO button - handled by extraction.js
     }
 
     // Keyboard shortcuts
     function initKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Skip if focused on input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            // Skip if focused on input (except for Escape)
+            const isInputFocused = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+
+            // Escape key - always handle (cancel mode, deselect, exit input)
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (isInputFocused) {
+                    e.target.blur();
+                    return;
+                }
+                // Cancel edit mode or deselect
+                if (window.editor?.getMode() !== 'none') {
+                    window.editor.cancelMode();
+                } else {
+                    window.overlay?.deselect();
+                }
+                return;
+            }
+
+            // Skip other shortcuts if focused on input
+            if (isInputFocused) {
                 return;
             }
 
@@ -148,18 +170,69 @@ window.app = (function() {
             if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
                 window.imageViewer.zoomIn();
-            } else if (e.key === '-') {
+                return;
+            }
+            if (e.key === '-') {
                 e.preventDefault();
                 window.imageViewer.zoomOut();
-            } else if (e.key === '0') {
+                return;
+            }
+            if (e.key === '0') {
                 e.preventDefault();
                 window.imageViewer.zoomToFit();
+                return;
             }
 
-            // Ctrl+S to save
-            if (e.ctrlKey && e.key === 's') {
+            // Delete / Backspace - delete selected item
+            if (e.key === 'Delete' || e.key === 'Backspace') {
                 e.preventDefault();
-                showToast('Save SLO coming in Phase 2', 'warning');
+                window.editor?.deleteSelected();
+                return;
+            }
+
+            // Tab - cycle through selection
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                window.editor?.cycleSelection();
+                return;
+            }
+
+            // Ctrl+Z - Undo
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                window.undoManager?.undo();
+                return;
+            }
+
+            // Ctrl+Y - Redo
+            if (e.ctrlKey && e.key === 'y') {
+                e.preventDefault();
+                window.undoManager?.redo();
+                return;
+            }
+
+            // Ctrl+S to save - handled by extraction.js
+
+            // Arrow keys - nudge selected tubercle
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                window.editor?.nudgeSelected(0, -1);
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                window.editor?.nudgeSelected(0, 1);
+                return;
+            }
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                window.editor?.nudgeSelected(-1, 0);
+                return;
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                window.editor?.nudgeSelected(1, 0);
+                return;
             }
         });
     }

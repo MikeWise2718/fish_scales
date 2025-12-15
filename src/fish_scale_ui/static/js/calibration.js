@@ -50,6 +50,15 @@ window.calibration = (function() {
         // Measure scale bar button
         measureBtn.addEventListener('click', startMeasuring);
 
+        // Apply estimate button
+        const applyEstimateBtn = document.getElementById('applyEstimateBtn');
+        if (applyEstimateBtn) {
+            applyEstimateBtn.addEventListener('click', () => {
+                // Apply the auto-estimated calibration (0.14 µm/pixel for 700x magnification)
+                applyCalibration(0.14, 'estimate');
+            });
+        }
+
         // Load current calibration
         loadCalibration();
     }
@@ -100,7 +109,14 @@ window.calibration = (function() {
             warningBadge.style.display = 'none';
 
             // Also update input fields
-            umPerPxInput.value = umPerPx.toFixed(4);
+            if (umPerPxInput) {
+                umPerPxInput.value = umPerPx.toFixed(4);
+            }
+
+            // Re-render overlay in case calibration scale is shown
+            if (window.overlay && window.overlay.render) {
+                window.overlay.render();
+            }
         }
     }
 
@@ -232,6 +248,18 @@ window.calibration = (function() {
         return currentCalibration;
     }
 
+    function getCurrentCalibration() {
+        return currentCalibration;
+    }
+
+    function setCalibration(calibrationData) {
+        // Set calibration from loaded SLO data
+        if (calibrationData && calibrationData.um_per_px) {
+            currentCalibration = calibrationData;
+            updateDisplay();
+        }
+    }
+
     function pxToUm(pixels) {
         if (!currentCalibration) return pixels * 0.14; // Auto-estimate
         return pixels * currentCalibration.um_per_px;
@@ -248,6 +276,8 @@ window.calibration = (function() {
     return {
         loadCalibration,
         getCalibration,
+        getCurrentCalibration,
+        setCalibration,
         pxToUm,
         umToPx
     };

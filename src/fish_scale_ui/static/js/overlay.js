@@ -1,0 +1,551 @@
+/**
+ * Fish Scale Measurement UI - Overlay Rendering
+ */
+
+window.overlay = (function() {
+    let canvas = null;
+    let ctx = null;
+    let tubercles = [];
+    let edges = [];
+    let selectedTubId = null;
+    let selectedEdgeIdx = null;
+    let scale = 1;
+
+    // Toggle state (controlled by checkboxes under image, independent of Settings)
+    let toggleState = {
+        numbers: false,
+        tubes: true,
+        links: true,
+        scale: false
+    };
+
+    // Get colors from settings (with defaults)
+    function getColors() {
+        const tubercleColor = (window.settings && window.settings.get('tubercleColor')) || '#00ffff';
+        const connectionColor = (window.settings && window.settings.get('connectionColor')) || '#ffff00';
+        return {
+            tubercle: tubercleColor,
+            edge: connectionColor,
+            selectedTubercle: '#ff00ff', // Magenta for selection (distinct from yellow ITCs)
+            selectedEdge: '#ff00ff',
+        };
+    }
+
+    // Initialize toggle states from Settings defaults
+    function initToggleStates() {
+        // Get defaults from Settings (if available)
+        if (window.settings) {
+            toggleState.numbers = window.settings.get('showTubercleIds') || false;
+            toggleState.scale = window.settings.get('showCalibrationScale') || false;
+        }
+        // tubes and links default to true (always shown unless toggled off)
+        toggleState.tubes = true;
+        toggleState.links = true;
+
+        // Update checkbox UI to match
+        updateToggleUI();
+    }
+
+    // Update toggle checkbox UI to match state
+    function updateToggleUI() {
+        const numbersEl = document.getElementById('toggleNumbers');
+        const tubesEl = document.getElementById('toggleTubes');
+        const linksEl = document.getElementById('toggleLinks');
+        const scaleEl = document.getElementById('toggleScale');
+
+        if (numbersEl) numbersEl.checked = toggleState.numbers;
+        if (tubesEl) tubesEl.checked = toggleState.tubes;
+        if (linksEl) linksEl.checked = toggleState.links;
+        if (scaleEl) scaleEl.checked = toggleState.scale;
+    }
+
+    // Bind toggle checkbox event handlers
+    function bindToggleHandlers() {
+        const numbersEl = document.getElementById('toggleNumbers');
+        const tubesEl = document.getElementById('toggleTubes');
+        const linksEl = document.getElementById('toggleLinks');
+        const scaleEl = document.getElementById('toggleScale');
+
+        if (numbersEl) {
+            numbersEl.addEventListener('change', function() {
+                toggleState.numbers = this.checked;
+                render();
+            });
+        }
+        if (tubesEl) {
+            tubesEl.addEventListener('change', function() {
+                toggleState.tubes = this.checked;
+                render();
+            });
+        }
+        if (linksEl) {
+            linksEl.addEventListener('change', function() {
+                toggleState.links = this.checked;
+                render();
+            });
+        }
+        if (scaleEl) {
+            scaleEl.addEventListener('change', function() {
+                toggleState.scale = this.checked;
+                render();
+            });
+        }
+    }
+
+    // Initialize
+    function init() {
+        canvas = document.getElementById('overlayCanvas');
+        if (!canvas) return;
+        ctx = canvas.getContext('2d');
+
+        // Make canvas interactive for Phase 2 click-to-select
+        canvas.style.pointerEvents = 'auto';
+        canvas.addEventListener('click', handleClick);
+
+        // Bind toggle handlers
+        bindToggleHandlers();
+
+        // Initialize toggle states from Settings defaults
+        initToggleStates();
+
+        // Reset toggle states when new image is loaded
+        document.addEventListener('imageLoaded', () => {
+            initToggleStates();
+        });
+    }
+
+    // Resize canvas to match image
+    function resize(width, height) {
+        if (!canvas) return;
+        canvas.width = width;
+        canvas.height = height;
+        render();
+    }
+
+    // Set scale factor (for zoom)
+    function setScale(newScale) {
+        scale = newScale;
+        render();
+    }
+
+    // Set data
+    function setData(newTubercles, newEdges) {
+        tubercles = newTubercles || [];
+        edges = newEdges || [];
+        selectedTubId = null;
+        selectedEdgeIdx = null;
+        render();
+    }
+
+    // Clear data
+    function clear() {
+        tubercles = [];
+        edges = [];
+        selectedTubId = null;
+        selectedEdgeIdx = null;
+        if (ctx && canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+
+    // Render overlay
+    function render() {
+        if (!ctx || !canvas) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const colors = getColors();
+
+        // Draw edges (ITCs) if enabled
+        if (toggleState.links) {
+            edges.forEach((edge, idx) => {
+                const isSelected = idx === selectedEdgeIdx;
+                drawEdge(edge, isSelected, colors);
+            });
+        }
+
+        // Draw tubercles (TUBs) if enabled
+        if (toggleState.tubes) {
+            tubercles.forEach(tub => {
+                const isSelected = tub.id === selectedTubId;
+                drawTubercle(tub, isSelected, colors);
+            });
+        }
+
+        // Draw IDs if enabled (uses toggle state, not Settings)
+        if (toggleState.numbers) {
+            const fontSize = (window.settings && window.settings.get('idTextSize')) || 12;
+            tubercles.forEach(tub => {
+                drawTubercleId(tub, fontSize, colors);
+            });
+        }
+
+        // Draw calibration scale if enabled (uses toggle state, not Settings)
+        if (toggleState.scale) {
+            drawCalibrationScale();
+        }
+    }
+
+    // Draw calibration scale bar
+    function drawCalibrationScale() {
+        if (!canvas || !ctx) return;
+
+        // Get calibration
+        const calibration = window.calibration && window.calibration.getCurrentCalibration();
+        const umPerPx = calibration ? calibration.um_per_px : 0.14; // Default to estimate
+
+        // Determine a nice scale bar length
+        // Aim for approximately 10% of image width
+        const targetWidthPx = canvas.width * 0.1;
+        const targetWidthUm = targetWidthPx * umPerPx;
+
+        // Round to a nice number
+        const niceValues = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+        let scaleUm = 10;
+        for (let i = 0; i < niceValues.length; i++) {
+            if (niceValues[i] >= targetWidthUm) {
+                scaleUm = niceValues[i];
+                break;
+            }
+        }
+
+        const scalePx = scaleUm / umPerPx;
+        const position = (window.settings && window.settings.get('scalePosition')) || 'bottom-left';
+        const padding = 20;
+        const barHeight = 6;
+        const labelOffset = 16;
+
+        // Calculate position
+        let x, y;
+        switch (position) {
+            case 'top-left':
+                x = padding;
+                y = padding;
+                break;
+            case 'top-center':
+                x = (canvas.width - scalePx) / 2;
+                y = padding;
+                break;
+            case 'top-right':
+                x = canvas.width - scalePx - padding;
+                y = padding;
+                break;
+            case 'middle-left':
+                x = padding;
+                y = canvas.height / 2;
+                break;
+            case 'middle-right':
+                x = canvas.width - scalePx - padding;
+                y = canvas.height / 2;
+                break;
+            case 'bottom-left':
+                x = padding;
+                y = canvas.height - padding - barHeight;
+                break;
+            case 'bottom-center':
+                x = (canvas.width - scalePx) / 2;
+                y = canvas.height - padding - barHeight;
+                break;
+            case 'bottom-right':
+                x = canvas.width - scalePx - padding;
+                y = canvas.height - padding - barHeight;
+                break;
+            default:
+                x = padding;
+                y = canvas.height - padding - barHeight;
+        }
+
+        // Draw scale bar background for contrast
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(x - 4, y - labelOffset - 4, scalePx + 8, barHeight + labelOffset + 8);
+
+        // Draw scale bar
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, scalePx, barHeight);
+
+        // Draw end caps
+        ctx.fillRect(x, y - 4, 2, barHeight + 8);
+        ctx.fillRect(x + scalePx - 2, y - 4, 2, barHeight + 8);
+
+        // Draw label
+        const label = scaleUm >= 1000 ? (scaleUm / 1000) + ' mm' : scaleUm + ' µm';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, x + scalePx / 2, y - 4);
+    }
+
+    // Draw a single tubercle
+    function drawTubercle(tub, isSelected, colors) {
+        const x = tub.centroid_x;
+        const y = tub.centroid_y;
+        const radius = tub.radius_px;
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = isSelected ? colors.selectedTubercle : colors.tubercle;
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.stroke();
+    }
+
+    // Draw tubercle ID text
+    function drawTubercleId(tub, fontSize, colors) {
+        const x = tub.centroid_x;
+        const y = tub.centroid_y;
+
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Draw text with outline for visibility
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeText(tub.id, x, y);
+
+        ctx.fillStyle = colors.tubercle;
+        ctx.fillText(tub.id, x, y);
+    }
+
+    // Draw a single edge
+    function drawEdge(edge, isSelected, colors) {
+        // Determine endpoint mode
+        const endpointMode = (window.settings && window.settings.get('connectionEndpoint')) || 'center';
+
+        let x1 = edge.x1;
+        let y1 = edge.y1;
+        let x2 = edge.x2;
+        let y2 = edge.y2;
+
+        // If drawing to edge, adjust endpoints
+        if (endpointMode === 'edge') {
+            // Find the tubercles
+            const tub1 = tubercles.find(t => t.id === edge.id1);
+            const tub2 = tubercles.find(t => t.id === edge.id2);
+
+            if (tub1 && tub2) {
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 0) {
+                    // Normalize direction
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+
+                    // Offset from center by radius
+                    x1 = x1 + nx * tub1.radius_px;
+                    y1 = y1 + ny * tub1.radius_px;
+                    x2 = x2 - nx * tub2.radius_px;
+                    y2 = y2 - ny * tub2.radius_px;
+                }
+            }
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = isSelected ? colors.selectedEdge : colors.edge;
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.stroke();
+    }
+
+    // Handle click for selection
+    function handleClick(e) {
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        // Account for zoom/scale
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        // Check if editor is in an edit mode that needs to handle clicks
+        const editorMode = window.editor?.getMode();
+        if (editorMode && editorMode !== 'none') {
+            // Pass click to editor for handling
+            window.editor.handleCanvasClick(x, y);
+            return;
+        }
+
+        // Check for tubercle click (closest center) - only if tubes are visible
+        let closestTub = null;
+        let closestTubDist = Infinity;
+
+        if (toggleState.tubes) {
+            tubercles.forEach(tub => {
+                const dx = x - tub.centroid_x;
+                const dy = y - tub.centroid_y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                // Click within radius * 1.5 for easier selection
+                if (dist < tub.radius_px * 1.5 && dist < closestTubDist) {
+                    closestTubDist = dist;
+                    closestTub = tub;
+                }
+            });
+        }
+
+        if (closestTub) {
+            selectTubercle(closestTub.id);
+            return;
+        }
+
+        // Check for edge click (within threshold of line) - only if links are visible
+        const clickThreshold = 10;
+        let closestEdge = null;
+        let closestEdgeDist = Infinity;
+
+        if (toggleState.links) {
+            edges.forEach((edge, idx) => {
+                const dist = pointToLineDistance(x, y, edge.x1, edge.y1, edge.x2, edge.y2);
+                if (dist < clickThreshold && dist < closestEdgeDist) {
+                    closestEdgeDist = dist;
+                    closestEdge = idx;
+                }
+            });
+        }
+
+        if (closestEdge !== null) {
+            selectEdge(closestEdge);
+            return;
+        }
+
+        // Click on empty space - deselect
+        deselect();
+    }
+
+    // Distance from point to line segment
+    function pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+
+        if (lenSq !== 0) param = dot / lenSq;
+
+        let xx, yy;
+
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Select a tubercle
+    function selectTubercle(id) {
+        selectedTubId = id;
+        selectedEdgeIdx = null;
+        render();
+
+        // Notify data table
+        if (window.data && window.data.highlightTubercleRow) {
+            window.data.highlightTubercleRow(id);
+        }
+
+        // Dispatch event
+        document.dispatchEvent(new CustomEvent('tubercleSelected', { detail: { id } }));
+    }
+
+    // Select an edge
+    function selectEdge(idx) {
+        selectedEdgeIdx = idx;
+        selectedTubId = null;
+        render();
+
+        // Notify data table
+        if (window.data && window.data.highlightEdgeRow) {
+            window.data.highlightEdgeRow(idx);
+        }
+
+        // Dispatch event
+        document.dispatchEvent(new CustomEvent('edgeSelected', { detail: { idx } }));
+    }
+
+    // Deselect all
+    function deselect() {
+        selectedTubId = null;
+        selectedEdgeIdx = null;
+        render();
+
+        // Clear table highlights
+        if (window.data && window.data.clearHighlights) {
+            window.data.clearHighlights();
+        }
+
+        // Dispatch event
+        document.dispatchEvent(new CustomEvent('overlayDeselected'));
+    }
+
+    // Get selected tubercle
+    function getSelectedTubercle() {
+        if (selectedTubId === null) return null;
+        return tubercles.find(t => t.id === selectedTubId);
+    }
+
+    // Get selected edge
+    function getSelectedEdge() {
+        if (selectedEdgeIdx === null) return null;
+        return edges[selectedEdgeIdx];
+    }
+
+    // Highlight a tubercle (called from data table)
+    function highlightTubercle(id) {
+        selectedTubId = id;
+        selectedEdgeIdx = null;
+        render();
+    }
+
+    // Highlight an edge (called from data table)
+    function highlightEdge(idx) {
+        selectedEdgeIdx = idx;
+        selectedTubId = null;
+        render();
+    }
+
+    // Get current data (for editor)
+    function getTubercles() {
+        return tubercles;
+    }
+
+    function getEdges() {
+        return edges;
+    }
+
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', init);
+
+    return {
+        init,
+        resize,
+        setScale,
+        setData,
+        clear,
+        render,
+        selectTubercle,
+        selectEdge,
+        deselect,
+        highlightTubercle,
+        highlightEdge,
+        getSelectedTubercle,
+        getSelectedEdge,
+        getTubercles,
+        getEdges,
+        initToggleStates,
+    };
+})();

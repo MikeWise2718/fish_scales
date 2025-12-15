@@ -542,14 +542,22 @@ body {
 
 .toast.success {
     border-left: 3px solid var(--success-color);
+    background-color: #ecfdf5;
 }
 
 .toast.error {
     border-left: 3px solid var(--error-color);
+    background-color: #fef2f2;
 }
 
 .toast.warning {
     border-left: 3px solid var(--warning-color);
+    background-color: #fffbeb;
+}
+
+.toast.info {
+    border-left: 3px solid var(--primary-color);
+    background-color: #fef3c7;
 }
 
 @keyframes slideIn {
@@ -632,4 +640,769 @@ body {
     margin-top: 2rem;
     padding-top: 1rem;
     border-top: 1px solid var(--border-color);
+}
+
+/* ========================================
+   Phase 2 Styles
+   ======================================== */
+
+/* Extraction Tab */
+.tab-description {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.extraction-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.extraction-info {
+    margin-bottom: 1.5rem;
+}
+
+.slo-actions {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.slo-actions h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+}
+
+.unsaved-indicator {
+    background-color: var(--warning-color);
+    color: white;
+    font-size: 0.65rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    vertical-align: middle;
+    margin-left: 0.5rem;
+}
+
+.params-changed-indicator {
+    color: var(--warning-color);
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+/* Configure Tab */
+.config-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.config-section:last-child {
+    border-bottom: none;
+}
+
+.config-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+}
+
+.param-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.param-row label {
+    flex: 0 0 140px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.param-input {
+    flex: 1;
+}
+
+.param-select {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    background: white;
+}
+
+.param-number {
+    width: 80px;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.param-range {
+    width: 100px;
+}
+
+.param-value {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-width: 40px;
+}
+
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.help-icon:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.config-actions {
+    margin-top: 1rem;
+}
+
+/* Data Tab */
+.data-section {
+    margin-bottom: 1.5rem;
+}
+
+.data-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.statistics-panel {
+    background-color: var(--bg-color);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+}
+
+.stat-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+}
+
+.stat-row:last-child {
+    margin-bottom: 0;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.stat-value {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.stat-unit {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.stat-confidence {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background-color: var(--border-color);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    margin-left: 0.25rem;
+}
+
+.stat-row.classification {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.data-table-container {
+    max-height: 200px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.375rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    font-weight: 600;
+    background-color: var(--bg-color);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.data-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.1s;
+}
+
+.data-table tbody tr:hover {
+    background-color: var(--bg-color);
+}
+
+.data-table tbody tr.highlighted {
+    background-color: rgba(255, 255, 0, 0.2);
+}
+
+.data-table .empty-table {
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 1rem;
+}
+
+/* Save SLO button with changes indicator */
+#saveSloBtn.has-changes {
+    background-color: var(--warning-color);
+}
+
+#saveSloBtn.has-changes:hover {
+    background-color: #d97706;
+}
+
+/* Overlay canvas pointer events */
+#overlayCanvas {
+    pointer-events: auto;
+    cursor: default;
+}
+
+/* Resizable Panels */
+.panel-resizer {
+    width: 6px;
+    background-color: var(--border-color);
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background-color 0.15s;
+}
+
+.panel-resizer:hover,
+.panel-resizer.resizing {
+    background-color: var(--primary-color);
+}
+
+.tabs-panel {
+    min-width: 300px;
+    max-width: 80vw; /* Allow panel to take up to 80% of viewport width */
+}
+
+/* Collapsible Settings Sections */
+.settings-group {
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+}
+
+.settings-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0.75rem;
+    background-color: var(--bg-color);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
+}
+
+.settings-group-header:hover {
+    background-color: #e2e8f0;
+}
+
+.settings-group-header h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.settings-group-toggle {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.settings-group.collapsed .settings-group-toggle {
+    transform: rotate(-90deg);
+}
+
+.settings-group-content {
+    padding: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.settings-group.collapsed .settings-group-content {
+    display: none;
+}
+
+/* Color Input */
+.color-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.color-input-row input[type="color"] {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+
+.color-input-row input[type="text"] {
+    width: 80px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+/* Range with value display */
+.range-with-value {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.range-with-value input[type="range"] {
+    flex: 1;
+}
+
+.range-with-value .range-value {
+    min-width: 40px;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Radio button group */
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.radio-label input[type="radio"] {
+    margin: 0;
+}
+
+/* Settings text label (non-checkbox) */
+.setting-label-text {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.375rem;
+}
+
+/* Settings select dropdown */
+.setting-select {
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    background: white;
+}
+
+/* Settings divider */
+.setting-divider {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ========================================
+   Phase 2a Styles
+   ======================================== */
+
+/* Image Tab */
+.image-tab-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.image-tab-section:last-child {
+    border-bottom: none;
+}
+
+.image-tab-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.image-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.image-action-buttons .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.image-action-buttons .btn svg {
+    flex-shrink: 0;
+}
+
+/* Crop Controls */
+.crop-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.crop-status {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.crop-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.autocrop-controls {
+    display: flex;
+    align-items: center;
+    margin-top: 0.75rem;
+}
+
+.autocrop-controls .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+/* Crop Mode */
+.image-container.cropping {
+    cursor: crosshair;
+}
+
+#cropCanvas {
+    z-index: 10;
+}
+
+/* Save Section */
+.save-section {
+    margin-top: auto;
+}
+
+.save-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Calibration Tab */
+.calibration-display-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.calibration-display-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.calibration-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 1.1rem;
+}
+
+.calibration-method-section {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.calibration-method-section:last-child {
+    border-bottom: none;
+}
+
+.calibration-method-section h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text-color);
+}
+
+.calibration-method-section .hint {
+    margin-bottom: 0.5rem;
+    margin-top: 0;
+}
+
+.calibration-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.calibration-inputs input {
+    width: 90px;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.calibration-inputs span {
+    color: var(--text-muted);
+}
+
+.measure-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.estimate-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Calibration Section Headers */
+.calibration-section-header {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+/* Overlay Toggle Controls */
+.overlay-toggles {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--panel-bg);
+    border-top: 1px solid var(--border-color);
+}
+
+.overlay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.overlay-toggle:hover {
+    color: var(--text-color);
+}
+
+.overlay-toggle input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.overlay-toggle span {
+    white-space: nowrap;
+}
+
+/* ========================================
+   Phase 3 Styles - Edit Tab
+   ======================================== */
+
+/* Edit Tab Sections */
+.edit-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.edit-section:last-child {
+    border-bottom: none;
+}
+
+.edit-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+}
+
+/* Edit Buttons */
+.edit-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.edit-buttons .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.edit-buttons .btn svg {
+    flex-shrink: 0;
+}
+
+/* Active mode button */
+.edit-buttons .btn.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Delete button */
+.btn-danger {
+    background-color: var(--error-color);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #dc2626;
+}
+
+/* Radius Controls */
+.radius-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.radius-controls input[type="range"] {
+    flex: 1;
+    min-width: 100px;
+}
+
+.radius-value {
+    min-width: 50px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* Edit Status */
+.edit-status-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.edit-status {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    font-style: italic;
+}
+
+/* Keyboard Shortcuts Table */
+.edit-shortcuts {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.edit-shortcuts h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+}
+
+.shortcuts-table {
+    width: 100%;
+    font-size: 0.8rem;
+    border-collapse: collapse;
+}
+
+.shortcuts-table td {
+    padding: 0.25rem 0.5rem;
+    vertical-align: middle;
+}
+
+.shortcuts-table td:first-child {
+    width: 100px;
+}
+
+.shortcuts-table kbd {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 0 var(--border-color);
+}
+
+/* Edit mode cursor styles */
+.image-container.edit-add-tub {
+    cursor: crosshair;
+}
+
+.image-container.edit-add-itc {
+    cursor: pointer;
+}
+
+.image-container.edit-move {
+    cursor: move;
 }

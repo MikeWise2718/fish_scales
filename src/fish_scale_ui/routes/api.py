@@ -20,6 +20,15 @@ _current_image = {
     'calibration': None,
 }
 
+# In-memory storage for extraction results
+_extraction_data = {
+    'tubercles': [],
+    'edges': [],
+    'statistics': {},
+    'parameters': {},
+    'dirty': False,  # Track unsaved changes
+}
+
 
 def allowed_file(filename):
     """Check if file extension is allowed."""
@@ -262,11 +271,21 @@ def calibration():
     })
 
 
-@api_bp.route('/log', methods=['GET'])
-def get_log():
-    """Get current session log entries."""
-    from fish_scale_ui.services.logging import get_log_entries
-    return jsonify({'entries': get_log_entries()})
+@api_bp.route('/log', methods=['GET', 'POST'])
+def handle_log():
+    """Get or add log entries."""
+    from fish_scale_ui.services.logging import get_log_entries, log_event
+
+    if request.method == 'GET':
+        return jsonify({'entries': get_log_entries()})
+
+    # POST - add a log entry
+    data = request.get_json() or {}
+    event_type = data.get('event_type', 'unknown')
+    details = data.get('details', {})
+
+    log_event(event_type, details)
+    return jsonify({'success': True})
 
 
 @api_bp.route('/current-image', methods=['GET'])
@@ -334,3 +353,363 @@ def browse_images():
         'directories': directories,
         'files': files
     })
+
+
+@api_bp.route('/profiles', methods=['GET'])
+def get_profiles():
+    """Get list of available detection profiles."""
+    from fish_scale_ui.services.extraction import get_profiles_list
+    return jsonify({'profiles': get_profiles_list()})
+
+
+@api_bp.route('/extract', methods=['POST'])
+def extract():
+    """Run tubercle extraction on the current image."""
+    from fish_scale_ui.services.logging import log_event
+    from fish_scale_ui.services.extraction import run_extraction
+
+    if not _current_image['path']:
+        return jsonify({'error': 'No image loaded'}), 400
+
+    if not _current_image.get('calibration'):
+        return jsonify({'error': 'Calibration not set'}), 400
+
+    data = request.get_json() or {}
+
+    # Get calibration
+    calibration = _current_image['calibration']
+    um_per_px = calibration.get('um_per_px', 0.33)
+
+    try:
+        result = run_extraction(
+            image_path=_current_image['path'],
+            um_per_px=um_per_px,
+            method=data.get('method', 'log'),
+            threshold=float(data.get('threshold', 0.05)),
+            min_diameter_um=float(data.get('min_diameter_um', 2.0)),
+            max_diameter_um=float(data.get('max_diameter_um', 10.0)),
+            min_circularity=float(data.get('min_circularity', 0.5)),
+            clahe_clip=float(data.get('clahe_clip', 0.03)),
+            clahe_kernel=int(data.get('clahe_kernel', 8)),
+            blur_sigma=float(data.get('blur_sigma', 1.0)),
+            neighbor_graph=data.get('neighbor_graph', 'delaunay'),
+        )
+
+        # Store extraction results
+        _extraction_data['tubercles'] = result['tubercles']
+        _extraction_data['edges'] = result['edges']
+        _extraction_data['statistics'] = result['statistics']
+        _extraction_data['parameters'] = result['parameters']
+        _extraction_data['dirty'] = True
+
+        # Log the extraction
+        log_event('extraction_complete', {
+            'n_tubercles': result['statistics']['n_tubercles'],
+            'n_edges': result['statistics']['n_edges'],
+            'method': result['parameters']['method'],
+        })
+
+        return jsonify(result)
+
+    except Exception as e:
+        log_event('extraction_failed', {'error': str(e)})
+        return jsonify({'error': f'Extraction failed: {str(e)}'}), 500
+
+
+@api_bp.route('/extraction-data', methods=['GET'])
+def get_extraction_data():
+    """Get current extraction data."""
+    return jsonify({
+        'tubercles': _extraction_data['tubercles'],
+        'edges': _extraction_data['edges'],
+        'statistics': _extraction_data['statistics'],
+        'parameters': _extraction_data['parameters'],
+        'dirty': _extraction_data['dirty'],
+    })
+
+
+@api_bp.route('/save-slo', methods=['POST'])
+def save_slo():
+    """Save SLO data to files."""
+    from fish_scale_ui.services.logging import log_event
+    from fish_scale_ui.services.persistence import save_slo as persist_slo
+
+    if not _current_image['filename']:
+        return jsonify({'error': 'No image loaded'}), 400
+
+    data = request.get_json() or {}
+    force = data.get('force', False)
+
+    # Use data from request if provided (for manual edits), otherwise use extraction cache
+    tubercles = data.get('tubercles', _extraction_data.get('tubercles', []))
+    edges = data.get('edges', _extraction_data.get('edges', []))
+    statistics = data.get('statistics', _extraction_data.get('statistics', {}))
+    parameters = data.get('parameters', _extraction_data.get('parameters', {}))
+
+    if not tubercles:
+        return jsonify({'error': 'No data to save'}), 400
+
+    slo_dir = current_app.config['APP_ROOT'] / 'slo'
+
+    try:
+        result = persist_slo(
+            slo_dir=slo_dir,
+            image_name=_current_image['filename'],
+            calibration=_current_image.get('calibration', {}),
+            tubercles=tubercles,
+            edges=edges,
+            statistics=statistics,
+            parameters=parameters,
+        )
+
+        if result['success']:
+            # Update server-side cache
+            _extraction_data['tubercles'] = tubercles
+            _extraction_data['edges'] = edges
+            _extraction_data['statistics'] = statistics
+            _extraction_data['parameters'] = parameters
+            _extraction_data['dirty'] = False
+
+            log_event('slo_saved', {
+                'filename': _current_image['filename'],
+                'n_tubercles': len(tubercles),
+                'n_edges': len(edges),
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        log_event('slo_save_failed', {'error': str(e)})
+        return jsonify({'error': f'Save failed: {str(e)}'}), 500
+
+
+@api_bp.route('/load-slo', methods=['POST'])
+def load_slo():
+    """Load SLO data from a file."""
+    from fish_scale_ui.services.logging import log_event
+    from fish_scale_ui.services.persistence import load_slo as load_slo_file
+
+    data = request.get_json() or {}
+    slo_path = data.get('path')
+
+    if not slo_path:
+        # Try to find SLO for current image
+        if not _current_image['filename']:
+            return jsonify({'error': 'No image loaded and no path provided'}), 400
+
+        slo_dir = current_app.config['APP_ROOT'] / 'slo'
+        base_name = Path(_current_image['filename']).stem
+        slo_path = slo_dir / f"{base_name}_slo.json"
+
+    try:
+        result = load_slo_file(slo_path)
+
+        if result['success']:
+            slo_data = result['data']
+
+            # Check image name match
+            name_match = True
+            if _current_image['filename']:
+                loaded_name = slo_data.get('image_name', '')
+                if loaded_name and loaded_name != _current_image['filename']:
+                    name_match = False
+
+            # Update extraction data
+            _extraction_data['tubercles'] = slo_data.get('tubercles', [])
+            _extraction_data['edges'] = slo_data.get('edges', [])
+            _extraction_data['statistics'] = slo_data.get('statistics', {})
+            _extraction_data['parameters'] = slo_data.get('parameters', {})
+            _extraction_data['dirty'] = False
+
+            # Update calibration if present
+            if slo_data.get('calibration'):
+                _current_image['calibration'] = slo_data['calibration']
+
+            log_event('slo_loaded', {
+                'filename': slo_data.get('image_name', 'unknown'),
+                'n_tubercles': len(_extraction_data['tubercles']),
+                'n_edges': len(_extraction_data['edges']),
+            })
+
+            return jsonify({
+                'success': True,
+                'data': slo_data,
+                'name_match': name_match,
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        log_event('slo_load_failed', {'error': str(e)})
+        return jsonify({'error': f'Load failed: {str(e)}'}), 500
+
+
+@api_bp.route('/list-slo', methods=['GET'])
+def list_slo():
+    """List available SLO files."""
+    from fish_scale_ui.services.persistence import list_slo_files
+
+    slo_dir = current_app.config['APP_ROOT'] / 'slo'
+    image_name = request.args.get('image')
+
+    files = list_slo_files(slo_dir, image_name)
+    return jsonify({'files': files})
+
+
+@api_bp.route('/dirty-state', methods=['GET', 'POST'])
+def dirty_state():
+    """Get or set the dirty state."""
+    if request.method == 'GET':
+        return jsonify({'dirty': _extraction_data['dirty']})
+
+    data = request.get_json() or {}
+    if 'dirty' in data:
+        _extraction_data['dirty'] = bool(data['dirty'])
+    return jsonify({'dirty': _extraction_data['dirty']})
+
+
+@api_bp.route('/crop', methods=['POST'])
+def crop_image():
+    """Crop the current image to the specified region."""
+    from fish_scale_ui.services.logging import log_event
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No crop data provided'}), 400
+
+    x = int(data.get('x', 0))
+    y = int(data.get('y', 0))
+    width = int(data.get('width', 0))
+    height = int(data.get('height', 0))
+
+    if width <= 0 or height <= 0:
+        return jsonify({'error': 'Invalid crop dimensions'}), 400
+
+    if not _current_image['path']:
+        return jsonify({'error': 'No image loaded'}), 400
+
+    try:
+        # Use web_path for display (it's the PNG version for TIF files)
+        web_path = Path(_current_image.get('web_path') or _current_image['path'])
+
+        with Image.open(web_path) as img:
+            # Ensure crop region is within image bounds
+            img_width, img_height = img.size
+            x = max(0, min(x, img_width - 1))
+            y = max(0, min(y, img_height - 1))
+            width = min(width, img_width - x)
+            height = min(height, img_height - y)
+
+            # Perform the crop
+            cropped = img.crop((x, y, x + width, y + height))
+            cropped.save(web_path, 'PNG' if web_path.suffix.lower() == '.png' else None)
+
+            new_width, new_height = cropped.size
+
+        # Clear any existing extraction data since the image changed
+        _extraction_data['tubercles'] = []
+        _extraction_data['edges'] = []
+        _extraction_data['statistics'] = {}
+        _extraction_data['parameters'] = {}
+        _extraction_data['dirty'] = False
+
+        log_event('image_cropped', {
+            'x': x,
+            'y': y,
+            'width': new_width,
+            'height': new_height,
+            'original_width': img_width,
+            'original_height': img_height
+        })
+
+        return jsonify({
+            'success': True,
+            'width': new_width,
+            'height': new_height,
+            'url': f'/uploads/{web_path.name}?t={uuid.uuid4().hex[:8]}'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to crop image: {str(e)}'}), 400
+
+
+@api_bp.route('/autocrop', methods=['POST'])
+def autocrop_image():
+    """Automatically crop the image to remove empty/uniform borders."""
+    from fish_scale_ui.services.logging import log_event
+
+    if not _current_image['path']:
+        return jsonify({'error': 'No image loaded'}), 400
+
+    try:
+        # Use web_path for display (it's the PNG version for TIF files)
+        web_path = Path(_current_image.get('web_path') or _current_image['path'])
+
+        with Image.open(web_path) as img:
+            original_width, original_height = img.size
+
+            # Convert to numpy array for edge detection
+            img_array = np.array(img.convert('L'))  # Convert to grayscale
+
+            # Find rows and columns that are not uniform (have variance)
+            # Threshold for detecting "non-empty" content
+            threshold = 10
+
+            # Check each row for variance
+            row_variance = np.var(img_array, axis=1)
+            col_variance = np.var(img_array, axis=0)
+
+            # Find first and last rows/cols with content
+            non_empty_rows = np.where(row_variance > threshold)[0]
+            non_empty_cols = np.where(col_variance > threshold)[0]
+
+            if len(non_empty_rows) == 0 or len(non_empty_cols) == 0:
+                return jsonify({'error': 'Could not detect content boundaries'}), 400
+
+            top = int(non_empty_rows[0])
+            bottom = int(non_empty_rows[-1]) + 1
+            left = int(non_empty_cols[0])
+            right = int(non_empty_cols[-1]) + 1
+
+            # Add small padding (5 pixels)
+            padding = 5
+            top = max(0, top - padding)
+            bottom = min(original_height, bottom + padding)
+            left = max(0, left - padding)
+            right = min(original_width, right + padding)
+
+            # Check if crop would actually change anything
+            if top == 0 and bottom == original_height and left == 0 and right == original_width:
+                return jsonify({'error': 'No empty borders detected'}), 400
+
+            # Perform the crop
+            cropped = img.crop((left, top, right, bottom))
+            cropped.save(web_path, 'PNG' if web_path.suffix.lower() == '.png' else None)
+
+            new_width, new_height = cropped.size
+
+        # Clear any existing extraction data since the image changed
+        _extraction_data['tubercles'] = []
+        _extraction_data['edges'] = []
+        _extraction_data['statistics'] = {}
+        _extraction_data['parameters'] = {}
+        _extraction_data['dirty'] = False
+
+        log_event('image_autocropped', {
+            'original_width': original_width,
+            'original_height': original_height,
+            'new_width': new_width,
+            'new_height': new_height,
+            'removed_top': top,
+            'removed_left': left,
+        })
+
+        return jsonify({
+            'success': True,
+            'width': new_width,
+            'height': new_height,
+            'url': f'/uploads/{web_path.name}?t={uuid.uuid4().hex[:8]}'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to autocrop image: {str(e)}'}), 400

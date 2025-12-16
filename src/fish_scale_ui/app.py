@@ -34,9 +34,11 @@ def create_app(config=None):
     # Register blueprints
     from fish_scale_ui.routes.main import main_bp
     from fish_scale_ui.routes.api import api_bp
+    from fish_scale_ui.routes.mcp_api import mcp_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(mcp_bp, url_prefix='/api/mcp')
 
     # Initialize logging service
     from fish_scale_ui.services.logging import init_logging

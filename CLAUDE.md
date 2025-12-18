@@ -244,7 +244,7 @@ The LLM Agent (`fish-scale-agent`) provides automated tubercle detection using v
 |----------|-------|-----------------|--------|
 | Claude | claude-sonnet-4-20250514 | `ANTHROPIC_API_KEY` | **Default** - with vision support |
 | Gemini | gemini-2.0-flash | `GEMINI_API_KEY` | Implemented |
-| OpenRouter | various | `OPENROUTER_API_KEY` | Planned |
+| OpenRouter | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` | Implemented - access to many models |
 
 ### Running the Agent
 

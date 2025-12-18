@@ -43,7 +43,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument(
         "--api-key",
-        help="API key (or use GEMINI_API_KEY/ANTHROPIC_API_KEY env var)",
+        help="API key (or use ANTHROPIC_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY env var)",
     )
     run_parser.add_argument(
         "--calibration",
@@ -113,11 +113,21 @@ def get_provider(provider_name: str, model: str | None, api_key: str | None):
         )
 
     elif provider_name == "openrouter":
-        console.print(
-            "[yellow]OpenRouter provider not yet implemented.[/yellow] "
-            "See Phase 3 of the implementation plan.",
+        from .providers.openrouter import OpenRouterAgentProvider
+
+        key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        if not key:
+            console.print(
+                "[red]Error:[/red] OpenRouter API key required. "
+                "Set OPENROUTER_API_KEY env var or use --api-key",
+                style="bold",
+            )
+            sys.exit(1)
+
+        return OpenRouterAgentProvider(
+            api_key=key,
+            model=model or "anthropic/claude-sonnet-4",
         )
-        sys.exit(1)
 
     else:
         console.print(f"[red]Unknown provider:[/red] {provider_name}")
@@ -223,8 +233,10 @@ def cmd_providers(args):
             "  Env var: ANTHROPIC_API_KEY\n\n"
             "[green]gemini[/green] - Google Gemini (default: gemini-2.0-flash)\n"
             "  Env var: GEMINI_API_KEY\n\n"
-            "[yellow]openrouter[/yellow] - OpenRouter (not yet implemented)\n"
-            "  Env var: OPENROUTER_API_KEY",
+            "[green]openrouter[/green] - OpenRouter (default: anthropic/claude-sonnet-4)\n"
+            "  Env var: OPENROUTER_API_KEY\n"
+            "  Models: anthropic/claude-*, openai/gpt-4o*, google/gemini-*, meta-llama/*, etc.\n"
+            "  See https://openrouter.ai/docs#models for full list",
             title="Available Providers",
         )
     )

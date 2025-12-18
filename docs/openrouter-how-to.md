@@ -64,6 +64,7 @@ The fish-scale-agent requires models that support:
 #### Tier 2: Budget (Good Value)
 | Model | Vision | Tools | Input $/M | Output $/M | Notes |
 |-------|--------|-------|-----------|------------|-------|
+| `google/gemini-2.0-flash-001` | ✅ | ✅ | $0.10 | $0.40 | **Recommended** - reliable, fast |
 | `x-ai/grok-4-fast` | ✅ | ✅ | $0.20 | $0.50 | Excellent value, 2M context |
 | `x-ai/grok-4.1-fast` | ✅ | ✅ | $0.20 | $0.50 | Best tool-calling |
 | `qwen/qwen3-vl-32b-instruct` | ✅ | ✅ | $0.02 | $0.00 | Nearly free! |
@@ -71,15 +72,15 @@ The fish-scale-agent requires models that support:
 | `z-ai/glm-4.5` | ✅ | ✅ | $0.11 | $0.28 | Agentic, very cheap |
 | `openai/gpt-4o-mini` | ✅ | ✅ | $0.15 | $0.60 | Fast, may be less accurate |
 | `mistralai/pixtral-12b` | ✅ | ✅ | $0.125 | $0.125 | Lightweight vision |
-| `google/gemini-flash-1.5` | ✅ | ✅ | $0.075 | $0.30 | Very fast |
 
 #### Tier 3: FREE Models
 | Model | Vision | Tools | Notes |
 |-------|--------|-------|-------|
-| `x-ai/grok-4.1-fast` | ✅ | ✅ | Free on OpenRouter (limited time) |
 | `qwen/qwen2.5-vl-72b-instruct:free` | ✅ | ✅ | Free tier, 72B params |
 | `qwen/qwen2.5-vl-32b-instruct:free` | ✅ | ✅ | Free tier, 32B params |
-| `mistralai/mistral-small-3.1-24b-instruct:free` | ✅ | ✅ | Free tier with vision |
+| `mistralai/mistral-small-3.1-24b-instruct:free` | ✅ | ⚠️ | Free tier - tool calling unreliable |
+
+**⚠️ Free Model Warning:** Free tier models often have unreliable tool calling or availability issues (404 errors, rate limits). For reliable results, use `google/gemini-2.0-flash-001` (~$0.01-0.03 per run).
 
 ### Models That Won't Work
 
@@ -143,6 +144,7 @@ OpenRouter charges per token (roughly 4 characters = 1 token). Prices are per mi
 #### Budget Models
 | Model | Input $/M | Output $/M | Typical Run* |
 |-------|-----------|------------|--------------|
+| `google/gemini-2.0-flash-001` | $0.10 | $0.40 | $0.01 - $0.03 |
 | `x-ai/grok-4-fast` | $0.20 | $0.50 | $0.02 - $0.04 |
 | `x-ai/grok-4.1-fast` | $0.20 | $0.50 | $0.02 - $0.04 |
 | `z-ai/glm-4.5` | $0.11 | $0.28 | $0.01 - $0.02 |
@@ -150,7 +152,6 @@ OpenRouter charges per token (roughly 4 characters = 1 token). Prices are per mi
 | `qwen/qwen3-vl-32b-instruct` | $0.02 | $0.00 | ~$0.002 |
 | `openai/gpt-4o-mini` | $0.15 | $0.60 | $0.02 - $0.05 |
 | `mistralai/pixtral-12b` | $0.125 | $0.125 | $0.01 - $0.02 |
-| `google/gemini-flash-1.5` | $0.075 | $0.30 | $0.01 - $0.03 |
 
 #### Free Models (while available)
 | Model | Notes |
@@ -225,20 +226,17 @@ export OPENROUTER_API_KEY=sk-or-v1-abc123...
 # Start the UI (required)
 uv run fish-scale-ui
 
-# In another terminal, run the agent with OpenRouter (default: Claude)
+# In another terminal, run with Gemini 2.0 Flash (RECOMMENDED - reliable & cheap)
+uv run fish-scale-agent run test_images/sample.tif --provider openrouter --model google/gemini-2.0-flash-001 -v
+
+# Or use the default (Claude Sonnet 4 - higher quality, more expensive)
 uv run fish-scale-agent run test_images/sample.tif --provider openrouter -v
 
-# Try the FREE Grok model (best value!)
-uv run fish-scale-agent run test_images/sample.tif --provider openrouter --model x-ai/grok-4.1-fast -v
-
-# Try a free Qwen model
+# Try a free Qwen model (may have availability issues)
 uv run fish-scale-agent run test_images/sample.tif --provider openrouter --model qwen/qwen2.5-vl-72b-instruct:free -v
 
 # Try Z.ai's vision model (very cheap)
 uv run fish-scale-agent run test_images/sample.tif --provider openrouter --model z-ai/glm-4.6v -v
-
-# Try Mistral's Pixtral (good balance)
-uv run fish-scale-agent run test_images/sample.tif --provider openrouter --model mistralai/pixtral-12b -v
 ```
 
 ## Provider Notes
@@ -258,6 +256,67 @@ Alibaba's Qwen models include excellent vision-language models. The free tiers (
 
 ### Mistral
 Pixtral models are Mistral's multimodal offerings. Pixtral-12B is lightweight and cheap; Pixtral-Large is more capable.
+
+## Quick Reference: All Model Commands
+
+Copy-paste ready commands for all documented models. Replace `IMAGE.tif` with your image path.
+
+### Premium Models ($0.15 - $0.50 per run)
+
+```bash
+# Claude Sonnet 4 (default) - Best quality
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model anthropic/claude-sonnet-4 -v
+
+# OpenAI GPT-4o - Strong alternative
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model openai/gpt-4o -v
+
+# xAI Grok-4 - 2M context window
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model x-ai/grok-4 -v
+
+# Mistral Pixtral Large - 124B multimodal
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model mistralai/pixtral-large-2411 -v
+```
+
+### Budget Models ($0.01 - $0.05 per run)
+
+```bash
+# Google Gemini 2.0 Flash - RECOMMENDED (reliable & cheap)
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model google/gemini-2.0-flash-001 -v
+
+# xAI Grok-4 Fast - Excellent value
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model x-ai/grok-4-fast -v
+
+# xAI Grok-4.1 Fast - Best tool-calling
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model x-ai/grok-4.1-fast -v
+
+# Z.ai GLM-4.5 - Very cheap
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model z-ai/glm-4.5 -v
+
+# Z.ai GLM-4.6V - Chinese vision model
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model z-ai/glm-4.6v -v
+
+# Qwen3 VL 32B - Nearly free
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model qwen/qwen3-vl-32b-instruct -v
+
+# OpenAI GPT-4o-mini - Fast
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model openai/gpt-4o-mini -v
+
+# Mistral Pixtral 12B - Lightweight
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model mistralai/pixtral-12b -v
+```
+
+### Free Models (may have availability issues)
+
+```bash
+# Qwen 2.5 VL 72B Free
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model qwen/qwen2.5-vl-72b-instruct:free -v
+
+# Qwen 2.5 VL 32B Free
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model qwen/qwen2.5-vl-32b-instruct:free -v
+
+# Mistral Small Free (tool calling may be unreliable)
+uv run fish-scale-agent run IMAGE.tif --provider openrouter --model mistralai/mistral-small-3.1-24b-instruct:free -v
+```
 
 ## Further Reading
 

@@ -42,6 +42,8 @@ MODEL_PRICING = {
     # Google models
     "google/gemini-pro-1.5": {"input": 2.5, "output": 7.5},
     "google/gemini-flash-1.5": {"input": 0.075, "output": 0.30},
+    "google/gemini-2.0-flash-001": {"input": 0.10, "output": 0.40},
+    "google/gemini-2.5-flash": {"input": 0.15, "output": 0.60},
     # Mistral models (with vision)
     "mistralai/pixtral-large-2411": {"input": 2.0, "output": 6.0},
     "mistralai/pixtral-12b": {"input": 0.125, "output": 0.125},
@@ -203,9 +205,34 @@ class OpenRouterAgentProvider(AgentLLMProvider):
             }
 
             # Call OpenRouter API
-            response = self._client.post("/chat/completions", json=payload)
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = self._client.post("/chat/completions", json=payload)
+                response.raise_for_status()
+                data = response.json()
+            except httpx.HTTPStatusError as e:
+                # Try to get error details from response body
+                try:
+                    error_body = e.response.json()
+                    error_detail = error_body.get("error", {}).get("message", str(error_body))
+                except Exception:
+                    error_detail = e.response.text[:500] if e.response.text else "No details"
+
+                if e.response.status_code == 404:
+                    raise RuntimeError(
+                        f"OpenRouter 404 error for model '{self._model_name}': {error_detail}"
+                    ) from e
+                elif e.response.status_code == 429:
+                    raise RuntimeError(
+                        f"Rate limit exceeded for model '{self._model_name}': {error_detail}"
+                    ) from e
+                elif e.response.status_code == 400:
+                    raise RuntimeError(
+                        f"OpenRouter 400 error for model '{self._model_name}': {error_detail}"
+                    ) from e
+                else:
+                    raise RuntimeError(
+                        f"OpenRouter {e.response.status_code} error: {error_detail}"
+                    ) from e
 
             # Track usage
             self._iteration_count += 1
@@ -225,10 +252,23 @@ class OpenRouterAgentProvider(AgentLLMProvider):
             if message.get("tool_calls"):
                 for tc in message["tool_calls"]:
                     if tc["type"] == "function":
+                        # Parse arguments, handling malformed JSON from some models
+                        args_str = tc["function"].get("arguments", "")
+                        if args_str:
+                            try:
+                                args = json.loads(args_str)
+                            except json.JSONDecodeError as e:
+                                # Some models return malformed JSON - try to extract what we can
+                                # or use empty dict as fallback
+                                print(f"Warning: Malformed JSON in tool arguments: {args_str[:100]}... Error: {e}")
+                                args = {}
+                        else:
+                            args = {}
+
                         tool_calls.append(ToolCall(
                             id=tc["id"],
                             name=tc["function"]["name"],
-                            arguments=json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {},
+                            arguments=args,
                         ))
 
             # Build iteration info

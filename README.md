@@ -1,6 +1,11 @@
 # Fish Scale Metrics Extraction
 
-A Python CLI tool for extracting tubercle diameter and intertubercular space measurements from SEM (Scanning Electron Microscope) images of ganoid fish scales.
+A Python toolset for extracting tubercle diameter and intertubercular space measurements from SEM (Scanning Electron Microscope) images of ganoid fish scales.
+
+**Three interfaces available:**
+- **CLI Tool** (`fish-scale-measure`) - Command-line batch processing
+- **Web UI** (`fish-scale-ui`) - Interactive graphical interface with manual editing
+- **MCP Server** (`fish-scale-mcp`) - Model Context Protocol server for LLM agent control
 
 ## Purpose
 
@@ -36,17 +41,40 @@ cd fish_scales
 
 # Create virtual environment and install dependencies with uv
 uv venv
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,mcp]"
 
 # Or with pip
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,mcp]"
 ```
 
 ## Usage
 
-### Process a Single Image
+### Web UI (Recommended)
+
+The web interface provides interactive tubercle detection with manual editing capabilities:
+
+```bash
+# Start the web UI (opens browser automatically)
+fish-scale-ui
+
+# With custom image directory
+fish-scale-ui -d /path/to/images
+
+# Custom port
+fish-scale-ui -p 8080
+```
+
+Features:
+- Image rotation, cropping, and preprocessing
+- Automatic and manual calibration
+- Interactive tubercle detection with parameter tuning
+- Manual add/delete/move tubercles
+- Multiple annotation sets per image
+- Export to CSV and SLO formats
+
+### CLI: Process a Single Image
 
 ```bash
 fish-scale-measure process path/to/image.tif
@@ -58,7 +86,7 @@ fish-scale-measure process image.tif --scale-bar-um 10 --scale-bar-px 73
 fish-scale-measure process image.tif --threshold 0.03 --min-diameter 2.5 --max-diameter 8.0
 ```
 
-### Process Multiple Images
+### CLI: Process Multiple Images
 
 ```bash
 fish-scale-measure batch path/to/images/
@@ -70,7 +98,7 @@ fish-scale-measure batch images/ --scatter
 fish-scale-measure batch images/ --no-viz
 ```
 
-### Run Validation Tests
+### CLI: Run Validation Tests
 
 ```bash
 # Validate against test images with known expected values
@@ -186,26 +214,68 @@ See `test_images/test_cases.md` for the complete list.
 4. **Measurement**: Delaunay triangulation for neighbor identification, edge-to-edge spacing calculation
 5. **Classification**: Compare metrics against reference ranges for genus suggestion
 
+## MCP Server (LLM Agent Control)
+
+The MCP (Model Context Protocol) server enables LLM agents to control the application programmatically for automated or semi-automated tubercle detection:
+
+```bash
+# Start the Web UI first
+fish-scale-ui
+
+# In another terminal, start the MCP server
+fish-scale-mcp
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_screenshot` | Capture current view as base64 PNG |
+| `get_state` | Get complete current state |
+| `load_image` | Load an image file |
+| `set_calibration` | Set µm/pixel calibration |
+| `get_params` / `set_params` | Get/set extraction parameters |
+| `run_extraction` | Run automated tubercle detection |
+| `add_tubercle` / `move_tubercle` / `delete_tubercle` | Tubercle CRUD operations |
+| `add_connection` / `delete_connection` | Connection CRUD operations |
+| `auto_connect` | Generate connections (delaunay/gabriel/rng) |
+| `get_statistics` | Get measurement statistics |
+| `save_slo` | Save annotations to file |
+
 ## Project Structure
 
 ```
 fish_scales/
-├── src/fish_scale_analysis/
-│   ├── cli.py                  # Command-line interface
-│   ├── models.py               # Data classes
-│   ├── core/
-│   │   ├── calibration.py      # Scale calibration
-│   │   ├── preprocessing.py    # Image enhancement
-│   │   ├── detection.py        # Tubercle detection
-│   │   └── measurement.py      # Metrics calculation
-│   └── output/
-│       ├── csv_writer.py       # CSV output
-│       ├── logger.py           # Logging utilities
-│       └── visualization.py    # Figure generation
+├── src/
+│   ├── fish_scale_analysis/    # Core analysis library + CLI
+│   │   ├── cli.py              # Command-line interface
+│   │   ├── models.py           # Data classes
+│   │   ├── core/
+│   │   │   ├── calibration.py  # Scale calibration
+│   │   │   ├── preprocessing.py # Image enhancement
+│   │   │   ├── detection.py    # Tubercle detection
+│   │   │   └── measurement.py  # Metrics calculation
+│   │   └── output/
+│   │       ├── csv_writer.py   # CSV output
+│   │       ├── logger.py       # Logging utilities
+│   │       └── visualization.py # Figure generation
+│   │
+│   ├── fish_scale_ui/          # Flask Web UI
+│   │   ├── app.py              # Flask app factory
+│   │   ├── routes/             # API and page routes
+│   │   ├── services/           # Business logic
+│   │   ├── templates/          # Jinja2 templates
+│   │   └── static/             # CSS, JS, assets
+│   │
+│   └── fish_scale_mcp/         # MCP Server
+│       ├── server.py           # FastMCP server with tools
+│       ├── screenshot.py       # Server-side rendering
+│       └── cli.py              # Entry point
+│
 ├── tests/                      # Pytest test suite
-├── test_images/                # Reference images
-├── images/                     # User images for analysis
-└── output/                     # Generated output
+├── test_images/                # Reference images with known values
+├── specs/                      # Specification documents
+└── output/                     # Generated output (gitignored)
 ```
 
 ## References

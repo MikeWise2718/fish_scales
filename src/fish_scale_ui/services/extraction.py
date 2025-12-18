@@ -117,6 +117,7 @@ def run_extraction(
             'diameter_um': t.diameter_um,
             'radius_px': t.radius_px,
             'circularity': t.circularity,
+            'source': 'extracted',  # Track origin for coloring
         })
 
     edges_data = []

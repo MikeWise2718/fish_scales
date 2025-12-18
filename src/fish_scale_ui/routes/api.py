@@ -294,14 +294,21 @@ def handle_log():
 @api_bp.route('/current-image', methods=['GET'])
 def get_current_image():
     """Get current image info."""
-    if not _current_image['path']:
+    if not _current_image.get('path'):
         return jsonify({'loaded': False})
+
+    # Build web URL from web_path
+    web_url = None
+    if _current_image.get('web_path'):
+        web_path = Path(_current_image['web_path'])
+        web_url = f"/uploads/{web_path.name}"
 
     return jsonify({
         'loaded': True,
-        'filename': _current_image['filename'],
-        'rotation': _current_image['rotation'],
-        'calibration': _current_image['calibration']
+        'filename': _current_image.get('filename'),
+        'rotation': _current_image.get('rotation', 0),
+        'calibration': _current_image.get('calibration'),
+        'web_url': web_url,
     })
 
 
@@ -384,8 +391,11 @@ def extract():
     um_per_px = calibration.get('um_per_px', 0.33)
 
     try:
+        # Use web_path (converted PNG) not original path (TIF)
+        # to ensure extraction coordinates match displayed image
+        image_to_process = _current_image.get('web_path') or _current_image['path']
         result = run_extraction(
-            image_path=_current_image['path'],
+            image_path=image_to_process,
             um_per_px=um_per_px,
             method=data.get('method', 'log'),
             threshold=float(data.get('threshold', 0.05)),

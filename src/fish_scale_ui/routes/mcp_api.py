@@ -60,6 +60,7 @@ def get_screenshot():
                 show_connections=True,
                 show_numbers=show_numbers,
                 show_scale_bar=show_scale_bar,
+                debug_shapes=_extraction_data.get('debug_shapes', []),
             )
         else:
             # Just return the image without overlay
@@ -138,6 +139,7 @@ def get_state():
         'statistics': _extraction_data.get('statistics', {}),
         'parameters': _extraction_data.get('parameters', {}),
         'dirty': _extraction_data.get('dirty', False),
+        'debug_shapes': _extraction_data.get('debug_shapes', []),
     })
 
 
@@ -250,6 +252,7 @@ def handle_tubercle():
             'diameter_px': float(diameter_px),
             'diameter_um': float(diameter_um),
             'circularity': 1.0,  # Perfect circle for manual additions
+            'source': 'manual',  # Track origin for coloring
         }
 
         tubercles.append(new_tub)
@@ -458,10 +461,10 @@ def auto_connect():
     """
     from fish_scale_ui.services.logging import log_event
     from fish_scale_analysis.core.measurement import (
-        build_neighbor_graph,
-        extract_gabriel_edges,
-        extract_rng_edges,
+        filter_to_gabriel,
+        filter_to_rng,
     )
+    from scipy.spatial import Delaunay
     import numpy as np
     import math
 
@@ -486,22 +489,27 @@ def auto_connect():
         centroids = np.array([[t['centroid_x'], t['centroid_y']] for t in tubercles])
         radii = np.array([t.get('radius_px', 10) for t in tubercles])
 
-        # Build Delaunay triangulation
-        tri = build_neighbor_graph(centroids)
+        # Build Delaunay triangulation (need at least 3 points for triangulation)
+        if len(tubercles) < 3:
+            # With only 2 tubercles, just connect them directly
+            edge_indices = [(0, 1)]
+        else:
+            tri = Delaunay(centroids)
 
-        # Extract edges based on method
-        if method == 'delaunay':
-            # All Delaunay edges
-            edge_indices = set()
+            # Extract all Delaunay edges first
+            delaunay_edges = set()
             for simplex in tri.simplices:
                 for i in range(3):
                     edge = tuple(sorted([simplex[i], simplex[(i + 1) % 3]]))
-                    edge_indices.add(edge)
-            edge_indices = list(edge_indices)
-        elif method == 'gabriel':
-            edge_indices = extract_gabriel_edges(tri, centroids)
-        else:  # rng
-            edge_indices = extract_rng_edges(tri, centroids)
+                    delaunay_edges.add(edge)
+
+            # Filter based on method
+            if method == 'delaunay':
+                edge_indices = list(delaunay_edges)
+            elif method == 'gabriel':
+                edge_indices = list(filter_to_gabriel(centroids, delaunay_edges))
+            else:  # rng
+                edge_indices = list(filter_to_rng(centroids, delaunay_edges))
 
         # Convert to edge objects with distance calculations
         edges = []
@@ -723,6 +731,101 @@ def load_image():
 
     except Exception as e:
         return jsonify({'error': f'Failed to load image: {str(e)}'}), 500
+
+
+@mcp_bp.route('/debug-shapes', methods=['GET', 'POST', 'DELETE'])
+def handle_debug_shapes():
+    """Manage debug shapes (rectangles, markers) for visualization.
+
+    GET returns current debug shapes.
+
+    POST (add):
+        {
+            "type": "rectangle",
+            "x": float,
+            "y": float,
+            "width": float,
+            "height": float,
+            "label": str (optional),
+            "color": str (optional, default: "magenta")
+        }
+        Returns: {"success": true, "shape": {...}, "id": int}
+
+    DELETE:
+        {"id": int} - delete specific shape
+        {} - delete all shapes
+        Returns: {"success": true}
+    """
+    from fish_scale_ui.services.logging import log_event
+
+    _current_image, _extraction_data = get_state_refs()
+
+    # Initialize debug_shapes if not present
+    if 'debug_shapes' not in _extraction_data:
+        _extraction_data['debug_shapes'] = []
+
+    shapes = _extraction_data['debug_shapes']
+
+    if request.method == 'GET':
+        return jsonify({
+            'success': True,
+            'shapes': shapes,
+        })
+
+    elif request.method == 'POST':
+        data = request.get_json() or {}
+        shape_type = data.get('type', 'rectangle')
+
+        if shape_type == 'rectangle':
+            x = data.get('x')
+            y = data.get('y')
+            width = data.get('width')
+            height = data.get('height')
+
+            if any(v is None for v in [x, y, width, height]):
+                return jsonify({'error': 'x, y, width, height required for rectangle'}), 400
+
+            new_id = max((s.get('id', 0) for s in shapes), default=0) + 1
+
+            shape = {
+                'id': new_id,
+                'type': 'rectangle',
+                'x': float(x),
+                'y': float(y),
+                'width': float(width),
+                'height': float(height),
+                'label': data.get('label', ''),
+                'color': data.get('color', 'magenta'),
+            }
+
+            shapes.append(shape)
+            log_event('mcp_debug_shape_added', shape)
+
+            return jsonify({
+                'success': True,
+                'shape': shape,
+                'id': new_id,
+            })
+        else:
+            return jsonify({'error': f'Unknown shape type: {shape_type}'}), 400
+
+    elif request.method == 'DELETE':
+        data = request.get_json() or {}
+        shape_id = data.get('id')
+
+        if shape_id is not None:
+            # Delete specific shape
+            original_count = len(shapes)
+            _extraction_data['debug_shapes'] = [s for s in shapes if s.get('id') != shape_id]
+            if len(_extraction_data['debug_shapes']) == original_count:
+                return jsonify({'error': f'Shape {shape_id} not found'}), 404
+            log_event('mcp_debug_shape_deleted', {'id': shape_id})
+        else:
+            # Delete all shapes
+            _extraction_data['debug_shapes'] = []
+            log_event('mcp_debug_shapes_cleared', {'count': len(shapes)})
+
+        return jsonify({'success': True})
 
 
 @mcp_bp.route('/statistics', methods=['GET'])

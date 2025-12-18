@@ -378,24 +378,24 @@ fish_scales/
 
 ## Implementation Phases
 
-### Phase 1: MCP Server Foundation (2-3 days)
-- [ ] Set up `fish_scale_mcp` package
-- [ ] Implement core MCP server with basic tools
-- [ ] Add Flask API endpoints for MCP to call
-- [ ] Server-side screenshot rendering (image + overlay)
+### Phase 1: MCP Server Foundation (2-3 days) ✅ COMPLETE
+- [x] Set up `fish_scale_mcp` package
+- [x] Implement core MCP server with basic tools
+- [x] Add Flask API endpoints for MCP to call
+- [x] Server-side screenshot rendering (image + overlay)
 - [ ] Test with MCP Inspector or simple client
 
-### Phase 2: Single-Provider Agent (2-3 days)
-- [ ] Set up `fish_scale_agent` package
-- [ ] Implement Gemini provider (free tier for testing)
-- [ ] Write system prompt for three-phase process
-- [ ] Implement agent runner
-- [ ] CLI to run agent: `uv run fish-scale-agent run <image>`
+### Phase 2: Single-Provider Agent (2-3 days) ✅ COMPLETE
+- [x] Set up `fish_scale_agent` package
+- [x] Implement Gemini provider (using google-genai SDK)
+- [x] Write system prompt for three-phase process
+- [x] Implement agent runner
+- [x] CLI to run agent: `uv run fish-scale-agent run <image>`
 
-### Phase 3: Multi-Provider Support (1-2 days)
-- [ ] Implement Claude provider
+### Phase 3: Multi-Provider Support (1-2 days) - PARTIAL
+- [x] Implement Claude provider (with vision support for screenshots)
 - [ ] Implement OpenRouter provider
-- [ ] Provider selection via CLI args or config
+- [x] Provider selection via CLI args or config
 
 ### Phase 4: UI Integration (2-3 days)
 - [ ] Agent control panel in UI

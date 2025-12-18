@@ -13,11 +13,12 @@ from PIL import Image, ImageDraw, ImageFont
 
 # Overlay colors (RGB tuples)
 COLORS = {
-    'tubercle_outline': (0, 255, 255),      # Cyan
+    'tubercle_outline': (0, 255, 255),      # Cyan - extracted tubercles
+    'tubercle_manual': (0, 255, 0),         # Green - manually added tubercles
     'tubercle_fill': (0, 255, 255, 50),     # Cyan with alpha
-    'tubercle_selected': (255, 255, 0),     # Yellow
-    'connection': (0, 255, 0),              # Green
-    'connection_selected': (255, 255, 0),   # Yellow
+    'tubercle_selected': (255, 0, 255),     # Magenta for selection
+    'connection': (255, 255, 0),            # Yellow
+    'connection_selected': (255, 0, 255),   # Magenta
     'text': (255, 255, 255),                # White
     'text_bg': (0, 0, 0, 180),              # Black with alpha
 }
@@ -34,6 +35,7 @@ def render_screenshot(
     show_scale_bar: bool = False,
     selected_tub_id: Optional[int] = None,
     selected_edge_idx: Optional[int] = None,
+    debug_shapes: Optional[list] = None,
 ) -> str:
     """Render image with overlay and return as base64 PNG.
 
@@ -48,6 +50,7 @@ def render_screenshot(
         show_scale_bar: Whether to draw a scale bar
         selected_tub_id: ID of selected tubercle (highlighted yellow)
         selected_edge_idx: Index of selected edge (highlighted yellow)
+        debug_shapes: Optional list of debug shapes (rectangles, etc.)
 
     Returns:
         Base64-encoded PNG image string
@@ -84,10 +87,16 @@ def render_screenshot(
                 cx = tub.get('centroid_x', 0)
                 cy = tub.get('centroid_y', 0)
                 radius = tub.get('radius_px', 10)
+                source = tub.get('source', 'extracted')
 
-                # Determine colors
+                # Determine colors based on selection and source
                 is_selected = tub_id == selected_tub_id
-                outline_color = COLORS['tubercle_selected'] if is_selected else COLORS['tubercle_outline']
+                if is_selected:
+                    outline_color = COLORS['tubercle_selected']
+                elif source == 'manual':
+                    outline_color = COLORS['tubercle_manual']
+                else:
+                    outline_color = COLORS['tubercle_outline']
                 width = 3 if is_selected else 2
 
                 # Draw circle outline
@@ -129,6 +138,10 @@ def render_screenshot(
             if um_per_px > 0:
                 _draw_scale_bar(draw, img.size, um_per_px)
 
+        # Draw debug shapes (rectangles, markers)
+        if debug_shapes:
+            _draw_debug_shapes(draw, debug_shapes)
+
         # Composite overlay onto image
         result = Image.alpha_composite(img, overlay)
 
@@ -141,6 +154,77 @@ def render_screenshot(
         buffer.seek(0)
 
         return base64.b64encode(buffer.read()).decode('utf-8')
+
+
+DEBUG_COLORS = {
+    'magenta': (255, 0, 255),
+    'red': (255, 0, 0),
+    'green': (0, 255, 0),
+    'blue': (0, 0, 255),
+    'yellow': (255, 255, 0),
+    'cyan': (0, 255, 255),
+    'white': (255, 255, 255),
+    'orange': (255, 165, 0),
+}
+
+
+def _draw_debug_shapes(draw: ImageDraw.Draw, shapes: list):
+    """Draw debug shapes (rectangles, markers) on the overlay."""
+    for shape in shapes:
+        shape_type = shape.get('type', 'rectangle')
+        color_name = shape.get('color', 'magenta')
+        color = DEBUG_COLORS.get(color_name, (255, 0, 255))
+
+        if shape_type == 'rectangle':
+            x = shape.get('x', 0)
+            y = shape.get('y', 0)
+            width = shape.get('width', 100)
+            height = shape.get('height', 100)
+            label = shape.get('label', '')
+
+            # Draw rectangle outline (no fill)
+            draw.rectangle(
+                [x, y, x + width, y + height],
+                outline=color,
+                width=3
+            )
+
+            # Draw corner markers for visibility
+            marker_size = 10
+            # Top-left
+            draw.line([(x, y), (x + marker_size, y)], fill=color, width=3)
+            draw.line([(x, y), (x, y + marker_size)], fill=color, width=3)
+            # Top-right
+            draw.line([(x + width, y), (x + width - marker_size, y)], fill=color, width=3)
+            draw.line([(x + width, y), (x + width, y + marker_size)], fill=color, width=3)
+            # Bottom-left
+            draw.line([(x, y + height), (x + marker_size, y + height)], fill=color, width=3)
+            draw.line([(x, y + height), (x, y + height - marker_size)], fill=color, width=3)
+            # Bottom-right
+            draw.line([(x + width, y + height), (x + width - marker_size, y + height)], fill=color, width=3)
+            draw.line([(x + width, y + height), (x + width, y + height - marker_size)], fill=color, width=3)
+
+            # Draw label if provided
+            if label:
+                try:
+                    font = ImageFont.truetype("arial.ttf", 14)
+                except (IOError, OSError):
+                    font = ImageFont.load_default()
+
+                text_bbox = draw.textbbox((0, 0), label, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+
+                # Position label at top-left inside the rectangle
+                text_x = x + 5
+                text_y = y + 5
+
+                # Draw background
+                draw.rectangle(
+                    [text_x - 2, text_y - 2, text_x + text_width + 2, text_y + text_height + 2],
+                    fill=(0, 0, 0, 200)
+                )
+                draw.text((text_x, text_y), label, fill=color, font=font)
 
 
 def _draw_scale_bar(draw: ImageDraw.Draw, img_size: tuple, um_per_px: float):

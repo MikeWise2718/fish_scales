@@ -855,18 +855,162 @@
 <script src="{{ url_for('static', filename='js/extraction.js') }}"></script>
 <script src="{{ url_for('static', filename='js/setUI.js') }}"></script>
 <script>
+    // MCP state polling for auto-refresh
+    let mcpPollingEnabled = true;
+    let lastStateHash = null;
+    let currentImageUrl = null;
+
+    function computeStateHash(state) {
+        // Simple hash based on counts and image filename
+        const tubCount = (state.tubercles || []).length;
+        const edgeCount = (state.edges || []).length;
+        const debugCount = (state.debug_shapes || []).length;
+        const imgName = state.image?.filename || '';
+        return `${imgName}:${tubCount}:${edgeCount}:${debugCount}`;
+    }
+
+    async function pollMCPState() {
+        if (!mcpPollingEnabled) return;
+
+        try {
+            const response = await fetch('/api/mcp/state');
+            const state = await response.json();
+            const newHash = computeStateHash(state);
+
+            // Check if state changed
+            if (newHash !== lastStateHash) {
+                console.log('MCP state changed:', lastStateHash, '->', newHash);
+                lastStateHash = newHash;
+
+                // Load image if changed or not loaded
+                if (state.image?.loaded && state.image?.filename) {
+                    const imgResponse = await fetch('/api/current-image');
+                    const imgData = await imgResponse.json();
+
+                    if (imgData.web_url && imgData.web_url !== currentImageUrl) {
+                        currentImageUrl = imgData.web_url;
+                        window.imageViewer.loadImage(currentImageUrl);
+                        // Wait for image to load before setting overlay
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+
+                    // Update overlay data (including debug shapes)
+                    window.overlay.setData(state.tubercles || [], state.edges || [], state.debug_shapes || []);
+
+                    // Update calibration
+                    if (state.calibration?.um_per_px) {
+                        window.calibration?.setCalibration(state.calibration.um_per_px, state.calibration.method || 'mcp');
+                    }
+
+                    // Fetch and update statistics (computed on-the-fly)
+                    try {
+                        const statsResponse = await fetch('/api/mcp/statistics');
+                        const stats = await statsResponse.json();
+                        updateStatisticsDisplay(stats);
+                    } catch (e) {
+                        console.log('Failed to fetch statistics:', e);
+                    }
+
+                    // Refresh data panel
+                    window.dataPanel?.refresh();
+                }
+            }
+        } catch (e) {
+            // Silently ignore polling errors
+        }
+
+        // Schedule next poll (2 seconds)
+        setTimeout(pollMCPState, 2000);
+    }
+
+    function updateStatisticsDisplay(stats) {
+        // Update the statistics panel elements
+        const panelElements = {
+            'statNTubercles': stats.n_tubercles,
+            'statNEdges': stats.n_edges,
+            'statMeanDiameter': stats.mean_diameter_um?.toFixed(2),
+            'statMeanSpace': stats.mean_space_um?.toFixed(2),
+            'statGenus': stats.suggested_genus,
+            'statConfidence': stats.classification_confidence,
+        };
+
+        // Update the stats bar elements
+        const barElements = {
+            'statsBarTubercles': stats.n_tubercles,
+            'statsBarEdges': stats.n_edges,
+            'statsBarDiameter': stats.mean_diameter_um?.toFixed(2),
+            'statsBarSpace': stats.mean_space_um?.toFixed(2),
+        };
+
+        for (const [id, value] of Object.entries({...panelElements, ...barElements})) {
+            const el = document.getElementById(id);
+            if (el && value !== undefined) {
+                el.textContent = value ?? '-';
+            }
+        }
+    }
+
     // Initialize workspace when DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
         // Get image URL from query params
         const params = new URLSearchParams(window.location.search);
-        const imgUrl = params.get('img');
+        let imgUrl = params.get('img');
+
+        // If no URL param, check if MCP API has loaded an image
+        if (!imgUrl) {
+            try {
+                const response = await fetch('/api/mcp/state');
+                const state = await response.json();
+                lastStateHash = computeStateHash(state);
+
+                if (state.image && state.image.loaded && state.image.filename) {
+                    // Get the web path from current-image endpoint
+                    const imgResponse = await fetch('/api/current-image');
+                    const imgData = await imgResponse.json();
+                    if (imgData.web_url) {
+                        imgUrl = imgData.web_url;
+                        currentImageUrl = imgUrl;
+                        // Also load any existing extraction data
+                        if (state.tubercles && state.tubercles.length > 0) {
+                            // Wait for image to load, then set overlay data
+                            window.imageViewer.loadImage(imgUrl);
+                            setTimeout(async () => {
+                                window.overlay.setData(state.tubercles, state.edges || []);
+                                if (state.calibration) {
+                                    window.calibration.setCalibration(state.calibration.um_per_px, state.calibration.method || 'mcp');
+                                }
+                                // Fetch statistics (computed on-the-fly)
+                                try {
+                                    const statsResponse = await fetch('/api/mcp/statistics');
+                                    const stats = await statsResponse.json();
+                                    updateStatisticsDisplay(stats);
+                                } catch (e) {
+                                    console.log('Failed to fetch statistics:', e);
+                                }
+                                window.dataPanel?.refresh();
+                            }, 500);
+                            window.app.loadLog();
+                            // Start polling for MCP changes
+                            setTimeout(pollMCPState, 2000);
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('No MCP state available:', e);
+            }
+        }
 
         if (imgUrl) {
+            currentImageUrl = imgUrl;
             window.imageViewer.loadImage(imgUrl);
         }
 
         // Load initial log
         window.app.loadLog();
+
+        // Start polling for MCP changes (even if loaded via URL param)
+        setTimeout(pollMCPState, 2000);
     });
 </script>
 {% endblock %}

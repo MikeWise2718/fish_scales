@@ -426,6 +426,69 @@ Typical workflow:
             return StatisticsData(**resp.json())
 
         @self.mcp.tool()
+        def add_debug_rectangle(
+            x: float,
+            y: float,
+            width: float,
+            height: float,
+            label: Optional[str] = None,
+            color: str = "magenta",
+        ) -> dict:
+            """Add a debug rectangle to visualize coordinate understanding.
+
+            Use this at the start of analysis to verify you understand the image
+            coordinate system. The rectangle will appear in screenshots.
+
+            Args:
+                x: X coordinate of top-left corner (in pixels)
+                y: Y coordinate of top-left corner (in pixels)
+                width: Width of rectangle (in pixels)
+                height: Height of rectangle (in pixels)
+                label: Optional text label to display
+                color: Color name (magenta, red, green, blue, yellow, cyan, white, orange)
+
+            Returns:
+                The created debug shape with ID
+            """
+            payload = {
+                'type': 'rectangle',
+                'x': x,
+                'y': y,
+                'width': width,
+                'height': height,
+                'color': color,
+            }
+            if label:
+                payload['label'] = label
+
+            resp = httpx.post(
+                self._api_url('/debug-shapes'),
+                json=payload,
+                timeout=10
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not data.get('success'):
+                raise Exception(data.get('error', 'Add debug rectangle failed'))
+            return data['shape']
+
+        @self.mcp.tool()
+        def clear_debug_shapes() -> bool:
+            """Remove all debug shapes from the overlay.
+
+            Returns:
+                True if successful
+            """
+            resp = httpx.request(
+                'DELETE',
+                self._api_url('/debug-shapes'),
+                json={},
+                timeout=10
+            )
+            resp.raise_for_status()
+            return resp.json().get('success', True)
+
+        @self.mcp.tool()
         def save_slo() -> dict:
             """Save current annotations to SLO file.
 

@@ -108,6 +108,19 @@ body {
     margin-bottom: 2rem;
 }
 
+.workspace-link {
+    margin-bottom: 1.5rem;
+}
+
+.workspace-link .btn {
+    margin-right: 0.5rem;
+}
+
+.workspace-hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
 .upload-zone {
     border: 2px dashed var(--border-color);
     border-radius: 0.5rem;

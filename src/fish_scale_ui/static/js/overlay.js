@@ -7,6 +7,7 @@ window.overlay = (function() {
     let ctx = null;
     let tubercles = [];
     let edges = [];
+    let debugShapes = [];
     let selectedTubId = null;
     let selectedEdgeIdx = null;
     let scale = 1;
@@ -19,16 +20,40 @@ window.overlay = (function() {
         scale: false
     };
 
+    // Color mode for tubercles: 'source' (extracted vs manual), 'uniform' (all same color)
+    // Future modes: 'neighbors' (by neighbor count), 'diameter' (by size), etc.
+    let colorMode = 'source';
+
     // Get colors from settings (with defaults)
     function getColors() {
         const tubercleColor = (window.settings && window.settings.get('tubercleColor')) || '#00ffff';
+        const manualTubercleColor = (window.settings && window.settings.get('manualTubercleColor')) || '#00ff00';
         const connectionColor = (window.settings && window.settings.get('connectionColor')) || '#ffff00';
         return {
-            tubercle: tubercleColor,
+            tubercle: tubercleColor,           // Extracted tubercles (cyan)
+            manualTubercle: manualTubercleColor, // Manually added (green)
             edge: connectionColor,
             selectedTubercle: '#ff00ff', // Magenta for selection (distinct from yellow ITCs)
             selectedEdge: '#ff00ff',
         };
+    }
+
+    // Get color for a specific tubercle based on color mode
+    function getTubercleColor(tub, colors, isSelected) {
+        if (isSelected) {
+            return colors.selectedTubercle;
+        }
+        if (colorMode === 'source') {
+            return tub.source === 'manual' ? colors.manualTubercle : colors.tubercle;
+        }
+        // Default/uniform mode
+        return colors.tubercle;
+    }
+
+    // Set the color mode
+    function setColorMode(mode) {
+        colorMode = mode;
+        render();
     }
 
     // Initialize toggle states from Settings defaults
@@ -128,10 +153,19 @@ window.overlay = (function() {
         render();
     }
 
+    // Set debug shapes for visualization
+    function setDebugShapes(shapes) {
+        debugShapes = shapes || [];
+        render();
+    }
+
     // Set data (preserves selection if selected item still exists)
-    function setData(newTubercles, newEdges) {
+    function setData(newTubercles, newEdges, newDebugShapes) {
         tubercles = newTubercles || [];
         edges = newEdges || [];
+        if (newDebugShapes !== undefined) {
+            debugShapes = newDebugShapes || [];
+        }
 
         // Preserve selection only if the selected item still exists in new data
         if (selectedTubId !== null) {
@@ -154,6 +188,7 @@ window.overlay = (function() {
     function clear() {
         tubercles = [];
         edges = [];
+        debugShapes = [];
         selectedTubId = null;
         selectedEdgeIdx = null;
         if (ctx && canvas) {
@@ -198,6 +233,81 @@ window.overlay = (function() {
         if (toggleState.scale) {
             drawCalibrationScale();
         }
+
+        // Draw debug shapes (always visible when present)
+        if (debugShapes.length > 0) {
+            drawDebugShapes(colors);
+        }
+    }
+
+    // Draw debug shapes (rectangles, markers)
+    function drawDebugShapes(colors) {
+        const debugColors = {
+            'magenta': '#ff00ff',
+            'red': '#ff0000',
+            'green': '#00ff00',
+            'blue': '#0000ff',
+            'yellow': '#ffff00',
+            'cyan': '#00ffff',
+            'white': '#ffffff',
+            'orange': '#ffa500',
+        };
+
+        debugShapes.forEach(shape => {
+            if (shape.type === 'rectangle') {
+                const color = debugColors[shape.color] || '#ff00ff';
+                const x = shape.x * scale;
+                const y = shape.y * scale;
+                const width = shape.width * scale;
+                const height = shape.height * scale;
+
+                // Draw rectangle outline
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 5]);
+                ctx.strokeRect(x, y, width, height);
+                ctx.setLineDash([]);
+
+                // Draw corner markers
+                const markerSize = 15;
+                ctx.lineWidth = 3;
+                // Top-left
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + markerSize, y);
+                ctx.moveTo(x, y);
+                ctx.lineTo(x, y + markerSize);
+                ctx.stroke();
+                // Top-right
+                ctx.beginPath();
+                ctx.moveTo(x + width, y);
+                ctx.lineTo(x + width - markerSize, y);
+                ctx.moveTo(x + width, y);
+                ctx.lineTo(x + width, y + markerSize);
+                ctx.stroke();
+                // Bottom-left
+                ctx.beginPath();
+                ctx.moveTo(x, y + height);
+                ctx.lineTo(x + markerSize, y + height);
+                ctx.moveTo(x, y + height);
+                ctx.lineTo(x, y + height - markerSize);
+                ctx.stroke();
+                // Bottom-right
+                ctx.beginPath();
+                ctx.moveTo(x + width, y + height);
+                ctx.lineTo(x + width - markerSize, y + height);
+                ctx.moveTo(x + width, y + height);
+                ctx.lineTo(x + width, y + height - markerSize);
+                ctx.stroke();
+
+                // Draw label if present
+                if (shape.label) {
+                    ctx.font = '14px Arial, sans-serif';
+                    ctx.fillStyle = color;
+                    ctx.fillText(shape.label, x + 5, y + 18);
+                }
+            }
+        });
     }
 
     // Draw calibration scale bar
@@ -298,7 +408,7 @@ window.overlay = (function() {
 
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = isSelected ? colors.selectedTubercle : colors.tubercle;
+        ctx.strokeStyle = getTubercleColor(tub, colors, isSelected);
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.stroke();
     }
@@ -317,7 +427,7 @@ window.overlay = (function() {
         ctx.lineWidth = 3;
         ctx.strokeText(tub.id, x, y);
 
-        ctx.fillStyle = colors.tubercle;
+        ctx.fillStyle = getTubercleColor(tub, colors, false);
         ctx.fillText(tub.id, x, y);
     }
 
@@ -565,6 +675,7 @@ window.overlay = (function() {
         resize,
         setScale,
         setData,
+        setDebugShapes,
         clear,
         render,
         selectTubercle,
@@ -577,5 +688,6 @@ window.overlay = (function() {
         getTubercles,
         getEdges,
         initToggleStates,
+        setColorMode,
     };
 })();

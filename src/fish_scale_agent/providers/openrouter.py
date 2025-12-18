@@ -29,6 +29,7 @@ def _convert_tool_to_openai(tool: ToolDefinition) -> dict:
 
 # Pricing per million tokens (approximate, varies by model)
 # See https://openrouter.ai/docs#models for current pricing
+# Prices may fluctuate - check OpenRouter for current rates
 MODEL_PRICING = {
     # Anthropic models via OpenRouter
     "anthropic/claude-sonnet-4": {"input": 3.0, "output": 15.0},
@@ -41,11 +42,31 @@ MODEL_PRICING = {
     # Google models
     "google/gemini-pro-1.5": {"input": 2.5, "output": 7.5},
     "google/gemini-flash-1.5": {"input": 0.075, "output": 0.30},
-    # Meta models
-    "meta-llama/llama-3.1-70b-instruct": {"input": 0.52, "output": 0.75},
-    "meta-llama/llama-3.1-405b-instruct": {"input": 2.0, "output": 2.0},
-    # Mistral models
-    "mistralai/mistral-large": {"input": 2.0, "output": 6.0},
+    # Mistral models (with vision)
+    "mistralai/pixtral-large-2411": {"input": 2.0, "output": 6.0},
+    "mistralai/pixtral-12b": {"input": 0.125, "output": 0.125},
+    "mistralai/mistral-small-3.1-24b-instruct": {"input": 0.10, "output": 0.30},
+    "mistralai/mistral-small-3.1-24b-instruct:free": {"input": 0.0, "output": 0.0},
+    # Qwen models (with vision)
+    "qwen/qwen3-vl-235b-a22b-instruct": {"input": 0.50, "output": 1.50},
+    "qwen/qwen3-vl-32b-instruct": {"input": 0.02, "output": 0.0},
+    "qwen/qwen2.5-vl-72b-instruct": {"input": 0.20, "output": 0.20},
+    "qwen/qwen2.5-vl-32b-instruct": {"input": 0.10, "output": 0.10},
+    "qwen/qwen2.5-vl-72b-instruct:free": {"input": 0.0, "output": 0.0},
+    "qwen/qwen2.5-vl-32b-instruct:free": {"input": 0.0, "output": 0.0},
+    # xAI Grok models (with vision)
+    "x-ai/grok-4": {"input": 3.0, "output": 15.0},
+    "x-ai/grok-4-fast": {"input": 0.20, "output": 0.50},
+    "x-ai/grok-4.1-fast": {"input": 0.20, "output": 0.50},
+    "x-ai/grok-2-vision-1212": {"input": 2.0, "output": 10.0},
+    "x-ai/grok-vision-beta": {"input": 5.0, "output": 15.0},
+    # Z.ai / Zhipu models (Chinese)
+    "z-ai/glm-4.5": {"input": 0.11, "output": 0.28},
+    "z-ai/glm-4.5-air": {"input": 0.05, "output": 0.15},
+    "z-ai/glm-4.6v": {"input": 0.20, "output": 0.50},  # Vision model
+    # DeepSeek (text only - no vision, listed for reference)
+    "deepseek/deepseek-chat": {"input": 0.14, "output": 0.28},
+    "deepseek/deepseek-chat-v3.1": {"input": 0.14, "output": 0.28},
 }
 
 # Default model - good balance of capability and cost

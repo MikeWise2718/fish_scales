@@ -96,7 +96,9 @@ fish_scales/
 │   │       │   ├── undo.js            # Undo/redo system
 │   │       │   ├── sets.js            # Multiple annotation sets
 │   │       │   └── settings.js        # User preferences
-│   │       └── help/parameters.html   # Parameter documentation
+│   │       └── help/
+│   │           ├── parameters.html    # Detection parameter documentation
+│   │           └── hexagonalness.html # Hexagonalness metrics documentation
 │   │
 │   ├── fish_scale_mcp/                # MCP Server for LLM agents
 │   │   ├── __init__.py
@@ -263,6 +265,40 @@ uv run fish-scale-agent run image.tif --calibration 0.1 --max-iterations 30 -v
 export GEMINI_API_KEY=your_key_here
 uv run fish-scale-agent run image.tif --provider gemini
 ```
+
+## Hexagonalness Metrics
+
+The hexagonalness score measures how well detected tubercle patterns match an ideal hexagonal lattice. The formula is:
+
+```
+Hexagonalness = 0.40 × Spacing Uniformity + 0.45 × Degree Score + 0.15 × Edge Ratio Score
+```
+
+**Components:**
+- **Spacing Uniformity** (40%): `max(0, 1 - 2 × CV)` where CV = coefficient of variation of edge lengths
+- **Degree Score** (45%): Weighted score based on neighbor counts (5-7 neighbors → 1.0, 4/8 → 0.7, 3/9 → 0.3)
+- **Edge Ratio Score** (15%): `max(0, 1 - |ratio - 2.5| / 2)` where ratio = edges/nodes
+
+**Reliability:**
+- `high`: 15+ nodes (statistically reliable)
+- `low`: 4-14 nodes (may be unreliable)
+- `none`: <4 nodes (insufficient data)
+
+**Implementation locations** (must stay in sync):
+- Python core: `fish_scale_analysis/core/measurement.py` → `calculate_hexagonalness()`
+- Python MCP API: `fish_scale_ui/routes/mcp_api.py` → `_calculate_hexagonalness_from_dicts()`
+- JavaScript: `extraction.js`, `setUI.js`, `editor.js` → `calculateHexagonalness()`
+
+Tests in `tests/test_hexagonalness_consistency.py` verify all implementations agree.
+
+## Screenshots and Debugging
+
+When the user provides screenshots for debugging UI issues, they are typically located at:
+```
+C:\Users\mike\Pictures\screenshots\
+```
+
+Use the Read tool to view screenshot images when debugging visual issues.
 
 ## Specifications
 

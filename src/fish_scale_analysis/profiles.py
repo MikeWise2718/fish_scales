@@ -71,6 +71,18 @@ PROFILES = {
         max_diameter_um=8.0,
         edge_margin_px=10,
     ),
+    "atractosteus": DetectionProfile(
+        name="atractosteus",
+        description="Optimized for Atractosteus spp. (large tubercles, tight spacing)",
+        clahe_clip=0.03,
+        clahe_kernel=8,
+        blur_sigma=1.0,
+        threshold=0.08,
+        min_circularity=0.4,
+        min_diameter_um=5.0,
+        max_diameter_um=12.0,
+        edge_margin_px=10,
+    ),
     "polypterus": DetectionProfile(
         name="polypterus",
         description="Optimized for Polypterus spp. (small tubercles, wide spacing)",

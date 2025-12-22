@@ -247,6 +247,9 @@ window.extraction = (function() {
             }
         }
 
+        // Calculate hexagonalness metrics
+        const hexMetrics = calculateHexagonalness(tubercles, edges);
+
         return {
             n_tubercles,
             n_edges,
@@ -256,7 +259,81 @@ window.extraction = (function() {
             std_space_um,
             suggested_genus: '-',
             classification_confidence: '-',
+            ...hexMetrics,
         };
+    }
+
+    // Calculate hexagonalness metrics
+    function calculateHexagonalness(tubercles, edges) {
+        const MIN_NODES_FOR_RELIABLE = 15;
+
+        const result = {
+            hexagonalness_score: 0.0,
+            spacing_uniformity: 0.0,
+            degree_score: 0.0,
+            edge_ratio_score: 0.0,
+            mean_degree: 0.0,
+            spacing_cv: 1.0,
+            reliability: 'none',
+            n_nodes: 0,
+        };
+
+        if (!tubercles || tubercles.length < 4) {
+            return result;
+        }
+
+        const n_nodes = tubercles.length;
+        result.n_nodes = n_nodes;
+        result.reliability = n_nodes >= MIN_NODES_FOR_RELIABLE ? 'high' : 'low';
+
+        // Spacing uniformity
+        if (edges && edges.length > 0) {
+            const spacings = edges.map(e => e.edge_distance_um).filter(s => s > 0);
+            if (spacings.length > 0) {
+                const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
+                const variance = spacings.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spacings.length;
+                const cv = mean > 0 ? Math.sqrt(variance) / mean : 1.0;
+                result.spacing_cv = cv;
+                result.spacing_uniformity = Math.max(0, 1 - 2 * cv);
+            }
+        }
+
+        // Degree distribution (use object key lookup for type coercion)
+        const degree = {};
+        tubercles.forEach(t => { degree[t.id] = 0; });
+        edges.forEach(e => {
+            const aId = e.tubercle_a_id ?? e.id1;
+            const bId = e.tubercle_b_id ?? e.id2;
+            if (degree[aId] !== undefined) degree[aId]++;
+            if (degree[bId] !== undefined) degree[bId]++;
+        });
+
+        const degrees = Object.values(degree);
+        if (degrees.length > 0) {
+            result.mean_degree = degrees.reduce((a, b) => a + b, 0) / degrees.length;
+            let weightedScore = 0;
+            degrees.forEach(d => {
+                if (d >= 5 && d <= 7) weightedScore += 1.0;
+                else if (d === 4 || d === 8) weightedScore += 0.7;
+                else if (d === 3 || d === 9) weightedScore += 0.3;
+            });
+            result.degree_score = weightedScore / degrees.length;
+        }
+
+        // Edge/node ratio
+        if (n_nodes > 0) {
+            const ratio = edges.length / n_nodes;
+            result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 2.5) / 2);
+        }
+
+        // Composite score
+        result.hexagonalness_score = (
+            0.40 * result.spacing_uniformity +
+            0.45 * result.degree_score +
+            0.15 * result.edge_ratio_score
+        );
+
+        return result;
     }
 
     // Show overwrite confirmation dialog

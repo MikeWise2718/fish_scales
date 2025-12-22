@@ -339,6 +339,137 @@ def measure_nearest_neighbor_spacing(
     return spaces, mean_space, std_space
 
 
+def calculate_hexagonalness(
+    tubercles: List[Tubercle],
+    edges: List[NeighborEdge],
+    min_nodes_for_reliable: int = 15,
+) -> dict:
+    """
+    Calculate hexagonalness metrics for the detected pattern.
+
+    A perfect hexagonal lattice has:
+    - Uniform spacing (low coefficient of variation)
+    - Each interior node has 6 neighbors (edge nodes have fewer)
+    - Edge count ≈ 3 × node count
+    - Angles between edges are multiples of 60°
+
+    Args:
+        tubercles: List of detected tubercles
+        edges: List of neighbor edges
+        min_nodes_for_reliable: Minimum nodes for statistically reliable metrics
+
+    Returns:
+        Dictionary with hexagonalness metrics:
+        - hexagonalness_score: Overall score 0-1 (1 = perfect hex)
+        - spacing_uniformity: How uniform edge lengths are (0-1)
+        - degree_score: Fraction of nodes with appropriate neighbor count (0-1)
+        - edge_ratio_score: How close edge/node ratio is to 3 (0-1)
+        - mean_degree: Average number of neighbors per node
+        - degree_histogram: Count of nodes by neighbor count
+        - spacing_cv: Coefficient of variation of edge lengths
+        - reliability: 'high' (≥15 nodes), 'low' (4-14 nodes), 'none' (<4 nodes)
+        - n_nodes: Number of nodes used in calculation
+    """
+    from collections import defaultdict
+
+    result = {
+        'hexagonalness_score': 0.0,
+        'spacing_uniformity': 0.0,
+        'degree_score': 0.0,
+        'edge_ratio_score': 0.0,
+        'mean_degree': 0.0,
+        'degree_histogram': {},
+        'spacing_cv': 1.0,
+        'reliability': 'none',
+        'n_nodes': 0,
+    }
+
+    if not tubercles or len(tubercles) < 4:
+        return result
+
+    n_nodes = len(tubercles)
+    result['n_nodes'] = n_nodes
+    result['reliability'] = 'high' if n_nodes >= min_nodes_for_reliable else 'low'
+
+    # 1. Spacing uniformity (coefficient of variation)
+    if edges:
+        spacings = [e.edge_distance_um for e in edges if e.edge_distance_um > 0]
+        if spacings:
+            mean_spacing = np.mean(spacings)
+            std_spacing = np.std(spacings)
+            cv = std_spacing / mean_spacing if mean_spacing > 0 else 1.0
+            result['spacing_cv'] = float(cv)
+            # Score: CV of 0 = perfect (1.0), CV of 0.5+ = poor (0.0)
+            result['spacing_uniformity'] = float(max(0, 1 - 2 * cv))
+
+    # 2. Degree distribution (neighbors per node)
+    degree = defaultdict(int)
+    tubercle_ids = {t.id for t in tubercles}
+
+    for e in edges:
+        if e.tubercle_a_id in tubercle_ids:
+            degree[e.tubercle_a_id] += 1
+        if e.tubercle_b_id in tubercle_ids:
+            degree[e.tubercle_b_id] += 1
+
+    # Include nodes with 0 connections
+    for t in tubercles:
+        if t.id not in degree:
+            degree[t.id] = 0
+
+    degrees = list(degree.values())
+    if degrees:
+        result['mean_degree'] = float(np.mean(degrees))
+
+        # Build histogram
+        histogram = defaultdict(int)
+        for d in degrees:
+            histogram[d] += 1
+        result['degree_histogram'] = dict(histogram)
+
+        # Score: fraction of nodes with 4-8 neighbors (allowing for edge effects)
+        # Interior hex nodes have 6, edge nodes have 3-5
+        good_count = sum(1 for d in degrees if 4 <= d <= 8)
+        acceptable_count = sum(1 for d in degrees if 3 <= d <= 9)
+
+        # Use a weighted score: full credit for 5-7, partial for 3-4 and 8-9
+        weighted_score = 0
+        for d in degrees:
+            if 5 <= d <= 7:
+                weighted_score += 1.0
+            elif d == 4 or d == 8:
+                weighted_score += 0.7
+            elif d == 3 or d == 9:
+                weighted_score += 0.3
+            # 0-2 or 10+ get 0
+
+        result['degree_score'] = float(weighted_score / len(degrees))
+
+    # 3. Edge/node ratio (ideal is ~3 for hex lattice)
+    # For a planar graph: E ≤ 3V - 6 (equality for triangulation)
+    # Hex lattice interior: each node has 6 edges, each edge shared by 2 nodes = 3 edges/node
+    n_nodes = len(tubercles)
+    n_edges = len(edges)
+    if n_nodes > 0:
+        ratio = n_edges / n_nodes
+        # Ideal is ~3, but with edge effects it's often 2-2.5
+        # Score: ratio of 2.5-3.5 is good, outside that degrades
+        ideal_ratio = 2.5  # Account for edge effects
+        deviation = abs(ratio - ideal_ratio)
+        result['edge_ratio_score'] = float(max(0, 1 - deviation / 2))
+
+    # 4. Composite hexagonalness score
+    # Weight: spacing uniformity and degree are most important
+    score = (
+        0.40 * result['spacing_uniformity'] +
+        0.45 * result['degree_score'] +
+        0.15 * result['edge_ratio_score']
+    )
+    result['hexagonalness_score'] = float(score)
+
+    return result
+
+
 def classify_genus(
     mean_diameter: float,
     mean_space: float,

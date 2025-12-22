@@ -115,6 +115,80 @@ window.data = (function() {
         document.getElementById('statGenus').textContent = stats.suggested_genus ?? '-';
         document.getElementById('statConfidence').textContent = stats.classification_confidence ?? '-';
 
+        // Hexagonalness metrics
+        const hexScoreEl = document.getElementById('statHexScore');
+        const hexReliabilityEl = document.getElementById('statHexReliability');
+        if (hexScoreEl) {
+            const hexScore = stats.hexagonalness_score;
+            const reliability = stats.reliability;
+            if (hexScore !== undefined) {
+                hexScoreEl.textContent = hexScore.toFixed(3);
+                // Color code: green (>0.7), yellow (0.4-0.7), red (<0.4)
+                hexScoreEl.classList.remove('score-good', 'score-medium', 'score-poor');
+                if (hexScore >= 0.7) {
+                    hexScoreEl.classList.add('score-good');
+                } else if (hexScore >= 0.4) {
+                    hexScoreEl.classList.add('score-medium');
+                } else {
+                    hexScoreEl.classList.add('score-poor');
+                }
+            } else {
+                hexScoreEl.textContent = '-';
+                hexScoreEl.classList.remove('score-good', 'score-medium', 'score-poor');
+            }
+
+            // Show reliability indicator
+            if (hexReliabilityEl) {
+                hexReliabilityEl.classList.remove('reliability-high', 'reliability-low', 'reliability-none');
+                if (reliability === 'low') {
+                    hexReliabilityEl.textContent = `(${stats.n_nodes || 0} nodes - low confidence)`;
+                    hexReliabilityEl.classList.add('reliability-low');
+                } else if (reliability === 'none') {
+                    hexReliabilityEl.textContent = '(insufficient data)';
+                    hexReliabilityEl.classList.add('reliability-none');
+                } else {
+                    hexReliabilityEl.textContent = '';
+                }
+            }
+        }
+
+        // Formula component scores
+        const spacingUniformityEl = document.getElementById('statSpacingUniformity');
+        if (spacingUniformityEl) {
+            spacingUniformityEl.textContent = stats.spacing_uniformity !== undefined
+                ? stats.spacing_uniformity.toFixed(3)
+                : '-';
+        }
+
+        const degreeScoreEl = document.getElementById('statDegreeScore');
+        if (degreeScoreEl) {
+            degreeScoreEl.textContent = stats.degree_score !== undefined
+                ? stats.degree_score.toFixed(3)
+                : '-';
+        }
+
+        const edgeRatioScoreEl = document.getElementById('statEdgeRatioScore');
+        if (edgeRatioScoreEl) {
+            edgeRatioScoreEl.textContent = stats.edge_ratio_score !== undefined
+                ? stats.edge_ratio_score.toFixed(3)
+                : '-';
+        }
+
+        // Supporting raw metrics
+        const spacingCVEl = document.getElementById('statSpacingCV');
+        if (spacingCVEl) {
+            spacingCVEl.textContent = stats.spacing_cv !== undefined
+                ? stats.spacing_cv.toFixed(3)
+                : '-';
+        }
+
+        const meanDegreeEl = document.getElementById('statMeanDegree');
+        if (meanDegreeEl) {
+            meanDegreeEl.textContent = stats.mean_degree !== undefined
+                ? stats.mean_degree.toFixed(2)
+                : '-';
+        }
+
         // Also update the always-visible stats bar
         const statsBarTubercles = document.getElementById('statsBarTubercles');
         const statsBarDiameter = document.getElementById('statsBarDiameter');
@@ -136,6 +210,20 @@ window.data = (function() {
             statsBarSpace.textContent = stats.mean_space_um !== undefined
                 ? `${stats.mean_space_um.toFixed(2)} ± ${stats.std_space_um?.toFixed(2) || '0.00'}`
                 : '-';
+        }
+
+        // Update hex score in stats bar
+        const statsBarHex = document.getElementById('statsBarHex');
+        if (statsBarHex) {
+            const hexScore = stats.hexagonalness_score;
+            const reliability = stats.reliability;
+            if (hexScore !== undefined && reliability !== 'none') {
+                statsBarHex.textContent = hexScore.toFixed(2);
+                statsBarHex.classList.toggle('hex-low', reliability === 'low');
+            } else {
+                statsBarHex.textContent = '-';
+                statsBarHex.classList.remove('hex-low');
+            }
         }
     }
 
@@ -200,6 +288,16 @@ window.data = (function() {
 
         document.addEventListener('overlayDeselected', () => {
             clearHighlights();
+        });
+
+        // Help icons for hexagonalness metrics
+        const helpIcons = document.querySelectorAll('.help-icon[data-help]');
+        helpIcons.forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                e.preventDefault();
+                const topic = icon.dataset.help;
+                window.open(`/static/help/hexagonalness.html#${topic}`, 'help', 'width=800,height=600');
+            });
         });
     }
 

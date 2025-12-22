@@ -10,8 +10,9 @@ from fish_scale_analysis.core.measurement import (
     measure_intertubercular_spaces,
     classify_genus,
     measure_metrics,
+    calculate_hexagonalness,
 )
-from fish_scale_analysis.models import Tubercle
+from fish_scale_analysis.models import Tubercle, NeighborEdge
 
 
 @pytest.fixture
@@ -233,3 +234,101 @@ class TestMeasureMetrics:
         assert "mean_diameter_um" in summary
         assert "mean_space_um" in summary
         assert "suggested_genus" in summary
+
+
+class TestHexagonalness:
+    """Tests for hexagonalness calculation."""
+
+    def test_hexagonalness_with_edges(self, sample_tubercles, simple_calibration):
+        """Test hexagonalness calculation with edges."""
+        # Build neighbor graph
+        tri = build_neighbor_graph(sample_tubercles)
+        edges = get_neighbor_edges(sample_tubercles, tri, simple_calibration)
+
+        result = calculate_hexagonalness(sample_tubercles, edges)
+
+        assert 'hexagonalness_score' in result
+        assert 'spacing_uniformity' in result
+        assert 'degree_score' in result
+        assert 'mean_degree' in result
+        assert 'spacing_cv' in result
+        assert 'degree_histogram' in result
+
+        # Score should be between 0 and 1
+        assert 0 <= result['hexagonalness_score'] <= 1
+        assert 0 <= result['spacing_uniformity'] <= 1
+        assert 0 <= result['degree_score'] <= 1
+
+    def test_hexagonalness_empty_tubercles(self):
+        """Test hexagonalness with no tubercles."""
+        result = calculate_hexagonalness([], [])
+
+        assert result['hexagonalness_score'] == 0.0
+        assert result['mean_degree'] == 0.0
+
+    def test_hexagonalness_few_tubercles(self):
+        """Test hexagonalness with fewer than 4 tubercles."""
+        few = [
+            Tubercle(1, (0, 0), 10, 2, 78, 0.9),
+            Tubercle(2, (50, 0), 10, 2, 78, 0.9),
+            Tubercle(3, (25, 43), 10, 2, 78, 0.9),
+        ]
+        result = calculate_hexagonalness(few, [])
+
+        assert result['hexagonalness_score'] == 0.0
+
+    def test_hexagonalness_uniform_grid(self, sample_tubercles, simple_calibration):
+        """Test that a uniform grid scores well on spacing uniformity."""
+        # The sample_tubercles fixture creates a regular 3x3 grid
+        tri = build_neighbor_graph(sample_tubercles)
+        edges = get_neighbor_edges(sample_tubercles, tri, simple_calibration)
+
+        result = calculate_hexagonalness(sample_tubercles, edges)
+
+        # A regular grid should have good spacing uniformity
+        # CV should be low for uniform spacing
+        assert result['spacing_cv'] < 0.5
+
+    def test_hexagonalness_reliability_indicator(self, simple_calibration):
+        """Test reliability indicator for different node counts."""
+        # 4 nodes - low reliability
+        t4 = [
+            Tubercle(1, (0, 0), 10, 2, 78, 0.9),
+            Tubercle(2, (50, 0), 10, 2, 78, 0.9),
+            Tubercle(3, (25, 43), 10, 2, 78, 0.9),
+            Tubercle(4, (25, 15), 10, 2, 78, 0.9),
+        ]
+        tri = build_neighbor_graph(t4)
+        edges = get_neighbor_edges(t4, tri, simple_calibration)
+        result = calculate_hexagonalness(t4, edges)
+
+        assert result['reliability'] == 'low'
+        assert result['n_nodes'] == 4
+
+        # 20 nodes - high reliability
+        import math
+        t20 = []
+        for row in range(5):
+            for col in range(4):
+                x = col * 30 + (15 if row % 2 else 0)
+                y = row * 26
+                t20.append(Tubercle(len(t20)+1, (x, y), 10, 2, 78, 0.9))
+
+        tri = build_neighbor_graph(t20)
+        edges = get_neighbor_edges(t20, tri, simple_calibration)
+        result = calculate_hexagonalness(t20, edges)
+
+        assert result['reliability'] == 'high'
+        assert result['n_nodes'] == 20
+
+    def test_hexagonalness_none_reliability(self):
+        """Test that 0-3 nodes returns none reliability."""
+        t3 = [
+            Tubercle(1, (0, 0), 10, 2, 78, 0.9),
+            Tubercle(2, (50, 0), 10, 2, 78, 0.9),
+            Tubercle(3, (25, 43), 10, 2, 78, 0.9),
+        ]
+        result = calculate_hexagonalness(t3, [])
+
+        assert result['reliability'] == 'none'
+        assert result['n_nodes'] == 0

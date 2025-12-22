@@ -16,6 +16,7 @@ from fish_scale_analysis.core.measurement import (
     measure_nearest_neighbor_spacing,
     measure_intertubercular_spaces,
     classify_genus,
+    calculate_hexagonalness,
 )
 from fish_scale_analysis.profiles import PROFILES, get_profile
 
@@ -106,6 +107,9 @@ def run_extraction(
     if tubercles:
         genus, confidence = classify_genus(mean_diam, mean_space)
 
+    # Calculate hexagonalness metrics
+    hex_metrics = calculate_hexagonalness(tubercles, edges)
+
     # Convert to serializable format
     tubercles_data = []
     for t in tubercles:
@@ -150,6 +154,14 @@ def run_extraction(
             'std_space_um': round(std_space, 2),
             'suggested_genus': genus,
             'classification_confidence': confidence,
+            # Hexagonalness metrics
+            'hexagonalness_score': round(hex_metrics['hexagonalness_score'], 3),
+            'spacing_uniformity': round(hex_metrics['spacing_uniformity'], 3),
+            'degree_score': round(hex_metrics['degree_score'], 3),
+            'mean_degree': round(hex_metrics['mean_degree'], 2),
+            'spacing_cv': round(hex_metrics['spacing_cv'], 3),
+            'reliability': hex_metrics['reliability'],
+            'n_nodes': hex_metrics['n_nodes'],
         },
         'parameters': {
             'method': method,

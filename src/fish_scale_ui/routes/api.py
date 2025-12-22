@@ -420,6 +420,8 @@ def extract():
             'n_tubercles': result['statistics']['n_tubercles'],
             'n_edges': result['statistics']['n_edges'],
             'method': result['parameters']['method'],
+            'hexagonalness_score': result['statistics'].get('hexagonalness_score'),
+            'reliability': result['statistics'].get('reliability'),
         })
 
         return jsonify(result)
@@ -606,9 +608,29 @@ def load_slo():
                 if loaded_name and loaded_name != _current_image['filename']:
                     name_match = False
 
-            # Update extraction data
-            _extraction_data['tubercles'] = slo_data.get('tubercles', [])
-            _extraction_data['edges'] = slo_data.get('edges', [])
+            # Update extraction data - handle both v1 and v2 formats
+            if slo_data.get('version') == 2 and slo_data.get('sets'):
+                # V2 format: get data from active set
+                active_set_id = slo_data.get('activeSetId')
+                active_set = None
+                for s in slo_data['sets']:
+                    if s.get('id') == active_set_id:
+                        active_set = s
+                        break
+                if not active_set and slo_data['sets']:
+                    active_set = slo_data['sets'][0]
+
+                if active_set:
+                    _extraction_data['tubercles'] = active_set.get('tubercles', [])
+                    _extraction_data['edges'] = active_set.get('edges', [])
+                else:
+                    _extraction_data['tubercles'] = []
+                    _extraction_data['edges'] = []
+            else:
+                # V1 format: get data from root level
+                _extraction_data['tubercles'] = slo_data.get('tubercles', [])
+                _extraction_data['edges'] = slo_data.get('edges', [])
+
             _extraction_data['statistics'] = slo_data.get('statistics', {})
             _extraction_data['parameters'] = slo_data.get('parameters', {})
             _extraction_data['dirty'] = False

@@ -538,14 +538,24 @@ def auto_connect():
         _extraction_data['edges'] = edges
         _extraction_data['dirty'] = True
 
-        # Update statistics
+        # Update statistics including hexagonalness
+        tubercles = _extraction_data.get('tubercles', [])
         if edges:
             edge_distances = [e['edge_distance_um'] for e in edges]
             _extraction_data['statistics']['n_edges'] = len(edges)
             _extraction_data['statistics']['mean_space_um'] = np.mean(edge_distances)
             _extraction_data['statistics']['std_space_um'] = np.std(edge_distances)
 
-        log_event('mcp_auto_connect', {'method': method, 'n_edges': len(edges)})
+        # Recalculate hexagonalness after connection changes
+        hex_metrics = _calculate_hexagonalness_from_dicts(tubercles, edges)
+        _extraction_data['statistics'].update(hex_metrics)
+
+        log_event('mcp_auto_connect', {
+            'method': method,
+            'n_edges': len(edges),
+            'hexagonalness_score': hex_metrics.get('hexagonalness_score'),
+            'reliability': hex_metrics.get('reliability'),
+        })
 
         return jsonify({
             'success': True,
@@ -830,7 +840,7 @@ def handle_debug_shapes():
 
 @mcp_bp.route('/statistics', methods=['GET'])
 def get_statistics():
-    """Get current statistics.
+    """Get current statistics including hexagonalness metrics.
 
     Returns:
         {
@@ -841,10 +851,16 @@ def get_statistics():
             "mean_space_um": float,
             "std_space_um": float,
             "suggested_genus": str,
-            "classification_confidence": str
+            "classification_confidence": str,
+            "hexagonalness_score": float (0-1, 1=perfect hex),
+            "spacing_uniformity": float (0-1),
+            "degree_score": float (0-1),
+            "mean_degree": float,
+            "spacing_cv": float
         }
     """
     import numpy as np
+    from collections import defaultdict
     from fish_scale_analysis.models import GENUS_REFERENCE_RANGES
 
     _current_image, _extraction_data = get_state_refs()
@@ -886,7 +902,118 @@ def get_statistics():
         stats['suggested_genus'] = best_genus
         stats['classification_confidence'] = 'high' if best_score < 2 else 'medium' if best_score < 4 else 'low'
 
+    # Calculate hexagonalness metrics
+    hex_metrics = _calculate_hexagonalness_from_dicts(tubercles, edges)
+    stats.update(hex_metrics)
+
     # Update stored statistics
     _extraction_data['statistics'] = stats
 
     return jsonify(stats)
+
+
+def _calculate_hexagonalness_from_dicts(
+    tubercles: list,
+    edges: list,
+    min_nodes_for_reliable: int = 15,
+) -> dict:
+    """
+    Calculate hexagonalness metrics from dict representations.
+
+    This is a standalone version that works with the dict format used in the API,
+    mirroring the logic in fish_scale_analysis.core.measurement.calculate_hexagonalness.
+    """
+    import numpy as np
+    from collections import defaultdict
+
+    result = {
+        'hexagonalness_score': 0.0,
+        'spacing_uniformity': 0.0,
+        'degree_score': 0.0,
+        'edge_ratio_score': 0.0,
+        'mean_degree': 0.0,
+        'degree_histogram': {},
+        'spacing_cv': 1.0,
+        'reliability': 'none',
+        'n_nodes': 0,
+    }
+
+    if not tubercles or len(tubercles) < 4:
+        return result
+
+    n_nodes = len(tubercles)
+    result['n_nodes'] = n_nodes
+    result['reliability'] = 'high' if n_nodes >= min_nodes_for_reliable else 'low'
+
+    # 1. Spacing uniformity (coefficient of variation)
+    if edges:
+        spacings = [e.get('edge_distance_um', 0) for e in edges if e.get('edge_distance_um', 0) > 0]
+        if spacings:
+            mean_spacing = np.mean(spacings)
+            std_spacing = np.std(spacings)
+            cv = std_spacing / mean_spacing if mean_spacing > 0 else 1.0
+            result['spacing_cv'] = float(cv)
+            # Score: CV of 0 = perfect (1.0), CV of 0.5+ = poor (0.0)
+            result['spacing_uniformity'] = float(max(0, 1 - 2 * cv))
+
+    # 2. Degree distribution (neighbors per node)
+    degree = defaultdict(int)
+    tubercle_ids = {t.get('id') for t in tubercles}
+
+    for e in edges:
+        # Edges can have either 'tubercle_a_id'/'tubercle_b_id' or 'id1'/'id2'
+        # Use explicit None check to handle id=0 correctly (0 is falsy)
+        a_id = e.get('tubercle_a_id') if e.get('tubercle_a_id') is not None else e.get('id1')
+        b_id = e.get('tubercle_b_id') if e.get('tubercle_b_id') is not None else e.get('id2')
+        if a_id in tubercle_ids:
+            degree[a_id] += 1
+        if b_id in tubercle_ids:
+            degree[b_id] += 1
+
+    # Include nodes with 0 connections
+    for t in tubercles:
+        tid = t.get('id')
+        if tid not in degree:
+            degree[tid] = 0
+
+    degrees = list(degree.values())
+    if degrees:
+        result['mean_degree'] = float(np.mean(degrees))
+
+        # Build histogram
+        histogram = defaultdict(int)
+        for d in degrees:
+            histogram[d] += 1
+        result['degree_histogram'] = dict(histogram)
+
+        # Score: weighted by how close to ideal 5-7 neighbors
+        weighted_score = 0
+        for d in degrees:
+            if 5 <= d <= 7:
+                weighted_score += 1.0
+            elif d == 4 or d == 8:
+                weighted_score += 0.7
+            elif d == 3 or d == 9:
+                weighted_score += 0.3
+            # 0-2 or 10+ get 0
+
+        result['degree_score'] = float(weighted_score / len(degrees))
+
+    # 3. Edge/node ratio (ideal is ~2.5 accounting for edge effects)
+    n_nodes = len(tubercles)
+    n_edges = len(edges)
+    if n_nodes > 0:
+        ratio = n_edges / n_nodes
+        ideal_ratio = 2.5
+        deviation = abs(ratio - ideal_ratio)
+        result['edge_ratio_score'] = float(max(0, 1 - deviation / 2))
+
+    # 4. Composite hexagonalness score
+    score = (
+        0.40 * result['spacing_uniformity'] +
+        0.45 * result['degree_score'] +
+        0.15 * result['edge_ratio_score']
+    )
+    result['hexagonalness_score'] = float(score)
+
+    return result

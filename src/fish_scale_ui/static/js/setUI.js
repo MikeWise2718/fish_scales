@@ -5,6 +5,8 @@
 
 window.setUI = (function() {
     let menuOpen = false;
+    let statsBarMenuOpen = false;
+    let dataTabMenuOpen = false;
 
     /**
      * Initialize the set selector UI
@@ -19,8 +21,8 @@ window.setUI = (function() {
         // Listen for set events
         bindSetEvents();
 
-        // Update stats bar set name
-        updateStatsBarSetName();
+        // Update all set indicators
+        updateAllSetIndicators();
     }
 
     /**
@@ -138,6 +140,15 @@ window.setUI = (function() {
      * Show create new set dialog
      */
     function showCreateSetDialog() {
+        const setList = window.sets.getSetList();
+        const currentSetId = window.sets.getCurrentSetId();
+
+        // Build options for the copy-from dropdown
+        let copyFromOptions = setList.map(set => {
+            const selected = set.id === currentSetId ? ' selected' : '';
+            return `<option value="${set.id}"${selected}>${set.name}</option>`;
+        }).join('');
+
         const html = `
             <p>Enter a name for the new set:</p>
             <input type="text" id="newSetName" class="modal-input" placeholder="Set name" maxlength="20" autofocus>
@@ -149,7 +160,10 @@ window.setUI = (function() {
                 </label>
                 <label class="modal-radio-label">
                     <input type="radio" name="setContent" value="copy">
-                    Copy from current set
+                    Copy from:
+                    <select id="copyFromSetSelect" class="modal-select" style="margin-left: 0.5rem; padding: 0.25rem; font-size: 0.85rem;">
+                        ${copyFromOptions}
+                    </select>
                 </label>
                 <label class="modal-radio-label">
                     <input type="radio" name="setContent" value="extract">
@@ -180,18 +194,22 @@ window.setUI = (function() {
     async function createSetFromDialog() {
         const nameInput = document.getElementById('newSetName');
         const contentRadio = document.querySelector('input[name="setContent"]:checked');
+        const copyFromSelect = document.getElementById('copyFromSetSelect');
 
         const name = nameInput?.value || 'New Set';
         const content = contentRadio?.value || 'empty';
 
         let options = {};
 
-        if (content === 'copy') {
-            const currentData = window.sets.getCurrentData();
-            options = {
-                tubercles: currentData.tubercles,
-                edges: currentData.edges,
-            };
+        if (content === 'copy' && copyFromSelect) {
+            const sourceSetId = copyFromSelect.value;
+            const sourceSet = window.sets.getSet(sourceSetId);
+            if (sourceSet) {
+                options = {
+                    tubercles: JSON.parse(JSON.stringify(sourceSet.tubercles)),
+                    edges: JSON.parse(JSON.stringify(sourceSet.edges)),
+                };
+            }
         }
 
         const newSet = window.sets.createSet(name, options);
@@ -359,6 +377,15 @@ window.setUI = (function() {
     }
 
     /**
+     * Update all set indicators across the UI
+     */
+    function updateAllSetIndicators() {
+        updateStatsBarSetName();
+        updateDataTabSetName();
+        updateEditTabSetName();
+    }
+
+    /**
      * Update the stats bar set name
      */
     function updateStatsBarSetName() {
@@ -372,6 +399,202 @@ window.setUI = (function() {
         } else {
             el.textContent = 'No Set';
         }
+    }
+
+    /**
+     * Update the Data tab set name
+     */
+    function updateDataTabSetName() {
+        const el = document.getElementById('dataTabSetName');
+        if (!el) return;
+
+        const currentSet = window.sets.getCurrentSet();
+        if (currentSet) {
+            el.innerHTML = currentSet.name +
+                (currentSet.isDirty ? '<span class="dirty-indicator">*</span>' : '');
+        } else {
+            el.textContent = 'No Set';
+        }
+    }
+
+    /**
+     * Update the Edit tab set name
+     */
+    function updateEditTabSetName() {
+        const el = document.getElementById('editTabSetName');
+        if (!el) return;
+
+        const currentSet = window.sets.getCurrentSet();
+        if (currentSet) {
+            el.innerHTML = currentSet.name +
+                (currentSet.isDirty ? '<span class="dirty-indicator">*</span>' : '');
+        } else {
+            el.textContent = 'No Set';
+        }
+    }
+
+    /**
+     * Close all dropdown menus
+     */
+    function closeAllMenus() {
+        closeMenu();
+        closeStatsBarMenu();
+        closeDataTabMenu();
+    }
+
+    /**
+     * Toggle the stats bar set menu
+     */
+    function toggleStatsBarMenu() {
+        statsBarMenuOpen = !statsBarMenuOpen;
+        if (statsBarMenuOpen) {
+            renderStatsBarMenu();
+            closeMenu();
+            closeDataTabMenu();
+        }
+        const menu = document.getElementById('statsBarSetMenu');
+        if (menu) {
+            menu.style.display = statsBarMenuOpen ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Close the stats bar set menu
+     */
+    function closeStatsBarMenu() {
+        statsBarMenuOpen = false;
+        const menu = document.getElementById('statsBarSetMenu');
+        if (menu) {
+            menu.style.display = 'none';
+        }
+    }
+
+    /**
+     * Render the stats bar set menu
+     */
+    function renderStatsBarMenu() {
+        const menu = document.getElementById('statsBarSetMenu');
+        if (!menu) return;
+
+        const setList = window.sets.getSetList();
+        const currentSetId = window.sets.getCurrentSetId();
+
+        let html = '';
+
+        // Set list
+        setList.forEach(set => {
+            const isActive = set.id === currentSetId;
+            html += `
+                <button class="stats-bar-set-menu-item${isActive ? ' active' : ''}"
+                        data-set-id="${set.id}">
+                    ${set.name}${set.isDirty ? '<span class="dirty-indicator">*</span>' : ''}
+                </button>
+            `;
+        });
+
+        // Divider and actions
+        html += `
+            <hr class="stats-bar-set-menu-divider">
+            <button class="stats-bar-set-menu-action" id="statsBarNewSetBtn">
+                + New Set...
+            </button>
+            <button class="stats-bar-set-menu-action" id="statsBarManageSetsBtn">
+                Manage Sets...
+            </button>
+        `;
+
+        menu.innerHTML = html;
+
+        // Bind click handlers
+        menu.querySelectorAll('.stats-bar-set-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const setId = item.dataset.setId;
+                closeStatsBarMenu();
+                handleSetClick(setId);
+            });
+        });
+
+        const newSetBtn = document.getElementById('statsBarNewSetBtn');
+        if (newSetBtn) {
+            newSetBtn.addEventListener('click', () => {
+                closeStatsBarMenu();
+                showCreateSetDialog();
+            });
+        }
+
+        const manageSetsBtn = document.getElementById('statsBarManageSetsBtn');
+        if (manageSetsBtn) {
+            manageSetsBtn.addEventListener('click', () => {
+                closeStatsBarMenu();
+                // Switch to Extraction tab and scroll to set selector
+                const extractionTab = document.querySelector('.tab-header[data-tab="extraction"]');
+                if (extractionTab) {
+                    extractionTab.click();
+                }
+            });
+        }
+    }
+
+    /**
+     * Toggle the Data tab set menu
+     */
+    function toggleDataTabMenu() {
+        dataTabMenuOpen = !dataTabMenuOpen;
+        if (dataTabMenuOpen) {
+            renderDataTabMenu();
+            closeMenu();
+            closeStatsBarMenu();
+        }
+        const menu = document.getElementById('dataTabSetMenu');
+        if (menu) {
+            menu.style.display = dataTabMenuOpen ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Close the Data tab set menu
+     */
+    function closeDataTabMenu() {
+        dataTabMenuOpen = false;
+        const menu = document.getElementById('dataTabSetMenu');
+        if (menu) {
+            menu.style.display = 'none';
+        }
+    }
+
+    /**
+     * Render the Data tab set menu
+     */
+    function renderDataTabMenu() {
+        const menu = document.getElementById('dataTabSetMenu');
+        if (!menu) return;
+
+        const setList = window.sets.getSetList();
+        const currentSetId = window.sets.getCurrentSetId();
+
+        let html = '';
+
+        // Set list
+        setList.forEach(set => {
+            const isActive = set.id === currentSetId;
+            html += `
+                <button class="tab-set-menu-item${isActive ? ' active' : ''}"
+                        data-set-id="${set.id}">
+                    ${set.name}${set.isDirty ? '<span class="dirty-indicator">*</span>' : ''}
+                </button>
+            `;
+        });
+
+        menu.innerHTML = html;
+
+        // Bind click handlers
+        menu.querySelectorAll('.tab-set-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const setId = item.dataset.setId;
+                closeDataTabMenu();
+                handleSetClick(setId);
+            });
+        });
     }
 
     /**
@@ -437,7 +660,45 @@ window.setUI = (function() {
                     closeMenu();
                 }
             }
+            if (statsBarMenuOpen) {
+                const container = document.getElementById('statsBarSetDropdown');
+                if (container && !container.contains(e.target)) {
+                    closeStatsBarMenu();
+                }
+            }
+            if (dataTabMenuOpen) {
+                const container = document.getElementById('dataTabSetDropdown');
+                if (container && !container.contains(e.target)) {
+                    closeDataTabMenu();
+                }
+            }
         });
+
+        // Stats bar set dropdown button
+        const statsBarSetBtn = document.getElementById('statsBarSetBtn');
+        if (statsBarSetBtn) {
+            statsBarSetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleStatsBarMenu();
+            });
+        }
+
+        // Data tab set dropdown button
+        const dataTabSetBtn = document.getElementById('dataTabSetBtn');
+        if (dataTabSetBtn) {
+            dataTabSetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDataTabMenu();
+            });
+        }
+
+        // Data tab "+ New Set" button
+        const dataTabNewSetBtn = document.getElementById('dataTabNewSetBtn');
+        if (dataTabNewSetBtn) {
+            dataTabNewSetBtn.addEventListener('click', () => {
+                showCreateSetDialog();
+            });
+        }
     }
 
     /**
@@ -447,23 +708,26 @@ window.setUI = (function() {
         // Set created
         document.addEventListener('setCreated', () => {
             renderSetButtons();
+            updateAllSetIndicators();
         });
 
         // Set deleted
         document.addEventListener('setDeleted', () => {
             renderSetButtons();
+            updateAllSetIndicators();
         });
 
         // Set renamed
         document.addEventListener('setRenamed', () => {
             renderSetButtons();
-            updateStatsBarSetName();
+            updateAllSetIndicators();
         });
 
         // Set changed (switched)
         document.addEventListener('setChanged', (e) => {
             renderSetButtons();
-            updateStatsBarSetName();
+            updateAllSetIndicators();
+            closeAllMenus();
 
             // Update other modules with new set data
             const set = e.detail.set;
@@ -480,14 +744,14 @@ window.setUI = (function() {
         // Dirty state changed
         document.addEventListener('setDirtyStateChanged', () => {
             renderSetButtons();
-            updateStatsBarSetName();
+            updateAllSetIndicators();
             updateSaveButton();
         });
 
         // Sets loaded from file
         document.addEventListener('setsLoaded', () => {
             renderSetButtons();
-            updateStatsBarSetName();
+            updateAllSetIndicators();
 
             // Update displays with current set data
             const set = window.sets.getCurrentSet();
@@ -533,6 +797,9 @@ window.setUI = (function() {
             }
         }
 
+        // Calculate hexagonalness metrics
+        const hexMetrics = calculateHexagonalness(tubercles, edges);
+
         return {
             n_tubercles,
             n_edges,
@@ -542,7 +809,84 @@ window.setUI = (function() {
             std_space_um,
             suggested_genus: '-',
             classification_confidence: '-',
+            ...hexMetrics,
         };
+    }
+
+    /**
+     * Calculate hexagonalness metrics
+     */
+    function calculateHexagonalness(tubercles, edges) {
+        const MIN_NODES_FOR_RELIABLE = 15;
+
+        const result = {
+            hexagonalness_score: 0.0,
+            spacing_uniformity: 0.0,
+            degree_score: 0.0,
+            edge_ratio_score: 0.0,
+            mean_degree: 0.0,
+            spacing_cv: 1.0,
+            reliability: 'none',
+            n_nodes: 0,
+        };
+
+        if (!tubercles || tubercles.length < 4) {
+            return result;
+        }
+
+        const n_nodes = tubercles.length;
+        result.n_nodes = n_nodes;
+        result.reliability = n_nodes >= MIN_NODES_FOR_RELIABLE ? 'high' : 'low';
+
+        // Spacing uniformity (filter out negative/zero distances from overlapping tubercles)
+        if (edges && edges.length > 0) {
+            const spacings = edges.map(e => e.edge_distance_um).filter(s => s > 0);
+            if (spacings.length > 0) {
+                const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
+                const variance = spacings.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spacings.length;
+                const cv = mean > 0 ? Math.sqrt(variance) / mean : 1.0;
+                result.spacing_cv = cv;
+                result.spacing_uniformity = Math.max(0, 1 - 2 * cv);
+            }
+        }
+
+        // Degree distribution (use object key lookup for type coercion)
+        const degree = {};
+        tubercles.forEach(t => { degree[t.id] = 0; });
+
+        edges.forEach(e => {
+            const aId = e.tubercle_a_id ?? e.id1;
+            const bId = e.tubercle_b_id ?? e.id2;
+            if (degree[aId] !== undefined) degree[aId]++;
+            if (degree[bId] !== undefined) degree[bId]++;
+        });
+
+        const degrees = Object.values(degree);
+        if (degrees.length > 0) {
+            result.mean_degree = degrees.reduce((a, b) => a + b, 0) / degrees.length;
+            let weightedScore = 0;
+            degrees.forEach(d => {
+                if (d >= 5 && d <= 7) weightedScore += 1.0;
+                else if (d === 4 || d === 8) weightedScore += 0.7;
+                else if (d === 3 || d === 9) weightedScore += 0.3;
+            });
+            result.degree_score = weightedScore / degrees.length;
+        }
+
+        // Edge/node ratio
+        if (n_nodes > 0) {
+            const ratio = edges.length / n_nodes;
+            result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 2.5) / 2);
+        }
+
+        // Composite score
+        result.hexagonalness_score = (
+            0.40 * result.spacing_uniformity +
+            0.45 * result.degree_score +
+            0.15 * result.edge_ratio_score
+        );
+
+        return result;
     }
 
     // Initialize on DOM ready
@@ -552,5 +896,9 @@ window.setUI = (function() {
         renderSetButtons,
         updateSaveButton,
         updateStatsBarSetName,
+        updateDataTabSetName,
+        updateEditTabSetName,
+        updateAllSetIndicators,
+        showCreateSetDialog,
     };
 })();

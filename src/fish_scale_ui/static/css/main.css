@@ -851,6 +851,73 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
+.stat-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 0.75rem 0;
+}
+
+.stat-row.hexagonalness {
+    margin-top: 0.25rem;
+}
+
+.stat-row.hexagonalness .stat-label {
+    font-weight: 600;
+}
+
+.stat-row.stat-indent {
+    padding-left: 1rem;
+}
+
+.stat-row.stat-indent .stat-label {
+    font-size: 0.85rem;
+}
+
+.stat-row.stat-indent .stat-unit {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.stat-row.stat-secondary {
+    padding-left: 1rem;
+    opacity: 0.7;
+}
+
+.stat-row.stat-secondary .stat-label {
+    font-size: 0.8rem;
+}
+
+.stat-score {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.stat-score.score-good {
+    color: #16a34a;
+}
+
+.stat-score.score-medium {
+    color: #ca8a04;
+}
+
+.stat-score.score-poor {
+    color: #dc2626;
+}
+
+.stat-reliability {
+    font-size: 0.75rem;
+    font-style: italic;
+    margin-left: 0.5rem;
+}
+
+.stat-reliability.reliability-low {
+    color: #ca8a04;
+}
+
+.stat-reliability.reliability-none {
+    color: #dc2626;
+}
+
 .data-table-container {
     max-height: 200px;
     overflow: auto;
@@ -1314,6 +1381,21 @@ body {
     font-size: 0.75rem;
 }
 
+.stats-bar-hex {
+    margin-left: auto;
+    padding-left: 1rem;
+    border-left: 1px solid #475569;
+}
+
+.stats-bar-hex-value {
+    color: #fbbf24 !important;
+    font-weight: 600;
+}
+
+.stats-bar-hex-value.hex-low {
+    opacity: 0.7;
+}
+
 /* ========================================
    Phase 3 Styles - Edit Tab
    ======================================== */
@@ -1656,4 +1738,240 @@ body {
 
 .modal-radio-label input[type="radio"] {
     margin: 0;
+}
+
+/* ========================================
+   Set Context UI - Phase 1 & 2
+   ======================================== */
+
+/* Stats bar set label */
+.stats-bar-set-label {
+    color: #64748b;
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
+}
+
+/* Stats bar set dropdown */
+.stats-bar-set-dropdown {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 1rem;
+}
+
+.stats-bar-set-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    background-color: rgba(37, 99, 235, 0.2);
+    border: 1px solid rgba(37, 99, 235, 0.4);
+    border-radius: 0.25rem;
+    color: #93c5fd;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.stats-bar-set-btn:hover {
+    background-color: rgba(37, 99, 235, 0.3);
+    border-color: rgba(37, 99, 235, 0.6);
+}
+
+.stats-bar-set-btn svg {
+    opacity: 0.7;
+}
+
+.stats-bar-set-btn .dirty-indicator {
+    color: #fcd34d;
+    margin-left: 0.125rem;
+}
+
+.stats-bar-set-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 0.25rem;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    min-width: 160px;
+    overflow: hidden;
+}
+
+.stats-bar-set-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    color: var(--text-color);
+}
+
+.stats-bar-set-menu-item:hover {
+    background-color: var(--bg-color);
+}
+
+.stats-bar-set-menu-item.active {
+    background-color: rgba(37, 99, 235, 0.1);
+    font-weight: 500;
+}
+
+.stats-bar-set-menu-item.active::before {
+    content: "●";
+    color: var(--primary-color);
+    font-size: 0.6rem;
+}
+
+.stats-bar-set-menu-divider {
+    margin: 0.25rem 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+.stats-bar-set-menu-action {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    color: var(--primary-color);
+}
+
+.stats-bar-set-menu-action:hover {
+    background-color: var(--bg-color);
+}
+
+/* Tab set header (Data tab) */
+.tab-set-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tab-set-label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.tab-set-dropdown {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tab-set-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.tab-set-btn:hover {
+    background-color: var(--border-color);
+}
+
+.tab-set-btn svg {
+    opacity: 0.6;
+}
+
+.tab-set-btn .dirty-indicator {
+    color: var(--warning-color);
+    margin-left: 0.125rem;
+}
+
+.tab-set-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 0.25rem;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    min-width: 160px;
+    overflow: hidden;
+}
+
+.tab-set-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    color: var(--text-color);
+}
+
+.tab-set-menu-item:hover {
+    background-color: var(--bg-color);
+}
+
+.tab-set-menu-item.active {
+    background-color: rgba(37, 99, 235, 0.1);
+    font-weight: 500;
+}
+
+.tab-set-menu-item.active::before {
+    content: "●";
+    color: var(--primary-color);
+    font-size: 0.6rem;
+}
+
+/* Edit tab set indicator */
+.editing-set-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+}
+
+.editing-set-label {
+    color: var(--text-muted);
+}
+
+.editing-set-name {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.editing-set-name .dirty-indicator {
+    color: var(--warning-color);
+    margin-left: 0.125rem;
 }

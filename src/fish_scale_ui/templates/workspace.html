@@ -15,7 +15,18 @@
 
         <!-- Statistics bar (always visible, first row under image) -->
         <div class="stats-bar" id="statsBar">
-            <span class="stats-bar-set-name" id="statsBarSetName">Base</span>
+            <span class="stats-bar-set-label">Set:</span>
+            <div class="stats-bar-set-dropdown" id="statsBarSetDropdown">
+                <button type="button" class="stats-bar-set-btn" id="statsBarSetBtn">
+                    <span id="statsBarSetName">Base</span>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+                <div class="stats-bar-set-menu" id="statsBarSetMenu" style="display: none;">
+                    <!-- Set list populated by JavaScript -->
+                </div>
+            </div>
             <div class="stats-bar-item">
                 <span class="stats-bar-label">TUB:</span>
                 <span id="statsBarTubercles" class="stats-bar-value">-</span>
@@ -33,6 +44,10 @@
                 <span class="stats-bar-label">Space:</span>
                 <span id="statsBarSpace" class="stats-bar-value">-</span>
                 <span class="stats-bar-unit">µm</span>
+            </div>
+            <div class="stats-bar-item stats-bar-hex">
+                <span class="stats-bar-label">Hex:</span>
+                <span id="statsBarHex" class="stats-bar-value stats-bar-hex-value">-</span>
             </div>
         </div>
 
@@ -412,8 +427,14 @@
 
             <!-- Edit Tab -->
             <div class="tab-pane" data-tab="edit">
-                <h2>Edit</h2>
+                <h2>Edit <a href="#" class="help-icon" data-edit="overview" title="Editing Help">?</a></h2>
                 <p class="tab-description">Manually edit tubercles and connections.</p>
+
+                <!-- Editing Set Indicator -->
+                <div class="editing-set-indicator" id="editTabSetIndicator">
+                    <span class="editing-set-label">Editing:</span>
+                    <span class="editing-set-name" id="editTabSetName">Base</span>
+                </div>
 
                 <div class="edit-section">
                     <h3>Add</h3>
@@ -426,6 +447,7 @@
                             </svg>
                             Add Tubercle
                         </button>
+                        <a href="#" class="help-icon" data-edit="add-tubercle" title="Help">?</a>
                         <button type="button" class="btn btn-secondary" id="addItcBtn" title="Add connection between tubercles">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="6" cy="12" r="3"/>
@@ -434,6 +456,7 @@
                             </svg>
                             Add Connection
                         </button>
+                        <a href="#" class="help-icon" data-edit="add-connection" title="Help">?</a>
                     </div>
                 </div>
 
@@ -451,6 +474,7 @@
                             </svg>
                             Move
                         </button>
+                        <a href="#" class="help-icon" data-edit="move" title="Help">?</a>
                         <button type="button" class="btn btn-secondary btn-danger" id="deleteTubBtn" disabled title="Delete selected tubercle (Del)">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
@@ -458,6 +482,7 @@
                             </svg>
                             Delete Selected
                         </button>
+                        <a href="#" class="help-icon" data-edit="delete-selected" title="Help">?</a>
                         <button type="button" class="btn btn-secondary btn-danger" id="deleteMultipleTubBtn" disabled title="Click tubercles to delete them (requires 'Allow delete without confirmation')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
@@ -465,6 +490,7 @@
                             </svg>
                             Delete Multiple
                         </button>
+                        <a href="#" class="help-icon" data-edit="delete-multiple-tub" title="Help">?</a>
                     </div>
                 </div>
 
@@ -478,6 +504,7 @@
                             </svg>
                             Delete Selected
                         </button>
+                        <a href="#" class="help-icon" data-edit="delete-itc" title="Help">?</a>
                         <button type="button" class="btn btn-secondary btn-danger" id="deleteMultipleItcBtn" disabled title="Click connections to delete them (requires 'Allow delete without confirmation')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
@@ -485,11 +512,12 @@
                             </svg>
                             Delete Multiple
                         </button>
+                        <a href="#" class="help-icon" data-edit="delete-multiple-itc" title="Help">?</a>
                     </div>
                 </div>
 
                 <div class="edit-section" id="radiusControls">
-                    <h3>Radius Adjustment</h3>
+                    <h3>Radius Adjustment <a href="#" class="help-icon" data-edit="radius" title="Help">?</a></h3>
                     <p class="hint" id="radiusHintSelect">Select a tubercle to resize</p>
                     <div class="radius-controls" id="radiusControlsInner">
                         <button type="button" class="btn btn-icon btn-sm" id="radiusDecBtn" title="Decrease radius" disabled>
@@ -510,7 +538,7 @@
                 </div>
 
                 <div class="edit-section">
-                    <h3>History</h3>
+                    <h3>History <a href="#" class="help-icon" data-edit="undo-redo" title="Help">?</a></h3>
                     <div class="edit-buttons">
                         <button type="button" class="btn btn-secondary" id="undoBtn" disabled title="Undo (Ctrl+Z)">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -530,7 +558,7 @@
                 </div>
 
                 <div class="edit-section">
-                    <h3>Options</h3>
+                    <h3>Options <a href="#" class="help-icon" data-edit="options" title="Help">?</a></h3>
                     <div class="setting-item">
                         <label class="setting-label">
                             <input type="checkbox" id="allowDeleteWithoutConfirm">
@@ -564,6 +592,23 @@
             <div class="tab-pane" data-tab="data">
                 <h2>Data</h2>
 
+                <!-- Current Set Header -->
+                <div class="tab-set-header" id="dataTabSetHeader">
+                    <span class="tab-set-label">Current Set:</span>
+                    <div class="tab-set-dropdown" id="dataTabSetDropdown">
+                        <button type="button" class="tab-set-btn" id="dataTabSetBtn">
+                            <span id="dataTabSetName">Base</span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="tab-set-menu" id="dataTabSetMenu" style="display: none;">
+                            <!-- Set list populated by JavaScript -->
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary" id="dataTabNewSetBtn">+ New Set</button>
+                </div>
+
                 <div class="data-section">
                     <h3>Statistics</h3>
                     <div id="statisticsPanel" class="statistics-panel">
@@ -589,6 +634,43 @@
                             <span class="stat-label">Classification:</span>
                             <span id="statGenus" class="stat-value">-</span>
                             <span id="statConfidence" class="stat-confidence">-</span>
+                        </div>
+                        <hr class="stat-divider">
+                        <div class="stat-row hexagonalness">
+                            <span class="stat-label">Hexagonalness:</span>
+                            <span id="statHexScore" class="stat-value stat-score">-</span>
+                            <span class="stat-unit">/ 1.0</span>
+                            <a href="#" class="help-icon" data-help="hexagonalness" title="Help">?</a>
+                            <span id="statHexReliability" class="stat-reliability"></span>
+                        </div>
+                        <div class="stat-row stat-indent">
+                            <span class="stat-label">Spacing Uniformity:</span>
+                            <span id="statSpacingUniformity" class="stat-value">-</span>
+                            <span class="stat-unit">(40%)</span>
+                            <a href="#" class="help-icon" data-help="spacing-uniformity" title="Help">?</a>
+                        </div>
+                        <div class="stat-row stat-indent">
+                            <span class="stat-label">Degree Score:</span>
+                            <span id="statDegreeScore" class="stat-value">-</span>
+                            <span class="stat-unit">(45%)</span>
+                            <a href="#" class="help-icon" data-help="degree-score" title="Help">?</a>
+                        </div>
+                        <div class="stat-row stat-indent">
+                            <span class="stat-label">Edge Ratio Score:</span>
+                            <span id="statEdgeRatioScore" class="stat-value">-</span>
+                            <span class="stat-unit">(15%)</span>
+                            <a href="#" class="help-icon" data-help="edge-ratio-score" title="Help">?</a>
+                        </div>
+                        <div class="stat-row stat-secondary">
+                            <span class="stat-label">Spacing CV:</span>
+                            <span id="statSpacingCV" class="stat-value">-</span>
+                            <a href="#" class="help-icon" data-help="spacing-cv" title="Help">?</a>
+                        </div>
+                        <div class="stat-row stat-secondary">
+                            <span class="stat-label">Mean Degree:</span>
+                            <span id="statMeanDegree" class="stat-value">-</span>
+                            <span class="stat-unit">neighbors</span>
+                            <a href="#" class="help-icon" data-help="mean-degree" title="Help">?</a>
                         </div>
                     </div>
                 </div>
@@ -932,6 +1014,13 @@
             'statMeanSpace': stats.mean_space_um?.toFixed(2),
             'statGenus': stats.suggested_genus,
             'statConfidence': stats.classification_confidence,
+            // Hexagonalness formula components
+            'statSpacingUniformity': stats.spacing_uniformity?.toFixed(3),
+            'statDegreeScore': stats.degree_score?.toFixed(3),
+            'statEdgeRatioScore': stats.edge_ratio_score?.toFixed(3),
+            // Supporting metrics
+            'statSpacingCV': stats.spacing_cv?.toFixed(3),
+            'statMeanDegree': stats.mean_degree?.toFixed(2),
         };
 
         // Update the stats bar elements
@@ -946,6 +1035,56 @@
             const el = document.getElementById(id);
             if (el && value !== undefined) {
                 el.textContent = value ?? '-';
+            }
+        }
+
+        // Update hex score in stats bar
+        const statsBarHex = document.getElementById('statsBarHex');
+        if (statsBarHex) {
+            const hexScore = stats.hexagonalness_score;
+            const reliability = stats.reliability;
+            if (hexScore !== undefined && reliability !== 'none') {
+                statsBarHex.textContent = hexScore.toFixed(2);
+                statsBarHex.classList.toggle('hex-low', reliability === 'low');
+            } else {
+                statsBarHex.textContent = '-';
+                statsBarHex.classList.remove('hex-low');
+            }
+        }
+
+        // Special handling for hexagonalness score (color-coded)
+        const hexScoreEl = document.getElementById('statHexScore');
+        const hexReliabilityEl = document.getElementById('statHexReliability');
+        if (hexScoreEl) {
+            const hexScore = stats.hexagonalness_score;
+            const reliability = stats.reliability;
+            if (hexScore !== undefined) {
+                hexScoreEl.textContent = hexScore.toFixed(3);
+                hexScoreEl.classList.remove('score-good', 'score-medium', 'score-poor');
+                if (hexScore >= 0.7) {
+                    hexScoreEl.classList.add('score-good');
+                } else if (hexScore >= 0.4) {
+                    hexScoreEl.classList.add('score-medium');
+                } else {
+                    hexScoreEl.classList.add('score-poor');
+                }
+            } else {
+                hexScoreEl.textContent = '-';
+                hexScoreEl.classList.remove('score-good', 'score-medium', 'score-poor');
+            }
+
+            // Show reliability indicator
+            if (hexReliabilityEl) {
+                hexReliabilityEl.classList.remove('reliability-high', 'reliability-low', 'reliability-none');
+                if (reliability === 'low') {
+                    hexReliabilityEl.textContent = `(${stats.n_nodes || 0} nodes - low confidence)`;
+                    hexReliabilityEl.classList.add('reliability-low');
+                } else if (reliability === 'none') {
+                    hexReliabilityEl.textContent = '(insufficient data)';
+                    hexReliabilityEl.classList.add('reliability-none');
+                } else {
+                    hexReliabilityEl.textContent = '';
+                }
             }
         }
     }

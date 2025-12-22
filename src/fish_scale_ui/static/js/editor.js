@@ -798,6 +798,9 @@ window.editor = (function() {
             }
         }
 
+        // Calculate hexagonalness metrics
+        const hexMetrics = calculateHexagonalness(tubercles, edges);
+
         return {
             n_tubercles,
             n_edges,
@@ -807,7 +810,103 @@ window.editor = (function() {
             std_space_um,
             suggested_genus: '-',
             classification_confidence: '-',
+            ...hexMetrics,
         };
+    }
+
+    /**
+     * Calculate hexagonalness metrics for the current data
+     */
+    function calculateHexagonalness(tubercles, edges) {
+        const MIN_NODES_FOR_RELIABLE = 15;
+
+        const result = {
+            hexagonalness_score: 0.0,
+            spacing_uniformity: 0.0,
+            degree_score: 0.0,
+            edge_ratio_score: 0.0,
+            mean_degree: 0.0,
+            degree_histogram: {},
+            spacing_cv: 1.0,
+            reliability: 'none',
+            n_nodes: 0,
+        };
+
+        if (!tubercles || tubercles.length < 4) {
+            return result;
+        }
+
+        const n_nodes = tubercles.length;
+        result.n_nodes = n_nodes;
+        result.reliability = n_nodes >= MIN_NODES_FOR_RELIABLE ? 'high' : 'low';
+
+        // 1. Spacing uniformity (coefficient of variation)
+        if (edges && edges.length > 0) {
+            const spacings = edges
+                .map(e => e.edge_distance_um)
+                .filter(s => s > 0);
+
+            if (spacings.length > 0) {
+                const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
+                const variance = spacings.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spacings.length;
+                const std = Math.sqrt(variance);
+                const cv = mean > 0 ? std / mean : 1.0;
+                result.spacing_cv = cv;
+                result.spacing_uniformity = Math.max(0, 1 - 2 * cv);
+            }
+        }
+
+        // 2. Degree distribution (neighbors per node)
+        const degree = {};
+
+        // Initialize all nodes with degree 0
+        tubercles.forEach(t => { degree[t.id] = 0; });
+
+        // Count connections (use object key lookup for type coercion)
+        edges.forEach(e => {
+            const aId = e.tubercle_a_id ?? e.id1;
+            const bId = e.tubercle_b_id ?? e.id2;
+            if (degree[aId] !== undefined) degree[aId]++;
+            if (degree[bId] !== undefined) degree[bId]++;
+        });
+
+        const degrees = Object.values(degree);
+        if (degrees.length > 0) {
+            result.mean_degree = degrees.reduce((a, b) => a + b, 0) / degrees.length;
+
+            // Build histogram
+            const histogram = {};
+            degrees.forEach(d => {
+                histogram[d] = (histogram[d] || 0) + 1;
+            });
+            result.degree_histogram = histogram;
+
+            // Weighted score for degree distribution
+            let weightedScore = 0;
+            degrees.forEach(d => {
+                if (d >= 5 && d <= 7) weightedScore += 1.0;
+                else if (d === 4 || d === 8) weightedScore += 0.7;
+                else if (d === 3 || d === 9) weightedScore += 0.3;
+            });
+            result.degree_score = weightedScore / degrees.length;
+        }
+
+        // 3. Edge/node ratio
+        if (n_nodes > 0) {
+            const ratio = edges.length / n_nodes;
+            const idealRatio = 2.5;
+            const deviation = Math.abs(ratio - idealRatio);
+            result.edge_ratio_score = Math.max(0, 1 - deviation / 2);
+        }
+
+        // 4. Composite score
+        result.hexagonalness_score = (
+            0.40 * result.spacing_uniformity +
+            0.45 * result.degree_score +
+            0.15 * result.edge_ratio_score
+        );
+
+        return result;
     }
 
     /**
@@ -1189,6 +1288,16 @@ window.editor = (function() {
 
         // Initialize delete multiple buttons state
         updateDeleteMultipleButtons(false);
+
+        // Help icons for Edit tab
+        const editHelpIcons = document.querySelectorAll('.help-icon[data-edit]');
+        editHelpIcons.forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                e.preventDefault();
+                const topic = icon.dataset.edit;
+                window.open(`/static/help/editing.html#${topic}`, 'help', 'width=800,height=600');
+            });
+        });
 
         // Update radius slider when selection changes
         document.addEventListener('tubercleSelected', (e) => {

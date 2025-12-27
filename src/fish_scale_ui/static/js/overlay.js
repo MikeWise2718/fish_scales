@@ -12,6 +12,18 @@ window.overlay = (function() {
     let selectedEdgeIdx = null;
     let scale = 1;
 
+    // Multi-selection state
+    let selectedTubIds = new Set();
+    let selectedEdgeIdxs = new Set();
+
+    // Area selection state
+    let isAreaSelecting = false;
+    let areaSelectStart = null;  // {x, y} in image coords
+    let areaSelectEnd = null;    // {x, y} in image coords
+
+    // Highlighted edge for chain mode navigation preview
+    let highlightedEdge = null;
+
     // Toggle state (controlled by checkboxes under image, independent of Settings)
     let toggleState = {
         numbers: false,
@@ -35,6 +47,11 @@ window.overlay = (function() {
             edge: connectionColor,
             selectedTubercle: '#ff00ff', // Magenta for selection (distinct from yellow ITCs)
             selectedEdge: '#ff00ff',
+            multiSelectedTubercle: '#ff00ff',  // Magenta for multi-selection
+            multiSelectedEdge: '#ff00ff',
+            highlightedEdge: '#ff8800',  // Orange for chain mode navigation preview
+            areaSelectStroke: '#00ffff',  // Cyan for area selection rectangle
+            areaSelectFill: 'rgba(0, 255, 255, 0.1)',
         };
     }
 
@@ -181,6 +198,11 @@ window.overlay = (function() {
             }
         }
 
+        // Clear multi-selection items that no longer exist
+        const validTubIds = new Set(tubercles.map(t => t.id));
+        selectedTubIds = new Set([...selectedTubIds].filter(id => validTubIds.has(id)));
+        selectedEdgeIdxs = new Set([...selectedEdgeIdxs].filter(idx => idx < edges.length));
+
         render();
     }
 
@@ -191,6 +213,11 @@ window.overlay = (function() {
         debugShapes = [];
         selectedTubId = null;
         selectedEdgeIdx = null;
+        selectedTubIds.clear();
+        selectedEdgeIdxs.clear();
+        isAreaSelecting = false;
+        areaSelectStart = null;
+        areaSelectEnd = null;
         if (ctx && canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
@@ -209,7 +236,10 @@ window.overlay = (function() {
         if (toggleState.links) {
             edges.forEach((edge, idx) => {
                 const isSelected = idx === selectedEdgeIdx;
-                drawEdge(edge, isSelected, colors);
+                const isHighlighted = highlightedEdge &&
+                    ((edge.id1 === highlightedEdge.id1 && edge.id2 === highlightedEdge.id2) ||
+                     (edge.id1 === highlightedEdge.id2 && edge.id2 === highlightedEdge.id1));
+                drawEdge(edge, isSelected, isHighlighted, colors);
             });
         }
 
@@ -238,6 +268,93 @@ window.overlay = (function() {
         if (debugShapes.length > 0) {
             drawDebugShapes(colors);
         }
+
+        // Draw multi-selected tubercles (on top of regular tubercles)
+        if (toggleState.tubes && selectedTubIds.size > 0) {
+            selectedTubIds.forEach(id => {
+                const tub = tubercles.find(t => t.id === id);
+                if (tub) {
+                    drawMultiSelectedTubercle(tub, colors);
+                }
+            });
+        }
+
+        // Draw multi-selected edges (on top of regular edges)
+        if (toggleState.links && selectedEdgeIdxs.size > 0) {
+            selectedEdgeIdxs.forEach(idx => {
+                const edge = edges[idx];
+                if (edge) {
+                    drawMultiSelectedEdge(edge, colors);
+                }
+            });
+        }
+
+        // Draw area selection rectangle while dragging
+        if (isAreaSelecting && areaSelectStart && areaSelectEnd) {
+            drawAreaSelectionRect(areaSelectStart, areaSelectEnd, colors);
+        }
+    }
+
+    // Draw a multi-selected tubercle (with fill and thicker stroke)
+    function drawMultiSelectedTubercle(tub, colors) {
+        const x = tub.centroid_x;
+        const y = tub.centroid_y;
+        const radius = tub.radius_px;
+
+        // Fill
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
+        ctx.fill();
+
+        // Stroke
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = colors.multiSelectedTubercle;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    // Draw a multi-selected edge (with thicker stroke)
+    function drawMultiSelectedEdge(edge, colors) {
+        ctx.beginPath();
+        ctx.moveTo(edge.x1, edge.y1);
+        ctx.lineTo(edge.x2, edge.y2);
+        ctx.strokeStyle = colors.multiSelectedEdge;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    // Draw area selection rectangle
+    function drawAreaSelectionRect(start, end, colors) {
+        const rect = normalizeRect(start, end);
+
+        ctx.save();
+        ctx.strokeStyle = colors.areaSelectStroke;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.fillStyle = colors.areaSelectFill;
+
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+        ctx.restore();
+    }
+
+    // Normalize rectangle coordinates (handle negative width/height)
+    function normalizeRect(p1, p2) {
+        return {
+            x: Math.min(p1.x, p2.x),
+            y: Math.min(p1.y, p2.y),
+            width: Math.abs(p2.x - p1.x),
+            height: Math.abs(p2.y - p1.y)
+        };
+    }
+
+    // Check if a point is inside a rectangle
+    function isPointInRect(px, py, rect) {
+        return px >= rect.x && px <= rect.x + rect.width &&
+               py >= rect.y && py <= rect.y + rect.height;
     }
 
     // Draw debug shapes (rectangles, markers)
@@ -432,7 +549,7 @@ window.overlay = (function() {
     }
 
     // Draw a single edge
-    function drawEdge(edge, isSelected, colors) {
+    function drawEdge(edge, isSelected, isHighlighted, colors) {
         // Determine endpoint mode
         const endpointMode = (window.settings && window.settings.get('connectionEndpoint')) || 'center';
 
@@ -469,8 +586,18 @@ window.overlay = (function() {
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
-        ctx.strokeStyle = isSelected ? colors.selectedEdge : colors.edge;
-        ctx.lineWidth = isSelected ? 3 : 2;
+
+        // Determine color: selected > highlighted > normal
+        if (isSelected) {
+            ctx.strokeStyle = colors.selectedEdge;
+            ctx.lineWidth = 3;
+        } else if (isHighlighted) {
+            ctx.strokeStyle = colors.highlightedEdge;
+            ctx.lineWidth = 4;
+        } else {
+            ctx.strokeStyle = colors.edge;
+            ctx.lineWidth = 2;
+        }
         ctx.stroke();
     }
 
@@ -658,6 +785,12 @@ window.overlay = (function() {
         render();
     }
 
+    // Set highlighted edge for chain mode navigation preview
+    function setHighlightedEdge(edge) {
+        highlightedEdge = edge;
+        render();
+    }
+
     // Get current data (for editor)
     function getTubercles() {
         return tubercles;
@@ -665,6 +798,162 @@ window.overlay = (function() {
 
     function getEdges() {
         return edges;
+    }
+
+    // ========================================
+    // Multi-selection functions
+    // ========================================
+
+    // Select multiple tubercles by ID
+    function selectMultipleTubercles(ids) {
+        selectedTubIds = new Set(ids);
+        // Clear single selection
+        selectedTubId = null;
+        render();
+        dispatchMultiSelectionEvent();
+    }
+
+    // Select multiple edges by index
+    function selectMultipleEdges(idxs) {
+        selectedEdgeIdxs = new Set(idxs);
+        // Clear single selection
+        selectedEdgeIdx = null;
+        render();
+        dispatchMultiSelectionEvent();
+    }
+
+    // Add to existing multi-selection
+    function addToMultiSelection(tubIds, edgeIdxs) {
+        if (tubIds) {
+            tubIds.forEach(id => selectedTubIds.add(id));
+        }
+        if (edgeIdxs) {
+            edgeIdxs.forEach(idx => selectedEdgeIdxs.add(idx));
+        }
+        render();
+        dispatchMultiSelectionEvent();
+    }
+
+    // Clear multi-selection
+    function clearMultiSelection() {
+        selectedTubIds.clear();
+        selectedEdgeIdxs.clear();
+        render();
+        dispatchMultiSelectionEvent();
+    }
+
+    // Get selected tubercle objects (not just IDs)
+    function getMultiSelectedTubercles() {
+        return tubercles.filter(t => selectedTubIds.has(t.id));
+    }
+
+    // Get selected edge objects (not just indices)
+    function getMultiSelectedEdges() {
+        return [...selectedEdgeIdxs].map(idx => edges[idx]).filter(e => e);
+    }
+
+    // Get multi-selection counts
+    function getMultiSelectionCounts() {
+        return {
+            tubercles: selectedTubIds.size,
+            edges: selectedEdgeIdxs.size
+        };
+    }
+
+    // Check if there's a multi-selection
+    function hasMultiSelection() {
+        return selectedTubIds.size > 0 || selectedEdgeIdxs.size > 0;
+    }
+
+    // Dispatch multi-selection change event
+    function dispatchMultiSelectionEvent() {
+        document.dispatchEvent(new CustomEvent('multiSelectionChanged', {
+            detail: {
+                tubercleCount: selectedTubIds.size,
+                edgeCount: selectedEdgeIdxs.size,
+                tubercleIds: Array.from(selectedTubIds),
+                edgeIndices: Array.from(selectedEdgeIdxs)
+            }
+        }));
+    }
+
+    // ========================================
+    // Area selection functions
+    // ========================================
+
+    // Start area selection (called on mousedown)
+    function startAreaSelect(x, y) {
+        isAreaSelecting = true;
+        areaSelectStart = { x, y };
+        areaSelectEnd = { x, y };
+        render();
+    }
+
+    // Update area selection (called on mousemove)
+    function updateAreaSelect(x, y) {
+        if (!isAreaSelecting) return;
+        areaSelectEnd = { x, y };
+        render();
+    }
+
+    // Finish area selection and return selected items
+    function finishAreaSelect() {
+        if (!isAreaSelecting || !areaSelectStart || !areaSelectEnd) {
+            return { tubIds: [], edgeIdxs: [] };
+        }
+
+        const rect = normalizeRect(areaSelectStart, areaSelectEnd);
+
+        // Find tubercles with centers inside rectangle
+        const tubIds = tubercles
+            .filter(t => isPointInRect(t.centroid_x, t.centroid_y, rect))
+            .map(t => t.id);
+
+        // Find edges with BOTH endpoints inside rectangle
+        const edgeIdxs = edges
+            .map((e, idx) => ({ e, idx }))
+            .filter(({ e }) =>
+                isPointInRect(e.x1, e.y1, rect) &&
+                isPointInRect(e.x2, e.y2, rect))
+            .map(({ idx }) => idx);
+
+        // Clear area selection state
+        isAreaSelecting = false;
+        areaSelectStart = null;
+        areaSelectEnd = null;
+        render();
+
+        return { tubIds, edgeIdxs };
+    }
+
+    // Cancel area selection
+    function cancelAreaSelect() {
+        isAreaSelecting = false;
+        areaSelectStart = null;
+        areaSelectEnd = null;
+        render();
+    }
+
+    // Check if currently in area selection mode
+    function isInAreaSelectMode() {
+        return isAreaSelecting;
+    }
+
+    // Get canvas for mouse event registration
+    function getCanvas() {
+        return canvas;
+    }
+
+    // Convert client coordinates to image coordinates
+    function clientToImageCoords(clientX, clientY) {
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
     }
 
     // Initialize on DOM ready
@@ -683,11 +972,29 @@ window.overlay = (function() {
         deselect,
         highlightTubercle,
         highlightEdge,
+        setHighlightedEdge,
         getSelectedTubercle,
         getSelectedEdge,
         getTubercles,
         getEdges,
         initToggleStates,
         setColorMode,
+        // Multi-selection
+        selectMultipleTubercles,
+        selectMultipleEdges,
+        addToMultiSelection,
+        clearMultiSelection,
+        getMultiSelectedTubercles,
+        getMultiSelectedEdges,
+        getMultiSelectionCounts,
+        hasMultiSelection,
+        // Area selection
+        startAreaSelect,
+        updateAreaSelect,
+        finishAreaSelect,
+        cancelAreaSelect,
+        isInAreaSelectMode,
+        getCanvas,
+        clientToImageCoords,
     };
 })();

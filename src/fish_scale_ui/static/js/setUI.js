@@ -7,6 +7,7 @@ window.setUI = (function() {
     let menuOpen = false;
     let statsBarMenuOpen = false;
     let dataTabMenuOpen = false;
+    let extractionTabMenuOpen = false;
 
     /**
      * Initialize the set selector UI
@@ -383,6 +384,7 @@ window.setUI = (function() {
         updateStatsBarSetName();
         updateDataTabSetName();
         updateEditTabSetName();
+        updateExtractionTabSetName();
     }
 
     /**
@@ -434,12 +436,29 @@ window.setUI = (function() {
     }
 
     /**
+     * Update the Extraction tab set name
+     */
+    function updateExtractionTabSetName() {
+        const el = document.getElementById('extractionTabSetName');
+        if (!el) return;
+
+        const currentSet = window.sets.getCurrentSet();
+        if (currentSet) {
+            el.innerHTML = currentSet.name +
+                (currentSet.isDirty ? '<span class="dirty-indicator">*</span>' : '');
+        } else {
+            el.textContent = 'No Set';
+        }
+    }
+
+    /**
      * Close all dropdown menus
      */
     function closeAllMenus() {
         closeMenu();
         closeStatsBarMenu();
         closeDataTabMenu();
+        closeExtractionTabMenu();
     }
 
     /**
@@ -598,6 +617,69 @@ window.setUI = (function() {
     }
 
     /**
+     * Toggle the Extraction tab set menu
+     */
+    function toggleExtractionTabMenu() {
+        extractionTabMenuOpen = !extractionTabMenuOpen;
+        if (extractionTabMenuOpen) {
+            renderExtractionTabMenu();
+            closeMenu();
+            closeStatsBarMenu();
+            closeDataTabMenu();
+        }
+        const menu = document.getElementById('extractionTabSetMenu');
+        if (menu) {
+            menu.style.display = extractionTabMenuOpen ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Close the Extraction tab set menu
+     */
+    function closeExtractionTabMenu() {
+        extractionTabMenuOpen = false;
+        const menu = document.getElementById('extractionTabSetMenu');
+        if (menu) {
+            menu.style.display = 'none';
+        }
+    }
+
+    /**
+     * Render the Extraction tab set menu
+     */
+    function renderExtractionTabMenu() {
+        const menu = document.getElementById('extractionTabSetMenu');
+        if (!menu) return;
+
+        const setList = window.sets.getSetList();
+        const currentSetId = window.sets.getCurrentSetId();
+
+        let html = '';
+
+        // Set list
+        setList.forEach(set => {
+            const isActive = set.id === currentSetId;
+            html += `
+                <button class="tab-set-menu-item${isActive ? ' active' : ''}"
+                        data-set-id="${set.id}">
+                    ${set.name}${set.isDirty ? '<span class="dirty-indicator">*</span>' : ''}
+                </button>
+            `;
+        });
+
+        menu.innerHTML = html;
+
+        // Bind click handlers
+        menu.querySelectorAll('.tab-set-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const setId = item.dataset.setId;
+                closeExtractionTabMenu();
+                handleSetClick(setId);
+            });
+        });
+    }
+
+    /**
      * Bind button handlers
      */
     function bindHandlers() {
@@ -672,6 +754,12 @@ window.setUI = (function() {
                     closeDataTabMenu();
                 }
             }
+            if (extractionTabMenuOpen) {
+                const container = document.getElementById('extractionTabSetDropdown');
+                if (container && !container.contains(e.target)) {
+                    closeExtractionTabMenu();
+                }
+            }
         });
 
         // Stats bar set dropdown button
@@ -696,6 +784,31 @@ window.setUI = (function() {
         const dataTabNewSetBtn = document.getElementById('dataTabNewSetBtn');
         if (dataTabNewSetBtn) {
             dataTabNewSetBtn.addEventListener('click', () => {
+                showCreateSetDialog();
+            });
+        }
+
+        // Extraction tab set dropdown button
+        const extractionTabSetBtn = document.getElementById('extractionTabSetBtn');
+        if (extractionTabSetBtn) {
+            extractionTabSetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleExtractionTabMenu();
+            });
+        }
+
+        // Extraction tab "+ New Set" button
+        const extractionTabNewSetBtn = document.getElementById('extractionTabNewSetBtn');
+        if (extractionTabNewSetBtn) {
+            extractionTabNewSetBtn.addEventListener('click', () => {
+                showCreateSetDialog();
+            });
+        }
+
+        // Edit tab "+ New Set" button
+        const editTabNewSetBtn = document.getElementById('editTabNewSetBtn');
+        if (editTabNewSetBtn) {
+            editTabNewSetBtn.addEventListener('click', () => {
                 showCreateSetDialog();
             });
         }
@@ -898,6 +1011,7 @@ window.setUI = (function() {
         updateStatsBarSetName,
         updateDataTabSetName,
         updateEditTabSetName,
+        updateExtractionTabSetName,
         updateAllSetIndicators,
         showCreateSetDialog,
     };

@@ -152,9 +152,11 @@ window.app = (function() {
                     e.target.blur();
                     return;
                 }
-                // Cancel edit mode or deselect
+                // Cancel edit mode, then clear multi-selection, then clear single selection
                 if (window.editor?.getMode() !== 'none') {
                     window.editor.cancelMode();
+                } else if (window.overlay?.hasMultiSelection()) {
+                    window.overlay.clearMultiSelection();
                 } else {
                     window.overlay?.deselect();
                 }
@@ -183,10 +185,38 @@ window.app = (function() {
                 return;
             }
 
-            // Delete / Backspace - delete selected item
+            // Arrow keys - in chain mode, navigate the DAG
+            if (window.editor?.getMode() === window.editor?.EditMode?.ADD_CHAIN) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    window.editor.chainGoBack();
+                    return;
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    window.editor.chainGoForward();
+                    return;
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    window.editor.chainCyclePrev();
+                    return;
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    window.editor.chainCycleNext();
+                    return;
+                }
+            }
+
+            // Delete / Backspace - delete selected item(s)
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 e.preventDefault();
-                window.editor?.deleteSelected();
+                if (window.overlay?.hasMultiSelection()) {
+                    window.editor?.deleteMultiSelected();
+                } else {
+                    window.editor?.deleteSelected();
+                }
                 return;
             }
 

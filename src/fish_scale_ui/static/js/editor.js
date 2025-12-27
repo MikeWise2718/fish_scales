@@ -9,14 +9,20 @@ window.editor = (function() {
         NONE: 'none',
         ADD_TUB: 'add_tub',
         ADD_ITC: 'add_itc',
+        ADD_CHAIN: 'add_chain',  // Add tubercles with auto-connections
         MOVE: 'move',
         DELETE_MULTI_TUB: 'delete_multi_tub',
         DELETE_MULTI_ITC: 'delete_multi_itc',
+        AREA_SELECT: 'area_select',  // Area selection mode for multi-select
     };
 
     // Current state
     let currentMode = EditMode.NONE;
     let pendingFirstTub = null; // For ITC creation - first selected tubercle
+    let chainParents = {}; // For chain mode - maps tubercle ID to its parent ID
+    let chainCurrentId = null; // Currently selected tubercle in chain mode
+    let chainNeighbors = []; // Neighbor tubercle IDs for navigation
+    let chainNeighborIndex = -1; // Currently highlighted neighbor (-1 = none)
     let allowDeleteWithoutConfirm = false;
     let defaultRadius = null; // Will be set from mean diameter
 
@@ -72,6 +78,21 @@ window.editor = (function() {
         currentMode = mode;
         pendingFirstTub = null;
 
+        // Reset chain when entering chain mode, or when leaving it
+        if (mode === EditMode.ADD_CHAIN) {
+            chainParents = {};
+            chainCurrentId = null;
+            chainNeighbors = [];
+            chainNeighborIndex = -1;
+            window.overlay?.setHighlightedEdge(null);
+        } else if (previousMode === EditMode.ADD_CHAIN) {
+            chainParents = {};
+            chainCurrentId = null;
+            chainNeighbors = [];
+            chainNeighborIndex = -1;
+            window.overlay?.setHighlightedEdge(null);
+        }
+
         // Update UI
         updateModeUI();
 
@@ -83,6 +104,13 @@ window.editor = (function() {
             if (mode === EditMode.ADD_ITC) {
                 ensureTubesVisible(); // Need to see tubes to click them
             }
+        } else if (mode === EditMode.ADD_CHAIN) {
+            ensureTubesVisible();
+            ensureLinksVisible();
+        } else if (mode === EditMode.AREA_SELECT) {
+            // Area select should show both tubes and links
+            ensureTubesVisible();
+            ensureLinksVisible();
         }
 
         // Update cursor
@@ -156,15 +184,20 @@ window.editor = (function() {
         // Update buttons
         const addTubBtn = document.getElementById('addTubBtn');
         const addItcBtn = document.getElementById('addItcBtn');
+        const addChainBtn = document.getElementById('addChainBtn');
         const moveBtn = document.getElementById('moveBtn');
         const deleteMultipleTubBtn = document.getElementById('deleteMultipleTubBtn');
         const deleteMultipleItcBtn = document.getElementById('deleteMultipleItcBtn');
+        const areaSelectBtn = document.getElementById('areaSelectBtn');
 
         if (addTubBtn) {
             addTubBtn.classList.toggle('active', currentMode === EditMode.ADD_TUB);
         }
         if (addItcBtn) {
             addItcBtn.classList.toggle('active', currentMode === EditMode.ADD_ITC);
+        }
+        if (addChainBtn) {
+            addChainBtn.classList.toggle('active', currentMode === EditMode.ADD_CHAIN);
         }
         if (moveBtn) {
             moveBtn.classList.toggle('active', currentMode === EditMode.MOVE);
@@ -174,6 +207,9 @@ window.editor = (function() {
         }
         if (deleteMultipleItcBtn) {
             deleteMultipleItcBtn.classList.toggle('active', currentMode === EditMode.DELETE_MULTI_ITC);
+        }
+        if (areaSelectBtn) {
+            areaSelectBtn.classList.toggle('active', currentMode === EditMode.AREA_SELECT);
         }
 
         // Update status
@@ -188,6 +224,16 @@ window.editor = (function() {
                         ? 'Click second tubercle to create connection'
                         : 'Click first tubercle';
                     break;
+                case EditMode.ADD_CHAIN:
+                    if (chainCurrentId === null) {
+                        statusEl.textContent = 'Click to place or select first tubercle';
+                    } else {
+                        const parentId = chainParents[chainCurrentId];
+                        statusEl.textContent = parentId !== undefined
+                            ? `Selected: #${chainCurrentId} (parent: #${parentId})`
+                            : `Selected: #${chainCurrentId} (root)`;
+                    }
+                    break;
                 case EditMode.MOVE:
                     statusEl.textContent = 'Click destination to move selected tubercle';
                     break;
@@ -197,8 +243,23 @@ window.editor = (function() {
                 case EditMode.DELETE_MULTI_ITC:
                     statusEl.textContent = 'Click connections to delete them';
                     break;
+                case EditMode.AREA_SELECT:
+                    statusEl.textContent = 'Click and drag to select an area. Release to select items.';
+                    break;
                 default:
                     statusEl.textContent = '';
+            }
+        }
+
+        // Update the hint element at top of Edit tab
+        const hintEl = document.getElementById('editModeHint');
+        if (hintEl) {
+            if (currentMode === EditMode.ADD_CHAIN) {
+                hintEl.innerHTML = '<strong>Chain Mode:</strong> Click to add tubercle (auto-connects). Click existing to select. ' +
+                    '<kbd>\u2191</kbd><kbd>\u2193</kbd> cycle neighbors, <kbd>\u2192</kbd> go to highlighted, <kbd>\u2190</kbd> go to parent. <kbd>Esc</kbd> finish.';
+                hintEl.style.display = 'block';
+            } else {
+                hintEl.style.display = 'none';
             }
         }
     }
@@ -212,6 +273,7 @@ window.editor = (function() {
 
         switch (currentMode) {
             case EditMode.ADD_TUB:
+            case EditMode.ADD_CHAIN:
                 container.style.cursor = 'crosshair';
                 break;
             case EditMode.ADD_ITC:
@@ -222,6 +284,7 @@ window.editor = (function() {
                 break;
             case EditMode.DELETE_MULTI_TUB:
             case EditMode.DELETE_MULTI_ITC:
+            case EditMode.AREA_SELECT:
                 container.style.cursor = 'crosshair';
                 break;
             default:
@@ -239,6 +302,9 @@ window.editor = (function() {
                 break;
             case EditMode.ADD_ITC:
                 handleItcClick(x, y);
+                break;
+            case EditMode.ADD_CHAIN:
+                addTubercleToChain(x, y);
                 break;
             case EditMode.MOVE:
                 handleMoveClick(x, y);
@@ -356,6 +422,245 @@ window.editor = (function() {
 
         // Stay in add mode for multiple additions
         window.app?.showToast(`Added tubercle #${newTub.id}`, 'success');
+    }
+
+    /**
+     * Add a tubercle to the chain (with auto-connection to current)
+     * Or select an existing tubercle if clicked on one
+     */
+    function addTubercleToChain(x, y) {
+        // Check if clicking on an existing tubercle
+        const clickedTub = findTubercleAt(x, y);
+        if (clickedTub) {
+            // Select this tubercle - it becomes the current node
+            chainCurrentId = clickedTub.id;
+            // If not tracked yet, add as a root (no parent)
+            if (chainParents[clickedTub.id] === undefined) {
+                chainParents[clickedTub.id] = null; // null = root node
+            }
+            window.overlay?.selectTubercle(clickedTub.id);
+            updateChainNeighbors();
+            updateModeUI();
+            window.app?.showToast(`Selected tubercle #${clickedTub.id}`, 'info');
+            return;
+        }
+
+        const calibration = getCalibration();
+        const umPerPx = calibration?.um_per_px || 0.14;
+
+        const newTub = {
+            id: nextTubId++,
+            centroid_x: x,
+            centroid_y: y,
+            radius_px: defaultRadius,
+            diameter_um: (defaultRadius * 2) * umPerPx,
+            circularity: 1.0,
+        };
+
+        tubercles.push(newTub);
+
+        // Push tubercle to undo stack
+        window.undoManager?.push({
+            type: window.undoManager.OperationType.ADD_TUB,
+            data: { tub: { ...newTub } },
+            redoData: { tub: { ...newTub } },
+        });
+
+        // If there's a current tubercle, create connection from it
+        if (chainCurrentId !== null) {
+            const currentTub = tubercles.find(t => t.id === chainCurrentId);
+
+            if (currentTub) {
+                // Calculate distances
+                const dx = newTub.centroid_x - currentTub.centroid_x;
+                const dy = newTub.centroid_y - currentTub.centroid_y;
+                const centerDistPx = Math.sqrt(dx * dx + dy * dy);
+                const edgeDistPx = Math.max(0, centerDistPx - currentTub.radius_px - newTub.radius_px);
+
+                const newEdge = {
+                    id1: currentTub.id,
+                    id2: newTub.id,
+                    x1: currentTub.centroid_x,
+                    y1: currentTub.centroid_y,
+                    x2: newTub.centroid_x,
+                    y2: newTub.centroid_y,
+                    center_distance_um: centerDistPx * umPerPx,
+                    edge_distance_um: edgeDistPx * umPerPx,
+                };
+
+                edges.push(newEdge);
+
+                // Push edge to undo stack
+                window.undoManager?.push({
+                    type: window.undoManager.OperationType.ADD_ITC,
+                    data: { edge: { ...newEdge } },
+                    redoData: { edge: { ...newEdge } },
+                });
+
+                logEdit('add_itc', { id1: currentTub.id, id2: newTub.id });
+            }
+        }
+
+        // Track parent relationship and update current
+        chainParents[newTub.id] = chainCurrentId; // parent is the current node (or null if first)
+        chainCurrentId = newTub.id;
+
+        // Select the new tubercle
+        window.overlay?.selectTubercle(newTub.id);
+
+        // Update displays
+        refreshDisplays();
+        markDirty();
+        updateChainNeighbors();
+        updateModeUI();
+        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1), chain: true });
+
+        window.app?.showToast(`Added tubercle #${newTub.id}`, 'success');
+    }
+
+    /**
+     * Go to parent tubercle in the DAG (Left arrow)
+     */
+    function chainGoBack() {
+        if (currentMode !== EditMode.ADD_CHAIN) return false;
+        if (chainCurrentId === null) return false;
+
+        const parentId = chainParents[chainCurrentId];
+        if (parentId === null || parentId === undefined) {
+            window.app?.showToast('Already at root (no parent)', 'info');
+            return false;
+        }
+
+        chainCurrentId = parentId;
+        window.overlay?.selectTubercle(parentId);
+
+        updateChainNeighbors();
+        updateModeUI();
+        window.app?.showToast(`Moved to parent: tubercle #${parentId}`, 'info');
+        return true;
+    }
+
+    /**
+     * Go to highlighted neighbor (Right arrow)
+     */
+    function chainGoForward() {
+        if (currentMode !== EditMode.ADD_CHAIN) return false;
+        if (chainNeighborIndex < 0 || chainNeighborIndex >= chainNeighbors.length) {
+            window.app?.showToast('No neighbor highlighted (use Up/Down)', 'info');
+            return false;
+        }
+
+        const targetId = chainNeighbors[chainNeighborIndex];
+        chainCurrentId = targetId;
+        window.overlay?.selectTubercle(targetId);
+
+        // Update neighbors for new position
+        updateChainNeighbors();
+        updateModeUI();
+
+        window.app?.showToast(`Moved to tubercle #${targetId}`, 'info');
+        return true;
+    }
+
+    /**
+     * Update the list of neighbors for current tubercle
+     */
+    function updateChainNeighbors() {
+        chainNeighbors = [];
+        chainNeighborIndex = -1;
+
+        if (chainCurrentId === null) {
+            window.overlay?.setHighlightedEdge(null);
+            return;
+        }
+
+        // Find all connected tubercles via edges
+        edges.forEach(edge => {
+            if (edge.id1 === chainCurrentId) {
+                chainNeighbors.push(edge.id2);
+            } else if (edge.id2 === chainCurrentId) {
+                chainNeighbors.push(edge.id1);
+            }
+        });
+
+        // If there are neighbors, highlight the first one (parent if exists)
+        if (chainNeighbors.length > 0) {
+            // Try to put parent first
+            const parentId = chainParents[chainCurrentId];
+            if (parentId !== null && parentId !== undefined) {
+                const parentIndex = chainNeighbors.indexOf(parentId);
+                if (parentIndex > 0) {
+                    // Move parent to front
+                    chainNeighbors.splice(parentIndex, 1);
+                    chainNeighbors.unshift(parentId);
+                }
+            }
+            chainNeighborIndex = 0;
+            updateHighlightedEdge();
+        } else {
+            window.overlay?.setHighlightedEdge(null);
+        }
+    }
+
+    /**
+     * Update the highlighted edge in the overlay
+     */
+    function updateHighlightedEdge() {
+        if (chainNeighborIndex < 0 || chainNeighborIndex >= chainNeighbors.length) {
+            window.overlay?.setHighlightedEdge(null);
+            return;
+        }
+
+        const neighborId = chainNeighbors[chainNeighborIndex];
+        // Find the edge between current and neighbor
+        const edge = edges.find(e =>
+            (e.id1 === chainCurrentId && e.id2 === neighborId) ||
+            (e.id1 === neighborId && e.id2 === chainCurrentId)
+        );
+
+        if (edge) {
+            window.overlay?.setHighlightedEdge(edge);
+        } else {
+            window.overlay?.setHighlightedEdge(null);
+        }
+    }
+
+    /**
+     * Cycle to next neighbor (Down arrow)
+     */
+    function chainCycleNext() {
+        if (currentMode !== EditMode.ADD_CHAIN) return false;
+        if (chainNeighbors.length === 0) {
+            window.app?.showToast('No neighbors to cycle through', 'info');
+            return false;
+        }
+
+        chainNeighborIndex = (chainNeighborIndex + 1) % chainNeighbors.length;
+        updateHighlightedEdge();
+
+        const neighborId = chainNeighbors[chainNeighborIndex];
+        const isParent = chainParents[chainCurrentId] === neighborId;
+        window.app?.showToast(`Neighbor ${chainNeighborIndex + 1}/${chainNeighbors.length}: #${neighborId}${isParent ? ' (parent)' : ''}`, 'info');
+        return true;
+    }
+
+    /**
+     * Cycle to previous neighbor (Up arrow)
+     */
+    function chainCyclePrev() {
+        if (currentMode !== EditMode.ADD_CHAIN) return false;
+        if (chainNeighbors.length === 0) {
+            window.app?.showToast('No neighbors to cycle through', 'info');
+            return false;
+        }
+
+        chainNeighborIndex = (chainNeighborIndex - 1 + chainNeighbors.length) % chainNeighbors.length;
+        updateHighlightedEdge();
+
+        const neighborId = chainNeighbors[chainNeighborIndex];
+        const isParent = chainParents[chainCurrentId] === neighborId;
+        window.app?.showToast(`Neighbor ${chainNeighborIndex + 1}/${chainNeighbors.length}: #${neighborId}${isParent ? ' (parent)' : ''}`, 'info');
+        return true;
     }
 
     /**
@@ -1005,6 +1310,24 @@ window.editor = (function() {
                 edges.push({ ...data.edge });
                 break;
             }
+            case window.undoManager.OperationType.DELETE_MULTI: {
+                // Restore all deleted tubercles
+                data.tubs.forEach(t => {
+                    tubercles.push({ ...t });
+                });
+                // Restore all deleted edges
+                data.edges.forEach(e => {
+                    edges.push({ ...e });
+                });
+                // Update next ID if needed
+                if (data.tubs.length > 0) {
+                    const maxId = Math.max(...data.tubs.map(t => t.id));
+                    if (maxId >= nextTubId) {
+                        nextTubId = maxId + 1;
+                    }
+                }
+                break;
+            }
         }
 
         refreshDisplays();
@@ -1068,6 +1391,20 @@ window.editor = (function() {
                 if (idx !== -1) edges.splice(idx, 1);
                 break;
             }
+            case window.undoManager.OperationType.DELETE_MULTI: {
+                // Re-delete all tubercles
+                redoData.tubIds.forEach(id => {
+                    const idx = tubercles.findIndex(t => t.id === id);
+                    if (idx !== -1) tubercles.splice(idx, 1);
+                });
+                // Re-delete all edges (filter by key)
+                const edgeKeysToDelete = new Set(redoData.edgeKeys);
+                edges = edges.filter(e => {
+                    const key = `${e.id1}-${e.id2}`;
+                    return !edgeKeysToDelete.has(key);
+                });
+                break;
+            }
         }
 
         refreshDisplays();
@@ -1123,6 +1460,172 @@ window.editor = (function() {
      */
     function setAllowDeleteWithoutConfirm(value) {
         allowDeleteWithoutConfirm = value;
+    }
+
+    /**
+     * Delete all multi-selected items
+     */
+    function deleteMultiSelected() {
+        const selectedTubs = window.overlay?.getMultiSelectedTubercles() || [];
+        const selectedEdges = window.overlay?.getMultiSelectedEdges() || [];
+
+        if (selectedTubs.length === 0 && selectedEdges.length === 0) {
+            window.app?.showToast('No items selected', 'info');
+            return;
+        }
+
+        // Confirmation dialog
+        const msg = `Delete ${selectedTubs.length} tubercle(s) and ${selectedEdges.length} connection(s)?`;
+        if (!allowDeleteWithoutConfirm && !confirm(msg)) {
+            return;
+        }
+
+        // Perform batch delete
+        batchDelete(selectedTubs, selectedEdges);
+    }
+
+    /**
+     * Batch delete tubercles and edges with single undo operation
+     */
+    function batchDelete(tubs, selectedEdges) {
+        // Collect all data for undo
+        const deletedTubs = tubs.map(t => ({ ...t }));
+        const deletedEdges = [];
+        const orphanedEdges = [];
+
+        // Find all edges that will be orphaned (connected to deleted tubs)
+        const tubIdsToDelete = new Set(tubs.map(t => t.id));
+        edges.forEach(e => {
+            if (tubIdsToDelete.has(e.id1) || tubIdsToDelete.has(e.id2)) {
+                orphanedEdges.push({ ...e });
+            }
+        });
+
+        // Combine explicitly selected edges with orphaned edges (deduped)
+        const edgeKeySet = new Set();
+        [...selectedEdges, ...orphanedEdges].forEach(e => {
+            const key = `${e.id1}-${e.id2}`;
+            if (!edgeKeySet.has(key)) {
+                edgeKeySet.add(key);
+                deletedEdges.push({ ...e });
+            }
+        });
+
+        // Remove tubercles
+        tubs.forEach(t => {
+            const idx = tubercles.findIndex(tb => tb.id === t.id);
+            if (idx !== -1) tubercles.splice(idx, 1);
+        });
+
+        // Remove all edges that should be deleted
+        const edgeKeysToDelete = new Set(deletedEdges.map(e => `${e.id1}-${e.id2}`));
+        edges = edges.filter(e => !edgeKeysToDelete.has(`${e.id1}-${e.id2}`));
+
+        // Push single undo operation
+        window.undoManager?.push({
+            type: window.undoManager.OperationType.DELETE_MULTI,
+            data: { tubs: deletedTubs, edges: deletedEdges },
+            redoData: {
+                tubIds: deletedTubs.map(t => t.id),
+                edgeKeys: deletedEdges.map(e => `${e.id1}-${e.id2}`)
+            }
+        });
+
+        // Clear multi-selection
+        window.overlay?.clearMultiSelection();
+
+        // Clear single selection too
+        window.overlay?.deselect();
+
+        // Update displays
+        refreshDisplays();
+        markDirty();
+        logEdit('delete_multi', {
+            tubCount: deletedTubs.length,
+            edgeCount: deletedEdges.length
+        });
+
+        window.app?.showToast(
+            `Deleted ${deletedTubs.length} tubercle(s) and ${deletedEdges.length} connection(s)`,
+            'success'
+        );
+    }
+
+    // ========================================
+    // Area Selection Mouse Handling
+    // ========================================
+
+    let areaSelectMouseHandlersBound = false;
+
+    /**
+     * Setup mouse handlers for area selection
+     */
+    function setupAreaSelectMouseHandlers() {
+        if (areaSelectMouseHandlersBound) return;
+
+        const canvas = window.overlay?.getCanvas();
+        if (!canvas) return;
+
+        canvas.addEventListener('mousedown', handleAreaSelectMouseDown);
+        canvas.addEventListener('mousemove', handleAreaSelectMouseMove);
+        canvas.addEventListener('mouseup', handleAreaSelectMouseUp);
+
+        areaSelectMouseHandlersBound = true;
+    }
+
+    function handleAreaSelectMouseDown(e) {
+        if (currentMode !== EditMode.AREA_SELECT) return;
+        if (e.button !== 0) return; // Only left click
+
+        const coords = window.overlay.clientToImageCoords(e.clientX, e.clientY);
+        window.overlay.startAreaSelect(coords.x, coords.y);
+        e.preventDefault();
+    }
+
+    function handleAreaSelectMouseMove(e) {
+        if (currentMode !== EditMode.AREA_SELECT) return;
+        if (!window.overlay.isInAreaSelectMode()) return;
+
+        const coords = window.overlay.clientToImageCoords(e.clientX, e.clientY);
+        window.overlay.updateAreaSelect(coords.x, coords.y);
+    }
+
+    function handleAreaSelectMouseUp(e) {
+        if (currentMode !== EditMode.AREA_SELECT) return;
+        if (!window.overlay.isInAreaSelectMode()) return;
+
+        const coords = window.overlay.clientToImageCoords(e.clientX, e.clientY);
+        window.overlay.updateAreaSelect(coords.x, coords.y);
+        const selected = window.overlay.finishAreaSelect();
+
+        // Select items within rectangle
+        if (selected.tubIds.length > 0 || selected.edgeIdxs.length > 0) {
+            window.overlay.selectMultipleTubercles(selected.tubIds);
+            window.overlay.addToMultiSelection(null, selected.edgeIdxs);
+
+            window.app?.showToast(
+                `Selected ${selected.tubIds.length} tubercle(s) and ${selected.edgeIdxs.length} connection(s)`,
+                'info'
+            );
+        } else {
+            window.app?.showToast('No items in selection area', 'info');
+        }
+    }
+
+    /**
+     * Enter area select mode
+     */
+    function enterAreaSelectMode() {
+        setMode(EditMode.AREA_SELECT);
+        setupAreaSelectMouseHandlers();
+    }
+
+    /**
+     * Exit area select mode
+     */
+    function exitAreaSelectMode() {
+        window.overlay?.cancelAreaSelect();
+        setMode(EditMode.NONE);
     }
 
     /**
@@ -1189,6 +1692,17 @@ window.editor = (function() {
             });
         }
 
+        const addChainBtn = document.getElementById('addChainBtn');
+        if (addChainBtn) {
+            addChainBtn.addEventListener('click', () => {
+                if (currentMode === EditMode.ADD_CHAIN) {
+                    setMode(EditMode.NONE);
+                } else {
+                    setMode(EditMode.ADD_CHAIN);
+                }
+            });
+        }
+
         const moveBtn = document.getElementById('moveBtn');
         if (moveBtn) {
             moveBtn.addEventListener('click', () => {
@@ -1245,6 +1759,47 @@ window.editor = (function() {
                 }
             });
         }
+
+        // Area selection button
+        const areaSelectBtn = document.getElementById('areaSelectBtn');
+        if (areaSelectBtn) {
+            areaSelectBtn.addEventListener('click', () => {
+                if (currentMode === EditMode.AREA_SELECT) {
+                    exitAreaSelectMode();
+                } else {
+                    enterAreaSelectMode();
+                }
+            });
+        }
+
+        // Delete selected (multi) button
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', deleteMultiSelected);
+        }
+
+        // Listen for multi-selection changes to update button state
+        document.addEventListener('multiSelectionChanged', (e) => {
+            const { tubercleCount, edgeCount } = e.detail;
+            const total = tubercleCount + edgeCount;
+
+            // Update delete selected button
+            const btn = document.getElementById('deleteSelectedBtn');
+            if (btn) {
+                btn.disabled = total === 0;
+                btn.textContent = `Delete Selected (${total})`;
+            }
+
+            // Update multi-select status
+            const status = document.getElementById('multiSelectStatus');
+            if (status) {
+                if (total === 0) {
+                    status.textContent = 'No items selected';
+                } else {
+                    status.textContent = `${tubercleCount} tubercle(s), ${edgeCount} connection(s) selected`;
+                }
+            }
+        });
 
         const undoBtn = document.getElementById('undoBtn');
         if (undoBtn) {
@@ -1362,9 +1917,17 @@ window.editor = (function() {
         cancelMode,
         handleCanvasClick,
         deleteSelected,
+        deleteMultiSelected,
         nudgeSelected,
         cycleSelection,
         areTubesVisible,
         areLinksVisible,
+        enterAreaSelectMode,
+        exitAreaSelectMode,
+        chainGoBack,
+        chainGoForward,
+        chainCycleNext,
+        chainCyclePrev,
+        hasMultiSelection: () => window.overlay?.hasMultiSelection() || false,
     };
 })();

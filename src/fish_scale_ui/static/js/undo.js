@@ -13,6 +13,7 @@ window.undoManager = (function() {
         RESIZE_TUB: 'resize_tub',
         ADD_ITC: 'add_itc',
         DELETE_ITC: 'delete_itc',
+        DELETE_MULTI: 'delete_multi',  // Batch delete tubercles and edges
     };
 
     /**

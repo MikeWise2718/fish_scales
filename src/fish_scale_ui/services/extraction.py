@@ -34,6 +34,7 @@ def run_extraction(
     blur_sigma: float = 1.0,
     neighbor_graph: str = "delaunay",
     edge_margin_px: int = 10,
+    refine_ellipse: bool = True,
 ) -> dict:
     """
     Run tubercle extraction on an image.
@@ -51,6 +52,7 @@ def run_extraction(
         blur_sigma: Gaussian blur sigma
         neighbor_graph: Graph type (delaunay, gabriel, rng)
         edge_margin_px: Edge margin in pixels
+        refine_ellipse: Whether to fit ellipses for more accurate measurements
 
     Returns:
         Dictionary with extraction results
@@ -82,6 +84,7 @@ def run_extraction(
         min_circularity=min_circularity,
         edge_margin_px=edge_margin_px,
         method=method,
+        refine_ellipse=refine_ellipse,
     )
 
     # Build neighbor graph and get edges
@@ -113,7 +116,7 @@ def run_extraction(
     # Convert to serializable format
     tubercles_data = []
     for t in tubercles:
-        tubercles_data.append({
+        tub_data = {
             'id': t.id,
             'centroid_x': t.centroid[0],
             'centroid_y': t.centroid[1],
@@ -122,7 +125,16 @@ def run_extraction(
             'radius_px': t.radius_px,
             'circularity': t.circularity,
             'source': 'extracted',  # Track origin for coloring
-        })
+        }
+        # Include ellipse parameters if available
+        if t.major_axis_px is not None:
+            tub_data['major_axis_px'] = t.major_axis_px
+            tub_data['minor_axis_px'] = t.minor_axis_px
+            tub_data['major_axis_um'] = t.major_axis_um
+            tub_data['minor_axis_um'] = t.minor_axis_um
+            tub_data['orientation'] = t.orientation  # radians
+            tub_data['eccentricity'] = t.eccentricity
+        tubercles_data.append(tub_data)
 
     edges_data = []
     for e in edges:

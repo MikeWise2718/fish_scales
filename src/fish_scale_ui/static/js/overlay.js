@@ -29,7 +29,8 @@ window.overlay = (function() {
         numbers: false,
         tubes: true,
         links: true,
-        scale: false
+        scale: false,
+        ellipses: false
     };
 
     // Color mode for tubercles: 'source' (extracted vs manual), 'uniform' (all same color)
@@ -107,6 +108,7 @@ window.overlay = (function() {
         const tubesEl = document.getElementById('toggleTubes');
         const linksEl = document.getElementById('toggleLinks');
         const scaleEl = document.getElementById('toggleScale');
+        const ellipsesEl = document.getElementById('showEllipses');
 
         if (numbersEl) {
             numbersEl.addEventListener('change', function() {
@@ -129,6 +131,12 @@ window.overlay = (function() {
         if (scaleEl) {
             scaleEl.addEventListener('change', function() {
                 toggleState.scale = this.checked;
+                render();
+            });
+        }
+        if (ellipsesEl) {
+            ellipsesEl.addEventListener('change', function() {
+                toggleState.ellipses = this.checked;
                 render();
             });
         }
@@ -301,15 +309,29 @@ window.overlay = (function() {
         const y = tub.centroid_y;
         const radius = tub.radius_px;
 
+        // Determine if drawing ellipse or circle
+        const useEllipse = toggleState.ellipses && tub.major_axis_px && tub.minor_axis_px;
+        const semiMajor = useEllipse ? tub.major_axis_px / 2 : radius;
+        const semiMinor = useEllipse ? tub.minor_axis_px / 2 : radius;
+        const rotation = useEllipse ? (tub.orientation || 0) : 0;
+
         // Fill
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        if (useEllipse) {
+            ctx.ellipse(x, y, semiMajor, semiMinor, rotation, 0, 2 * Math.PI);
+        } else {
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        }
         ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
         ctx.fill();
 
         // Stroke
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        if (useEllipse) {
+            ctx.ellipse(x, y, semiMajor, semiMinor, rotation, 0, 2 * Math.PI);
+        } else {
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        }
         ctx.strokeStyle = colors.multiSelectedTubercle;
         ctx.lineWidth = 3;
         ctx.stroke();
@@ -517,14 +539,26 @@ window.overlay = (function() {
         ctx.fillText(label, x + scalePx / 2, y - 4);
     }
 
-    // Draw a single tubercle
+    // Draw a single tubercle (as circle or ellipse)
     function drawTubercle(tub, isSelected, colors) {
         const x = tub.centroid_x;
         const y = tub.centroid_y;
         const radius = tub.radius_px;
 
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+
+        // Draw ellipse if toggle is on and ellipse data is available
+        if (toggleState.ellipses && tub.major_axis_px && tub.minor_axis_px) {
+            // major_axis_px and minor_axis_px are full axis lengths, so divide by 2 for radii
+            const semiMajor = tub.major_axis_px / 2;
+            const semiMinor = tub.minor_axis_px / 2;
+            const rotation = tub.orientation || 0;  // radians
+            ctx.ellipse(x, y, semiMajor, semiMinor, rotation, 0, 2 * Math.PI);
+        } else {
+            // Draw circle (default)
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        }
+
         ctx.strokeStyle = getTubercleColor(tub, colors, isSelected);
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.stroke();

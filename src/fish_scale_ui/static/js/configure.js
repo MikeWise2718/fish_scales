@@ -62,9 +62,12 @@ window.configure = (function() {
             const input = document.getElementById(id);
             if (input && value !== undefined && value !== null) {
                 input.value = value;
-                // Update range display if exists
+                // Update range display if exists (3 decimal places)
                 const display = document.getElementById(`${id}_value`);
-                if (display) display.textContent = value;
+                if (display) {
+                    const val = parseFloat(value);
+                    display.textContent = isNaN(val) ? value : val.toFixed(3);
+                }
             }
         }
 
@@ -141,8 +144,12 @@ window.configure = (function() {
                 } else {
                     input.value = value;
                 }
+                // Update range display with 3 decimal places
                 const display = document.getElementById(`${id}_value`);
-                if (display) display.textContent = value;
+                if (display) {
+                    const val = parseFloat(value);
+                    display.textContent = isNaN(val) ? value : val.toFixed(3);
+                }
             }
         }
         // Update cull factor row visibility
@@ -185,9 +192,12 @@ window.configure = (function() {
                 checkParamsChanged();
             });
             input.addEventListener('input', () => {
-                // Update range display
+                // Update range display with 3 decimal places for sliders
                 const display = document.getElementById(`${input.id}_value`);
-                if (display) display.textContent = input.value;
+                if (display) {
+                    const val = parseFloat(input.value);
+                    display.textContent = isNaN(val) ? input.value : val.toFixed(3);
+                }
             });
         });
 

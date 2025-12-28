@@ -305,11 +305,31 @@
                     <button type="button" class="btn btn-sm btn-secondary" id="extractionTabNewSetBtn">+ New Set</button>
                 </div>
 
-                <div class="config-section">
-                    <h3>Profile Presets</h3>
-                    <select id="profileSelect" class="param-select">
-                        <option value="">-- Select Profile --</option>
-                    </select>
+                <div class="config-section collapsible-section">
+                    <h3 class="collapsible-header" id="profilePresetsToggle">
+                        <span class="collapse-icon">&#9660;</span>
+                        Profile Presets
+                    </h3>
+                    <div class="collapsible-content" id="profilePresetsContent">
+                        <div class="param-row">
+                            <label for="profileSelect">Apply Profile</label>
+                            <select id="profileSelect" class="param-select">
+                                <option value="">-- Select Profile --</option>
+                            </select>
+                        </div>
+                        <div class="profile-management">
+                            <h4>Save Current Settings</h4>
+                            <div class="profile-save-row">
+                                <input type="text" id="newProfileName" class="profile-name-input"
+                                       placeholder="Profile name...">
+                                <button type="button" class="btn btn-sm btn-primary" id="saveProfileBtn">Save</button>
+                            </div>
+                            <h4>Your Profiles</h4>
+                            <div id="profileListContainer">
+                                <p class="empty-profiles">No user profiles saved yet.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="config-section">
@@ -435,6 +455,7 @@
                 </div>
 
                 <div class="config-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" id="undoParamsBtn" disabled title="No undo history">Undo</button>
                     <button type="button" class="btn btn-secondary btn-sm" id="resetParamsBtn">Reset to Defaults</button>
                 </div>
 

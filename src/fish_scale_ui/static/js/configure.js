@@ -3,6 +3,10 @@
  */
 
 window.configure = (function() {
+    const STORAGE_KEY = 'fishScaleParams';
+    const USER_PROFILES_KEY = 'fishScaleUserProfiles';
+    const MAX_UNDO_HISTORY = 20;
+
     // Default parameter values
     const defaults = {
         method: 'log',
@@ -22,31 +26,285 @@ window.configure = (function() {
     let currentParams = { ...defaults };
     let lastExtractedParams = null;
 
-    // Load profiles from server
-    async function loadProfiles() {
+    // Undo history stack
+    let undoHistory = [];
+    let isApplyingUndo = false;
+
+    // Built-in profiles (from server)
+    let builtInProfiles = [];
+
+    // ==================== Persistence ====================
+
+    // Save parameters to localStorage
+    function saveToStorage() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentParams));
+        } catch (err) {
+            console.warn('Failed to save params to localStorage:', err);
+        }
+    }
+
+    // Load parameters from localStorage
+    function loadFromStorage() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                return JSON.parse(stored);
+            }
+        } catch (err) {
+            console.warn('Failed to load params from localStorage:', err);
+        }
+        return null;
+    }
+
+    // Apply parameters to form inputs
+    function applyParamsToForm(params) {
+        if (!params) return;
+
+        for (const [id, value] of Object.entries(params)) {
+            const input = document.getElementById(id);
+            if (input && value !== undefined && value !== null) {
+                if (input.type === 'checkbox') {
+                    input.checked = value;
+                } else {
+                    input.value = value;
+                }
+                // Update range display if exists (3 decimal places)
+                const display = document.getElementById(`${id}_value`);
+                if (display) {
+                    const val = parseFloat(value);
+                    display.textContent = isNaN(val) ? value : val.toFixed(3);
+                }
+            }
+        }
+        updateCullFactorVisibility();
+    }
+
+    // ==================== Undo System ====================
+
+    // Push current state to undo history
+    function pushUndo() {
+        if (isApplyingUndo) return;
+
+        undoHistory.push({ ...currentParams });
+        if (undoHistory.length > MAX_UNDO_HISTORY) {
+            undoHistory.shift();
+        }
+        updateUndoButton();
+    }
+
+    // Undo last parameter change
+    function undo() {
+        if (undoHistory.length === 0) return;
+
+        isApplyingUndo = true;
+        const prevState = undoHistory.pop();
+        applyParamsToForm(prevState);
+        currentParams = { ...prevState };
+        saveToStorage();
+        checkParamsChanged();
+        updateUndoButton();
+        isApplyingUndo = false;
+    }
+
+    // Update undo button state
+    function updateUndoButton() {
+        const btn = document.getElementById('undoParamsBtn');
+        if (btn) {
+            btn.disabled = undoHistory.length === 0;
+            btn.title = undoHistory.length > 0
+                ? `Undo (${undoHistory.length} step${undoHistory.length > 1 ? 's' : ''} available)`
+                : 'No undo history';
+        }
+    }
+
+    // ==================== Profiles ====================
+
+    // Load built-in profiles from server
+    async function loadBuiltInProfiles() {
         try {
             const response = await fetch('/api/profiles');
             const data = await response.json();
-            const select = document.getElementById('profileSelect');
-
-            if (select && data.profiles) {
-                select.innerHTML = '<option value="">-- Select Profile --</option>';
-                data.profiles.forEach(profile => {
-                    const option = document.createElement('option');
-                    option.value = profile.name;
-                    option.textContent = `${profile.name} - ${profile.description}`;
-                    option.dataset.profile = JSON.stringify(profile);
-                    select.appendChild(option);
-                });
+            if (data.profiles) {
+                builtInProfiles = data.profiles;
             }
         } catch (err) {
-            console.error('Failed to load profiles:', err);
+            console.error('Failed to load built-in profiles:', err);
         }
+    }
+
+    // Get user-defined profiles from localStorage
+    function getUserProfiles() {
+        try {
+            const stored = localStorage.getItem(USER_PROFILES_KEY);
+            if (stored) {
+                return JSON.parse(stored);
+            }
+        } catch (err) {
+            console.warn('Failed to load user profiles:', err);
+        }
+        return [];
+    }
+
+    // Save user-defined profiles to localStorage
+    function saveUserProfiles(profiles) {
+        try {
+            localStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+        } catch (err) {
+            console.warn('Failed to save user profiles:', err);
+        }
+    }
+
+    // Render the profile select dropdown
+    function renderProfileSelect() {
+        const select = document.getElementById('profileSelect');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">-- Select Profile --</option>';
+
+        // Add built-in profiles
+        if (builtInProfiles.length > 0) {
+            const builtInGroup = document.createElement('optgroup');
+            builtInGroup.label = 'Built-in Profiles';
+            builtInProfiles.forEach(profile => {
+                const option = document.createElement('option');
+                option.value = `builtin:${profile.name}`;
+                option.textContent = `${profile.name} - ${profile.description}`;
+                option.dataset.profile = JSON.stringify(profile);
+                option.dataset.builtin = 'true';
+                builtInGroup.appendChild(option);
+            });
+            select.appendChild(builtInGroup);
+        }
+
+        // Add user profiles
+        const userProfiles = getUserProfiles();
+        if (userProfiles.length > 0) {
+            const userGroup = document.createElement('optgroup');
+            userGroup.label = 'User Profiles';
+            userProfiles.forEach(profile => {
+                const option = document.createElement('option');
+                option.value = `user:${profile.name}`;
+                option.textContent = profile.name;
+                option.dataset.profile = JSON.stringify(profile);
+                option.dataset.builtin = 'false';
+                userGroup.appendChild(option);
+            });
+            select.appendChild(userGroup);
+        }
+    }
+
+    // Render the profile list in the management container
+    function renderProfileList() {
+        const container = document.getElementById('profileListContainer');
+        if (!container) return;
+
+        const userProfiles = getUserProfiles();
+
+        if (userProfiles.length === 0) {
+            container.innerHTML = '<p class="empty-profiles">No user profiles saved yet.</p>';
+            return;
+        }
+
+        let html = '<ul class="profile-list">';
+        userProfiles.forEach((profile, idx) => {
+            html += `
+                <li class="profile-item">
+                    <span class="profile-name">${escapeHtml(profile.name)}</span>
+                    <button class="btn-icon btn-delete-profile" data-index="${idx}" title="Delete profile">
+                        <span class="icon-delete">✕</span>
+                    </button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        container.innerHTML = html;
+
+        // Add delete handlers
+        container.querySelectorAll('.btn-delete-profile').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index);
+                deleteUserProfile(idx);
+            });
+        });
+    }
+
+    // Save current parameters as a new user profile
+    function saveAsNewProfile() {
+        const nameInput = document.getElementById('newProfileName');
+        if (!nameInput) return;
+
+        const name = nameInput.value.trim();
+        if (!name) {
+            alert('Please enter a profile name.');
+            return;
+        }
+
+        // Check for duplicate names
+        const userProfiles = getUserProfiles();
+        const builtInNames = builtInProfiles.map(p => p.name.toLowerCase());
+        const userNames = userProfiles.map(p => p.name.toLowerCase());
+
+        if (builtInNames.includes(name.toLowerCase())) {
+            alert('Cannot use a built-in profile name.');
+            return;
+        }
+
+        if (userNames.includes(name.toLowerCase())) {
+            if (!confirm(`Profile "${name}" already exists. Overwrite?`)) {
+                return;
+            }
+            // Remove existing
+            const existingIdx = userProfiles.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+            if (existingIdx >= 0) {
+                userProfiles.splice(existingIdx, 1);
+            }
+        }
+
+        // Create new profile from current params
+        const newProfile = {
+            name: name,
+            ...currentParams,
+        };
+
+        userProfiles.push(newProfile);
+        saveUserProfiles(userProfiles);
+
+        // Refresh UI
+        renderProfileSelect();
+        renderProfileList();
+        nameInput.value = '';
+
+        // Show confirmation
+        window.app?.showStatus?.(`Profile "${name}" saved.`, 'success');
+    }
+
+    // Delete a user profile by index
+    function deleteUserProfile(index) {
+        const userProfiles = getUserProfiles();
+        if (index < 0 || index >= userProfiles.length) return;
+
+        const profile = userProfiles[index];
+        if (!confirm(`Delete profile "${profile.name}"?`)) {
+            return;
+        }
+
+        userProfiles.splice(index, 1);
+        saveUserProfiles(userProfiles);
+
+        // Refresh UI
+        renderProfileSelect();
+        renderProfileList();
+
+        window.app?.showStatus?.(`Profile "${profile.name}" deleted.`, 'info');
     }
 
     // Apply a profile to the form
     function applyProfile(profileData) {
         if (!profileData) return;
+
+        // Push current state to undo before applying
+        pushUndo();
 
         const fields = {
             'threshold': profileData.threshold,
@@ -80,8 +338,11 @@ window.configure = (function() {
         }
 
         updateCurrentParams();
+        saveToStorage();
         checkParamsChanged();
     }
+
+    // ==================== Core Functions ====================
 
     // Get current parameters from form
     function getParams() {
@@ -104,6 +365,14 @@ window.configure = (function() {
     // Update current params from form
     function updateCurrentParams() {
         currentParams = getParams();
+    }
+
+    // Handle parameter change (with undo support)
+    function onParamChange() {
+        pushUndo();
+        updateCurrentParams();
+        saveToStorage();
+        checkParamsChanged();
     }
 
     // Check if params changed since last extraction
@@ -136,6 +405,8 @@ window.configure = (function() {
 
     // Reset to defaults
     function resetToDefaults() {
+        pushUndo();
+
         for (const [id, value] of Object.entries(defaults)) {
             const input = document.getElementById(id);
             if (input) {
@@ -155,6 +426,7 @@ window.configure = (function() {
         // Update cull factor row visibility
         updateCullFactorVisibility();
         updateCurrentParams();
+        saveToStorage();
         checkParamsChanged();
     }
 
@@ -167,10 +439,29 @@ window.configure = (function() {
         }
     }
 
-    // Initialize
-    function init() {
-        // Load profiles
-        loadProfiles();
+    // Escape HTML for safe insertion
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ==================== Initialization ====================
+
+    async function init() {
+        // Load built-in profiles first
+        await loadBuiltInProfiles();
+
+        // Render profile select and list
+        renderProfileSelect();
+        renderProfileList();
+
+        // Load saved params from localStorage
+        const savedParams = loadFromStorage();
+        if (savedParams) {
+            applyParamsToForm(savedParams);
+            currentParams = { ...savedParams };
+        }
 
         // Profile select handler
         const profileSelect = document.getElementById('profileSelect');
@@ -187,10 +478,7 @@ window.configure = (function() {
         // Add change listeners to all parameter inputs
         const paramInputs = document.querySelectorAll('.param-input');
         paramInputs.forEach(input => {
-            input.addEventListener('change', () => {
-                updateCurrentParams();
-                checkParamsChanged();
-            });
+            input.addEventListener('change', onParamChange);
             input.addEventListener('input', () => {
                 // Update range display with 3 decimal places for sliders
                 const display = document.getElementById(`${input.id}_value`);
@@ -206,8 +494,7 @@ window.configure = (function() {
         if (cullCheckbox) {
             cullCheckbox.addEventListener('change', () => {
                 updateCullFactorVisibility();
-                updateCurrentParams();
-                checkParamsChanged();
+                onParamChange();
             });
             // Initialize visibility on load
             updateCullFactorVisibility();
@@ -217,6 +504,41 @@ window.configure = (function() {
         const resetBtn = document.getElementById('resetParamsBtn');
         if (resetBtn) {
             resetBtn.addEventListener('click', resetToDefaults);
+        }
+
+        // Undo button
+        const undoBtn = document.getElementById('undoParamsBtn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', undo);
+        }
+        updateUndoButton();
+
+        // Save profile button
+        const saveProfileBtn = document.getElementById('saveProfileBtn');
+        if (saveProfileBtn) {
+            saveProfileBtn.addEventListener('click', saveAsNewProfile);
+        }
+
+        // Enter key in profile name input
+        const nameInput = document.getElementById('newProfileName');
+        if (nameInput) {
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveAsNewProfile();
+                }
+            });
+        }
+
+        // Profile presets collapsible toggle
+        const profileToggle = document.getElementById('profilePresetsToggle');
+        const profileContent = document.getElementById('profilePresetsContent');
+        if (profileToggle && profileContent) {
+            profileToggle.addEventListener('click', () => {
+                const isOpen = profileContent.style.display !== 'none';
+                profileContent.style.display = isOpen ? 'none' : 'block';
+                profileToggle.classList.toggle('collapsed', isOpen);
+            });
         }
 
         // Help icons
@@ -239,6 +561,7 @@ window.configure = (function() {
         checkParamsChanged,
         applyProfile,
         resetToDefaults,
+        undo,
         defaults,
     };
 })();

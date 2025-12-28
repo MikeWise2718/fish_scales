@@ -1141,6 +1141,7 @@ window.editor = (function() {
             spacing_cv: 1.0,
             reliability: 'none',
             n_nodes: 0,
+            n_interior_nodes: 0,
         };
 
         if (!tubercles || tubercles.length < 4) {
@@ -1149,9 +1150,17 @@ window.editor = (function() {
 
         const n_nodes = tubercles.length;
         result.n_nodes = n_nodes;
-        result.reliability = n_nodes >= MIN_NODES_FOR_RELIABLE ? 'high' : 'low';
 
-        // 1. Spacing uniformity (coefficient of variation)
+        // Separate interior and boundary nodes
+        const interiorTubercles = tubercles.filter(t => !t.is_boundary);
+        const interiorIds = new Set(interiorTubercles.map(t => t.id));
+        const n_interior = interiorIds.size;
+        result.n_interior_nodes = n_interior;
+
+        // Reliability based on interior node count
+        result.reliability = n_interior >= MIN_NODES_FOR_RELIABLE ? 'high' : (n_interior >= 4 ? 'low' : 'none');
+
+        // 1. Spacing uniformity (coefficient of variation) - uses all edges
         if (edges && edges.length > 0) {
             const spacings = edges
                 .map(e => e.edge_distance_um)
@@ -1167,7 +1176,7 @@ window.editor = (function() {
             }
         }
 
-        // 2. Degree distribution (neighbors per node)
+        // 2. Degree distribution (neighbors per node) - INTERIOR NODES ONLY
         const degree = {};
 
         // Initialize all nodes with degree 0
@@ -1181,31 +1190,32 @@ window.editor = (function() {
             if (degree[bId] !== undefined) degree[bId]++;
         });
 
-        const degrees = Object.values(degree);
-        if (degrees.length > 0) {
-            result.mean_degree = degrees.reduce((a, b) => a + b, 0) / degrees.length;
+        // Filter to interior nodes only
+        const interiorDegrees = interiorTubercles.map(t => degree[t.id]);
+        if (interiorDegrees.length > 0) {
+            result.mean_degree = interiorDegrees.reduce((a, b) => a + b, 0) / interiorDegrees.length;
 
-            // Build histogram
+            // Build histogram (interior nodes only)
             const histogram = {};
-            degrees.forEach(d => {
+            interiorDegrees.forEach(d => {
                 histogram[d] = (histogram[d] || 0) + 1;
             });
             result.degree_histogram = histogram;
 
             // Weighted score for degree distribution
             let weightedScore = 0;
-            degrees.forEach(d => {
+            interiorDegrees.forEach(d => {
                 if (d >= 5 && d <= 7) weightedScore += 1.0;
                 else if (d === 4 || d === 8) weightedScore += 0.7;
                 else if (d === 3 || d === 9) weightedScore += 0.3;
             });
-            result.degree_score = weightedScore / degrees.length;
+            result.degree_score = weightedScore / interiorDegrees.length;
         }
 
-        // 3. Edge/node ratio
-        if (n_nodes > 0) {
-            const ratio = edges.length / n_nodes;
-            const idealRatio = 2.5;
+        // 3. Edge/node ratio - uses interior nodes
+        if (n_interior > 0) {
+            const ratio = edges.length / n_interior;
+            const idealRatio = 3.0;
             const deviation = Math.abs(ratio - idealRatio);
             result.edge_ratio_score = Math.max(0, 1 - deviation / 2);
         }

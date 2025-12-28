@@ -385,6 +385,7 @@ window.extraction = (function() {
             spacing_cv: 1.0,
             reliability: 'none',
             n_nodes: 0,
+            n_interior_nodes: 0,
         };
 
         if (!tubercles || tubercles.length < 4) {
@@ -393,9 +394,17 @@ window.extraction = (function() {
 
         const n_nodes = tubercles.length;
         result.n_nodes = n_nodes;
-        result.reliability = n_nodes >= MIN_NODES_FOR_RELIABLE ? 'high' : 'low';
 
-        // Spacing uniformity
+        // Separate interior and boundary nodes
+        const interiorTubercles = tubercles.filter(t => !t.is_boundary);
+        const interiorIds = new Set(interiorTubercles.map(t => t.id));
+        const n_interior = interiorIds.size;
+        result.n_interior_nodes = n_interior;
+
+        // Reliability based on interior node count
+        result.reliability = n_interior >= MIN_NODES_FOR_RELIABLE ? 'high' : (n_interior >= 4 ? 'low' : 'none');
+
+        // Spacing uniformity - uses all edges
         if (edges && edges.length > 0) {
             const spacings = edges.map(e => e.edge_distance_um).filter(s => s > 0);
             if (spacings.length > 0) {
@@ -407,7 +416,7 @@ window.extraction = (function() {
             }
         }
 
-        // Degree distribution (use object key lookup for type coercion)
+        // Degree distribution - INTERIOR NODES ONLY
         const degree = {};
         tubercles.forEach(t => { degree[t.id] = 0; });
         edges.forEach(e => {
@@ -417,22 +426,23 @@ window.extraction = (function() {
             if (degree[bId] !== undefined) degree[bId]++;
         });
 
-        const degrees = Object.values(degree);
-        if (degrees.length > 0) {
-            result.mean_degree = degrees.reduce((a, b) => a + b, 0) / degrees.length;
+        // Filter to interior nodes only
+        const interiorDegrees = interiorTubercles.map(t => degree[t.id]);
+        if (interiorDegrees.length > 0) {
+            result.mean_degree = interiorDegrees.reduce((a, b) => a + b, 0) / interiorDegrees.length;
             let weightedScore = 0;
-            degrees.forEach(d => {
+            interiorDegrees.forEach(d => {
                 if (d >= 5 && d <= 7) weightedScore += 1.0;
                 else if (d === 4 || d === 8) weightedScore += 0.7;
                 else if (d === 3 || d === 9) weightedScore += 0.3;
             });
-            result.degree_score = weightedScore / degrees.length;
+            result.degree_score = weightedScore / interiorDegrees.length;
         }
 
-        // Edge/node ratio
-        if (n_nodes > 0) {
-            const ratio = edges.length / n_nodes;
-            result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 2.5) / 2);
+        // Edge/node ratio - uses interior nodes
+        if (n_interior > 0) {
+            const ratio = edges.length / n_interior;
+            result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 3.0) / 2);
         }
 
         // Composite score (use configurable weights from settings)

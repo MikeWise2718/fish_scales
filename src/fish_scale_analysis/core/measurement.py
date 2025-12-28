@@ -389,8 +389,11 @@ def calculate_hexagonalness(
     - Edge count ≈ 3 × node count
     - Angles between edges are multiples of 60°
 
+    Note: Boundary nodes are excluded from degree score calculation since
+    they naturally have fewer neighbors due to edge effects.
+
     Args:
-        tubercles: List of detected tubercles
+        tubercles: List of detected tubercles (with is_boundary attribute)
         edges: List of neighbor edges
         min_nodes_for_reliable: Minimum nodes for statistically reliable metrics
 
@@ -398,13 +401,14 @@ def calculate_hexagonalness(
         Dictionary with hexagonalness metrics:
         - hexagonalness_score: Overall score 0-1 (1 = perfect hex)
         - spacing_uniformity: How uniform edge lengths are (0-1)
-        - degree_score: Fraction of nodes with appropriate neighbor count (0-1)
+        - degree_score: Fraction of interior nodes with appropriate neighbor count (0-1)
         - edge_ratio_score: How close edge/node ratio is to 3 (0-1)
-        - mean_degree: Average number of neighbors per node
-        - degree_histogram: Count of nodes by neighbor count
+        - mean_degree: Average number of neighbors per interior node
+        - degree_histogram: Count of interior nodes by neighbor count
         - spacing_cv: Coefficient of variation of edge lengths
-        - reliability: 'high' (≥15 nodes), 'low' (4-14 nodes), 'none' (<4 nodes)
-        - n_nodes: Number of nodes used in calculation
+        - reliability: 'high' (≥15 interior nodes), 'low' (4-14), 'none' (<4)
+        - n_nodes: Total number of nodes
+        - n_interior_nodes: Number of interior nodes used for degree calculation
     """
     from collections import defaultdict
 
@@ -418,6 +422,7 @@ def calculate_hexagonalness(
         'spacing_cv': 1.0,
         'reliability': 'none',
         'n_nodes': 0,
+        'n_interior_nodes': 0,
     }
 
     if not tubercles or len(tubercles) < 4:
@@ -425,9 +430,17 @@ def calculate_hexagonalness(
 
     n_nodes = len(tubercles)
     result['n_nodes'] = n_nodes
-    result['reliability'] = 'high' if n_nodes >= min_nodes_for_reliable else 'low'
 
-    # 1. Spacing uniformity (coefficient of variation)
+    # Separate interior and boundary nodes
+    interior_ids = {t.id for t in tubercles if not getattr(t, 'is_boundary', False)}
+    boundary_ids = {t.id for t in tubercles if getattr(t, 'is_boundary', False)}
+    n_interior = len(interior_ids)
+    result['n_interior_nodes'] = n_interior
+
+    # Reliability based on interior node count
+    result['reliability'] = 'high' if n_interior >= min_nodes_for_reliable else ('low' if n_interior >= 4 else 'none')
+
+    # 1. Spacing uniformity (coefficient of variation) - uses all edges
     if edges:
         spacings = [e.edge_distance_um for e in edges if e.edge_distance_um > 0]
         if spacings:
@@ -438,7 +451,7 @@ def calculate_hexagonalness(
             # Score: CV of 0 = perfect (1.0), CV of 0.5+ = poor (0.0)
             result['spacing_uniformity'] = float(max(0, 1 - 2 * cv))
 
-    # 2. Degree distribution (neighbors per node)
+    # 2. Degree distribution (neighbors per node) - INTERIOR NODES ONLY
     degree = defaultdict(int)
     tubercle_ids = {t.id for t in tubercles}
 
@@ -453,24 +466,21 @@ def calculate_hexagonalness(
         if t.id not in degree:
             degree[t.id] = 0
 
-    degrees = list(degree.values())
-    if degrees:
-        result['mean_degree'] = float(np.mean(degrees))
+    # Filter to interior nodes only for degree scoring
+    interior_degrees = [degree[tid] for tid in interior_ids]
 
-        # Build histogram
+    if interior_degrees:
+        result['mean_degree'] = float(np.mean(interior_degrees))
+
+        # Build histogram (interior nodes only)
         histogram = defaultdict(int)
-        for d in degrees:
+        for d in interior_degrees:
             histogram[d] += 1
         result['degree_histogram'] = dict(histogram)
 
-        # Score: fraction of nodes with 4-8 neighbors (allowing for edge effects)
-        # Interior hex nodes have 6, edge nodes have 3-5
-        good_count = sum(1 for d in degrees if 4 <= d <= 8)
-        acceptable_count = sum(1 for d in degrees if 3 <= d <= 9)
-
         # Use a weighted score: full credit for 5-7, partial for 3-4 and 8-9
         weighted_score = 0
-        for d in degrees:
+        for d in interior_degrees:
             if 5 <= d <= 7:
                 weighted_score += 1.0
             elif d == 4 or d == 8:
@@ -479,18 +489,16 @@ def calculate_hexagonalness(
                 weighted_score += 0.3
             # 0-2 or 10+ get 0
 
-        result['degree_score'] = float(weighted_score / len(degrees))
+        result['degree_score'] = float(weighted_score / len(interior_degrees))
 
-    # 3. Edge/node ratio (ideal is ~3 for hex lattice)
+    # 3. Edge/node ratio (ideal is ~3 for hex lattice) - uses interior nodes
     # For a planar graph: E ≤ 3V - 6 (equality for triangulation)
     # Hex lattice interior: each node has 6 edges, each edge shared by 2 nodes = 3 edges/node
-    n_nodes = len(tubercles)
     n_edges = len(edges)
-    if n_nodes > 0:
-        ratio = n_edges / n_nodes
-        # Ideal is ~3, but with edge effects it's often 2-2.5
-        # Score: ratio of 2.5-3.5 is good, outside that degrades
-        ideal_ratio = 2.5  # Account for edge effects
+    if n_interior > 0:
+        ratio = n_edges / n_interior
+        # Ideal is ~3 for interior-only count
+        ideal_ratio = 3.0
         deviation = abs(ratio - ideal_ratio)
         result['edge_ratio_score'] = float(max(0, 1 - deviation / 2))
 

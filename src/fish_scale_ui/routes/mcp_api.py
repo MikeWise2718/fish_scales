@@ -922,6 +922,9 @@ def _calculate_hexagonalness_from_dicts(
 
     This is a standalone version that works with the dict format used in the API,
     mirroring the logic in fish_scale_analysis.core.measurement.calculate_hexagonalness.
+
+    Note: Boundary nodes are excluded from degree score calculation since
+    they naturally have fewer neighbors due to edge effects.
     """
     import numpy as np
     from collections import defaultdict
@@ -936,6 +939,7 @@ def _calculate_hexagonalness_from_dicts(
         'spacing_cv': 1.0,
         'reliability': 'none',
         'n_nodes': 0,
+        'n_interior_nodes': 0,
     }
 
     if not tubercles or len(tubercles) < 4:
@@ -943,9 +947,16 @@ def _calculate_hexagonalness_from_dicts(
 
     n_nodes = len(tubercles)
     result['n_nodes'] = n_nodes
-    result['reliability'] = 'high' if n_nodes >= min_nodes_for_reliable else 'low'
 
-    # 1. Spacing uniformity (coefficient of variation)
+    # Separate interior and boundary nodes
+    interior_ids = {t.get('id') for t in tubercles if not t.get('is_boundary', False)}
+    n_interior = len(interior_ids)
+    result['n_interior_nodes'] = n_interior
+
+    # Reliability based on interior node count
+    result['reliability'] = 'high' if n_interior >= min_nodes_for_reliable else ('low' if n_interior >= 4 else 'none')
+
+    # 1. Spacing uniformity (coefficient of variation) - uses all edges
     if edges:
         spacings = [e.get('edge_distance_um', 0) for e in edges if e.get('edge_distance_um', 0) > 0]
         if spacings:
@@ -956,7 +967,7 @@ def _calculate_hexagonalness_from_dicts(
             # Score: CV of 0 = perfect (1.0), CV of 0.5+ = poor (0.0)
             result['spacing_uniformity'] = float(max(0, 1 - 2 * cv))
 
-    # 2. Degree distribution (neighbors per node)
+    # 2. Degree distribution (neighbors per node) - INTERIOR NODES ONLY
     degree = defaultdict(int)
     tubercle_ids = {t.get('id') for t in tubercles}
 
@@ -976,19 +987,21 @@ def _calculate_hexagonalness_from_dicts(
         if tid not in degree:
             degree[tid] = 0
 
-    degrees = list(degree.values())
-    if degrees:
-        result['mean_degree'] = float(np.mean(degrees))
+    # Filter to interior nodes only for degree scoring
+    interior_degrees = [degree[tid] for tid in interior_ids]
 
-        # Build histogram
+    if interior_degrees:
+        result['mean_degree'] = float(np.mean(interior_degrees))
+
+        # Build histogram (interior nodes only)
         histogram = defaultdict(int)
-        for d in degrees:
+        for d in interior_degrees:
             histogram[d] += 1
         result['degree_histogram'] = dict(histogram)
 
         # Score: weighted by how close to ideal 5-7 neighbors
         weighted_score = 0
-        for d in degrees:
+        for d in interior_degrees:
             if 5 <= d <= 7:
                 weighted_score += 1.0
             elif d == 4 or d == 8:
@@ -997,14 +1010,13 @@ def _calculate_hexagonalness_from_dicts(
                 weighted_score += 0.3
             # 0-2 or 10+ get 0
 
-        result['degree_score'] = float(weighted_score / len(degrees))
+        result['degree_score'] = float(weighted_score / len(interior_degrees))
 
-    # 3. Edge/node ratio (ideal is ~2.5 accounting for edge effects)
-    n_nodes = len(tubercles)
+    # 3. Edge/node ratio (ideal is ~3 for interior nodes)
     n_edges = len(edges)
-    if n_nodes > 0:
-        ratio = n_edges / n_nodes
-        ideal_ratio = 2.5
+    if n_interior > 0:
+        ratio = n_edges / n_interior
+        ideal_ratio = 3.0
         deviation = abs(ratio - ideal_ratio)
         result['edge_ratio_score'] = float(max(0, 1 - deviation / 2))
 

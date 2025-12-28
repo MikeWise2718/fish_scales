@@ -84,15 +84,19 @@
         <div class="overlay-toggles">
             <label class="overlay-toggle" title="Show/hide tubercle ID numbers">
                 <input type="checkbox" id="toggleNumbers">
-                <span>Numbers</span>
+                <span>Tube IDs</span>
             </label>
             <label class="overlay-toggle" title="Show/hide tubercle circles">
                 <input type="checkbox" id="toggleTubes" checked>
                 <span>Tubes</span>
             </label>
-            <label class="overlay-toggle" title="Show/hide connection lines">
+            <label class="overlay-toggle" title="Show/hide ITC ID numbers">
+                <input type="checkbox" id="toggleItcIds">
+                <span>ITC IDs</span>
+            </label>
+            <label class="overlay-toggle" title="Show/hide ITC connection lines">
                 <input type="checkbox" id="toggleLinks" checked>
-                <span>Links</span>
+                <span>ITCs</span>
             </label>
             <label class="overlay-toggle" title="Show/hide calibration scale">
                 <input type="checkbox" id="toggleScale">
@@ -148,7 +152,6 @@
             <button class="tab-header active" data-tab="image">Image</button>
             <button class="tab-header" data-tab="calibration">Calibration</button>
             <button class="tab-header" data-tab="extraction">Extraction</button>
-            <button class="tab-header" data-tab="configure">Configure</button>
             <button class="tab-header" data-tab="edit">Edit</button>
             <button class="tab-header" data-tab="data">Data</button>
             <button class="tab-header" data-tab="log">Log</button>
@@ -280,10 +283,10 @@
                 </div>
             </div>
 
-            <!-- Extraction Tab -->
+            <!-- Extraction Tab (combined with Configure) -->
             <div class="tab-pane" data-tab="extraction">
                 <h2>Extraction <span id="unsavedIndicator" class="unsaved-indicator" style="display: none;">Unsaved</span></h2>
-                <p class="tab-description">Extract tubercles and intertubercular connections from the image.</p>
+                <p class="tab-description">Configure parameters and extract tubercles and connections.</p>
 
                 <!-- Current Set Header -->
                 <div class="tab-set-header" id="extractionTabSetHeader">
@@ -301,39 +304,6 @@
                     </div>
                     <button type="button" class="btn btn-sm btn-secondary" id="extractionTabNewSetBtn">+ New Set</button>
                 </div>
-
-                <div class="extraction-actions">
-                    <button type="button" class="btn btn-primary" id="extractBtn">
-                        Extract Tubercles and Connections
-                    </button>
-                    <span class="spinner" id="extractSpinner" style="display: none;"></span>
-                    <span id="paramsChangedIndicator" class="params-changed-indicator" style="display: none;">
-                        Parameters changed
-                    </span>
-                </div>
-
-                <div class="extraction-info">
-                    <p class="hint">Configure detection parameters in the Configure tab before extraction.</p>
-                </div>
-
-                <div class="extraction-display-options">
-                    <h3>Display Options</h3>
-                    <label class="overlay-toggle" title="Show fitted ellipses instead of circles">
-                        <input type="checkbox" id="showEllipses">
-                        <span>Show Ellipses</span>
-                    </label>
-                    <p class="hint">Display the fitted ellipses used for diameter calculation. The circle diameter is the equivalent diameter of a circle with the same area as the ellipse.</p>
-                </div>
-
-                <div class="slo-actions">
-                    <h3>SLO Files</h3>
-                    <button type="button" class="btn btn-secondary btn-sm" id="loadSloBtn">Load Existing SLO</button>
-                </div>
-            </div>
-
-            <!-- Configure Tab -->
-            <div class="tab-pane" data-tab="configure">
-                <h2>Configure</h2>
 
                 <div class="config-section">
                     <h3>Profile Presets</h3>
@@ -444,10 +414,58 @@
                             <option value="rng">RNG (Recommended)</option>
                         </select>
                     </div>
+
+                    <div class="param-row">
+                        <label>
+                            <input type="checkbox" id="cull_long_edges" checked>
+                            Cull Long Edges
+                            <a href="#" class="help-icon" data-param="cull-long-edges" title="Help">?</a>
+                        </label>
+                    </div>
+
+                    <div class="param-row" id="cullFactorRow">
+                        <label for="cull_factor">
+                            Cull Factor
+                            <a href="#" class="help-icon" data-param="cull-factor" title="Help">?</a>
+                        </label>
+                        <input type="number" id="cull_factor" class="param-input param-number"
+                               min="1.0" max="5.0" step="0.1" value="1.8">
+                        <span class="param-hint">× avg length</span>
+                    </div>
                 </div>
 
                 <div class="config-actions">
                     <button type="button" class="btn btn-secondary btn-sm" id="resetParamsBtn">Reset to Defaults</button>
+                </div>
+
+                <div class="extraction-actions">
+                    <h3>Run Extraction</h3>
+                    <div class="extraction-buttons">
+                        <button type="button" class="btn btn-primary" id="extractBtn">
+                            Extract Tubercles + Connections
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="extractConnectionsBtn" title="Clear and regenerate connections using current tubercles">
+                            Extract Connections Only
+                        </button>
+                        <span class="spinner" id="extractSpinner" style="display: none;"></span>
+                    </div>
+                    <span id="paramsChangedIndicator" class="params-changed-indicator" style="display: none;">
+                        Parameters changed
+                    </span>
+                </div>
+
+                <div class="extraction-display-options">
+                    <h3>Display Options</h3>
+                    <label class="overlay-toggle" title="Show fitted ellipses instead of circles">
+                        <input type="checkbox" id="showEllipses">
+                        <span>Show Ellipses</span>
+                    </label>
+                    <p class="hint">Display the fitted ellipses used for diameter calculation.</p>
+                </div>
+
+                <div class="slo-actions">
+                    <h3>SLO Files</h3>
+                    <button type="button" class="btn btn-secondary btn-sm" id="loadSloBtn">Load Existing SLO</button>
                 </div>
             </div>
 

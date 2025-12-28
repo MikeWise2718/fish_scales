@@ -7,6 +7,101 @@ window.extraction = (function() {
     // Note: isDirty state is now managed by sets module
     // currentTubercles/currentEdges are now stored in sets module
 
+    // Run connection regeneration only (keeps existing tubercles)
+    async function runConnectionExtraction() {
+        if (isExtracting) return;
+
+        // Check calibration
+        const calibration = window.calibration?.getCurrentCalibration();
+        if (!calibration || !calibration.um_per_px) {
+            window.app.showToast('Please set calibration first', 'warning');
+            return;
+        }
+
+        // Get current tubercles
+        const currentSet = window.sets?.getCurrentSet();
+        if (!currentSet || !currentSet.tubercles || currentSet.tubercles.length < 2) {
+            window.app.showToast('Need at least 2 tubercles to generate connections', 'warning');
+            return;
+        }
+
+        // Get graph type and culling params from configure
+        const params = window.configure?.getParams() || {};
+        const graphType = params.neighbor_graph || 'gabriel';
+        const cullLongEdges = params.cull_long_edges !== undefined ? params.cull_long_edges : true;
+        const cullFactor = params.cull_factor || 1.8;
+
+        isExtracting = true;
+        updateUI();
+
+        try {
+            const response = await fetch('/api/regenerate-connections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tubercles: currentSet.tubercles,
+                    graph_type: graphType,
+                    cull_long_edges: cullLongEdges,
+                    cull_factor: cullFactor,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                window.app.showToast(result.error, 'error');
+                return;
+            }
+
+            // Update edges in sets module (keep existing tubercles)
+            window.sets.setCurrentData(currentSet.tubercles, result.edges);
+
+            // Update overlay
+            if (window.overlay) {
+                window.overlay.setData(currentSet.tubercles, result.edges);
+            }
+
+            // Update data tables with new edge statistics
+            if (window.data) {
+                const stats = calculateStatistics(currentSet.tubercles, result.edges);
+                window.data.setData(currentSet.tubercles, result.edges, stats);
+            }
+
+            // Update editor
+            if (window.editor) {
+                window.editor.setData(currentSet.tubercles, result.edges);
+            }
+
+            // Mark set as dirty
+            window.sets.markDirty();
+            updateDirtyIndicator();
+
+            // Dispatch event
+            document.dispatchEvent(new CustomEvent('connectionsRegenerated', {
+                detail: {
+                    tubercles: currentSet.tubercles,
+                    edges: result.edges,
+                }
+            }));
+
+            // Show success message
+            window.app.showToast(
+                `Regenerated ${result.edges.length} connections using ${graphType}`,
+                'success'
+            );
+
+            // Refresh log
+            window.app.loadLog();
+
+        } catch (err) {
+            console.error('Connection extraction failed:', err);
+            window.app.showToast('Connection extraction failed: ' + err.message, 'error');
+        } finally {
+            isExtracting = false;
+            updateUI();
+        }
+    }
+
     // Run extraction
     async function runExtraction() {
         if (isExtracting) return;
@@ -353,11 +448,15 @@ window.extraction = (function() {
     // Update UI state
     function updateUI() {
         const extractBtn = document.getElementById('extractBtn');
+        const extractConnectionsBtn = document.getElementById('extractConnectionsBtn');
         const extractSpinner = document.getElementById('extractSpinner');
 
         if (extractBtn) {
             extractBtn.disabled = isExtracting;
-            extractBtn.textContent = isExtracting ? 'Extracting...' : 'Extract Tubercles and Connections';
+            extractBtn.textContent = isExtracting ? 'Extracting...' : 'Extract Tubercles + Connections';
+        }
+        if (extractConnectionsBtn) {
+            extractConnectionsBtn.disabled = isExtracting;
         }
         if (extractSpinner) {
             extractSpinner.style.display = isExtracting ? 'inline-block' : 'none';
@@ -412,6 +511,12 @@ window.extraction = (function() {
             extractBtn.addEventListener('click', runExtraction);
         }
 
+        // Extract Connections Only button
+        const extractConnectionsBtn = document.getElementById('extractConnectionsBtn');
+        if (extractConnectionsBtn) {
+            extractConnectionsBtn.addEventListener('click', runConnectionExtraction);
+        }
+
         // Save SLO button (in toolbar)
         const saveSloBtn = document.getElementById('saveSloBtn');
         if (saveSloBtn) {
@@ -464,6 +569,7 @@ window.extraction = (function() {
 
     return {
         runExtraction,
+        runConnectionExtraction,
         saveSlo,
         loadSlo,
         checkDirty,

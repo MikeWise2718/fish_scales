@@ -406,6 +406,8 @@ def extract():
             clahe_kernel=int(data.get('clahe_kernel', 8)),
             blur_sigma=float(data.get('blur_sigma', 1.0)),
             neighbor_graph=data.get('neighbor_graph', 'delaunay'),
+            cull_long_edges=data.get('cull_long_edges', True),
+            cull_factor=float(data.get('cull_factor', 1.8)),
         )
 
         # Store extraction results
@@ -441,6 +443,131 @@ def get_extraction_data():
         'parameters': _extraction_data['parameters'],
         'dirty': _extraction_data['dirty'],
     })
+
+
+@api_bp.route('/regenerate-connections', methods=['POST'])
+def regenerate_connections():
+    """Regenerate connections for given tubercles using specified graph method.
+
+    POST body:
+        {
+            "tubercles": [...],
+            "graph_type": "delaunay" | "gabriel" | "rng",
+            "cull_long_edges": true | false,
+            "cull_factor": float (default 1.8)
+        }
+
+    Returns:
+        {"success": true, "edges": [...], "statistics": {...}}
+    """
+    from fish_scale_ui.services.logging import log_event
+    from fish_scale_analysis.core.measurement import filter_to_gabriel, filter_to_rng
+    from scipy.spatial import Delaunay
+    import numpy as np
+    import math
+
+    if not _current_image.get('calibration'):
+        return jsonify({'error': 'Calibration not set'}), 400
+
+    data = request.get_json() or {}
+    tubercles = data.get('tubercles', [])
+    graph_type = data.get('graph_type', 'gabriel')
+    cull_long_edges = data.get('cull_long_edges', True)
+    cull_factor = float(data.get('cull_factor', 1.8))
+
+    if graph_type not in ('delaunay', 'gabriel', 'rng'):
+        return jsonify({'error': f'Invalid graph_type: {graph_type}'}), 400
+
+    if len(tubercles) < 2:
+        return jsonify({
+            'success': True,
+            'edges': [],
+            'statistics': {'n_edges': 0, 'mean_space_um': 0, 'std_space_um': 0}
+        })
+
+    um_per_px = _current_image['calibration'].get('um_per_px', 0.33)
+
+    try:
+        # Build centroids array
+        centroids = np.array([[t['centroid_x'], t['centroid_y']] for t in tubercles])
+        radii = np.array([t.get('radius_px', 10) for t in tubercles])
+
+        # Build Delaunay triangulation
+        if len(tubercles) < 3:
+            # With only 2 tubercles, just connect them directly
+            edge_indices = [(0, 1)]
+        else:
+            tri = Delaunay(centroids)
+
+            # Extract all Delaunay edges
+            delaunay_edges = set()
+            for simplex in tri.simplices:
+                for i in range(3):
+                    edge = tuple(sorted([simplex[i], simplex[(i + 1) % 3]]))
+                    delaunay_edges.add(edge)
+
+            # Filter based on graph type
+            if graph_type == 'delaunay':
+                edge_indices = list(delaunay_edges)
+            elif graph_type == 'gabriel':
+                edge_indices = list(filter_to_gabriel(centroids, delaunay_edges))
+            else:  # rng
+                edge_indices = list(filter_to_rng(centroids, delaunay_edges))
+
+        # Convert to edge objects with distance calculations
+        edges = []
+        for i, j in edge_indices:
+            tub1 = tubercles[i]
+            tub2 = tubercles[j]
+
+            x1, y1 = tub1['centroid_x'], tub1['centroid_y']
+            x2, y2 = tub2['centroid_x'], tub2['centroid_y']
+            r1, r2 = radii[i], radii[j]
+
+            center_dist_px = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            edge_dist_px = max(0, center_dist_px - r1 - r2)
+
+            edges.append({
+                'id1': tub1['id'],
+                'id2': tub2['id'],
+                'x1': x1,
+                'y1': y1,
+                'x2': x2,
+                'y2': y2,
+                'center_distance_um': center_dist_px * um_per_px,
+                'edge_distance_um': edge_dist_px * um_per_px,
+            })
+
+        # Cull long edges if enabled
+        if cull_long_edges and edges:
+            avg_center_distance = np.mean([e['center_distance_um'] for e in edges])
+            max_allowed = avg_center_distance * cull_factor
+            edges = [e for e in edges if e['center_distance_um'] <= max_allowed]
+
+        # Calculate statistics
+        statistics = {'n_edges': len(edges), 'mean_space_um': 0, 'std_space_um': 0}
+        if edges:
+            edge_distances = [e['edge_distance_um'] for e in edges]
+            statistics['mean_space_um'] = float(np.mean(edge_distances))
+            statistics['std_space_um'] = float(np.std(edge_distances))
+
+        log_event('regenerate_connections', {
+            'graph_type': graph_type,
+            'n_tubercles': len(tubercles),
+            'n_edges': len(edges),
+            'cull_long_edges': cull_long_edges,
+            'cull_factor': cull_factor,
+        })
+
+        return jsonify({
+            'success': True,
+            'edges': edges,
+            'statistics': statistics,
+        })
+
+    except Exception as e:
+        log_event('regenerate_connections_failed', {'error': str(e)})
+        return jsonify({'error': f'Regenerate connections failed: {str(e)}'}), 500
 
 
 @api_bp.route('/save-slo', methods=['POST'])

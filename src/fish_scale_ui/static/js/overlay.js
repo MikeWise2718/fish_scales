@@ -26,9 +26,10 @@ window.overlay = (function() {
 
     // Toggle state (controlled by checkboxes under image, independent of Settings)
     let toggleState = {
-        numbers: false,
+        numbers: false,    // Tube IDs
         tubes: true,
-        links: true,
+        itcIds: false,     // ITC IDs
+        links: true,       // ITCs (connection lines)
         scale: false,
         ellipses: false
     };
@@ -137,6 +138,15 @@ window.overlay = (function() {
         if (ellipsesEl) {
             ellipsesEl.addEventListener('change', function() {
                 toggleState.ellipses = this.checked;
+                render();
+            });
+        }
+
+        // ITC IDs checkbox
+        const itcIdsEl = document.getElementById('toggleItcIds');
+        if (itcIdsEl) {
+            itcIdsEl.addEventListener('change', function() {
+                toggleState.itcIds = this.checked;
                 render();
             });
         }
@@ -259,11 +269,19 @@ window.overlay = (function() {
             });
         }
 
-        // Draw IDs if enabled (uses toggle state, not Settings)
+        // Draw Tube IDs if enabled (uses toggle state, not Settings)
         if (toggleState.numbers) {
             const fontSize = (window.settings && window.settings.get('idTextSize')) || 12;
             tubercles.forEach(tub => {
                 drawTubercleId(tub, fontSize, colors);
+            });
+        }
+
+        // Draw ITC IDs if enabled
+        if (toggleState.itcIds) {
+            const fontSize = (window.settings && window.settings.get('idTextSize')) || 12;
+            edges.forEach((edge, idx) => {
+                drawEdgeId(edge, idx, fontSize, colors);
             });
         }
 
@@ -580,6 +598,25 @@ window.overlay = (function() {
 
         ctx.fillStyle = getTubercleColor(tub, colors, false);
         ctx.fillText(tub.id, x, y);
+    }
+
+    // Draw edge (ITC) ID text at midpoint
+    function drawEdgeId(edge, idx, fontSize, colors) {
+        // Calculate midpoint of the edge
+        const x = (edge.x1 + edge.x2) / 2;
+        const y = (edge.y1 + edge.y2) / 2;
+
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Draw text with outline for visibility
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeText(idx, x, y);
+
+        ctx.fillStyle = colors.edge;
+        ctx.fillText(idx, x, y);
     }
 
     // Draw a single edge

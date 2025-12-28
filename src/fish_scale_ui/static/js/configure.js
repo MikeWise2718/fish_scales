@@ -14,6 +14,8 @@ window.configure = (function() {
         clahe_kernel: 8,
         blur_sigma: 1.0,
         neighbor_graph: 'delaunay',
+        cull_long_edges: true,
+        cull_factor: 1.8,
     };
 
     // Current values (for change detection)
@@ -80,6 +82,7 @@ window.configure = (function() {
 
     // Get current parameters from form
     function getParams() {
+        const cullCheckbox = document.getElementById('cull_long_edges');
         return {
             method: document.getElementById('method')?.value || defaults.method,
             threshold: parseFloat(document.getElementById('threshold')?.value) || defaults.threshold,
@@ -90,6 +93,8 @@ window.configure = (function() {
             clahe_kernel: parseInt(document.getElementById('clahe_kernel')?.value) || defaults.clahe_kernel,
             blur_sigma: parseFloat(document.getElementById('blur_sigma')?.value) || defaults.blur_sigma,
             neighbor_graph: document.getElementById('neighbor_graph')?.value || defaults.neighbor_graph,
+            cull_long_edges: cullCheckbox ? cullCheckbox.checked : defaults.cull_long_edges,
+            cull_factor: parseFloat(document.getElementById('cull_factor')?.value) || defaults.cull_factor,
         };
     }
 
@@ -131,13 +136,28 @@ window.configure = (function() {
         for (const [id, value] of Object.entries(defaults)) {
             const input = document.getElementById(id);
             if (input) {
-                input.value = value;
+                if (input.type === 'checkbox') {
+                    input.checked = value;
+                } else {
+                    input.value = value;
+                }
                 const display = document.getElementById(`${id}_value`);
                 if (display) display.textContent = value;
             }
         }
+        // Update cull factor row visibility
+        updateCullFactorVisibility();
         updateCurrentParams();
         checkParamsChanged();
+    }
+
+    // Show/hide cull factor row based on checkbox
+    function updateCullFactorVisibility() {
+        const checkbox = document.getElementById('cull_long_edges');
+        const row = document.getElementById('cullFactorRow');
+        if (checkbox && row) {
+            row.style.display = checkbox.checked ? 'flex' : 'none';
+        }
     }
 
     // Initialize
@@ -170,6 +190,18 @@ window.configure = (function() {
                 if (display) display.textContent = input.value;
             });
         });
+
+        // Cull long edges checkbox handler
+        const cullCheckbox = document.getElementById('cull_long_edges');
+        if (cullCheckbox) {
+            cullCheckbox.addEventListener('change', () => {
+                updateCullFactorVisibility();
+                updateCurrentParams();
+                checkParamsChanged();
+            });
+            // Initialize visibility on load
+            updateCullFactorVisibility();
+        }
 
         // Reset button
         const resetBtn = document.getElementById('resetParamsBtn');

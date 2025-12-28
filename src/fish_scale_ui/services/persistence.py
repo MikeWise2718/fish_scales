@@ -88,7 +88,8 @@ def save_slo(
         if csv_tubercles:
             writer = csv.DictWriter(f, fieldnames=['id', 'centroid_x', 'centroid_y',
                                                     'diameter_px', 'diameter_um',
-                                                    'radius_px', 'circularity'])
+                                                    'radius_px', 'circularity'],
+                                    extrasaction='ignore')  # Ignore extra fields like ellipse params
             writer.writeheader()
             writer.writerows(csv_tubercles)
 

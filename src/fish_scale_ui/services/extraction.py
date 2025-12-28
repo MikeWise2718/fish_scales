@@ -35,6 +35,8 @@ def run_extraction(
     neighbor_graph: str = "delaunay",
     edge_margin_px: int = 10,
     refine_ellipse: bool = True,
+    cull_long_edges: bool = True,
+    cull_factor: float = 1.8,
 ) -> dict:
     """
     Run tubercle extraction on an image.
@@ -53,6 +55,8 @@ def run_extraction(
         neighbor_graph: Graph type (delaunay, gabriel, rng)
         edge_margin_px: Edge margin in pixels
         refine_ellipse: Whether to fit ellipses for more accurate measurements
+        cull_long_edges: Whether to remove edges longer than cull_factor * average
+        cull_factor: Factor for edge length culling (e.g., 1.8 = remove edges > 1.8x average)
 
     Returns:
         Dictionary with extraction results
@@ -153,13 +157,25 @@ def run_extraction(
                 'edge_distance_um': e.edge_distance_um,
             })
 
+    # Cull long edges if enabled
+    if cull_long_edges and edges_data:
+        avg_center_distance = np.mean([e['center_distance_um'] for e in edges_data])
+        max_allowed = avg_center_distance * cull_factor
+        edges_data = [e for e in edges_data if e['center_distance_um'] <= max_allowed]
+
+    # Recalculate edge statistics after culling
+    if edges_data:
+        edge_distances = [e['edge_distance_um'] for e in edges_data]
+        mean_space = np.mean(edge_distances)
+        std_space = np.std(edge_distances)
+
     return {
         'success': True,
         'tubercles': tubercles_data,
         'edges': edges_data,
         'statistics': {
             'n_tubercles': len(tubercles),
-            'n_edges': len(edges),
+            'n_edges': len(edges_data),  # Use culled count
             'mean_diameter_um': round(mean_diam, 2),
             'std_diameter_um': round(std_diam, 2),
             'mean_space_um': round(mean_space, 2),

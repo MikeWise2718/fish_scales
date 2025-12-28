@@ -1106,9 +1106,15 @@ window.editor = (function() {
         // Calculate hexagonalness metrics
         const hexMetrics = calculateHexagonalness(tubercles, edges);
 
+        // Count boundary vs interior nodes
+        const n_boundary = tubercles.filter(t => t.is_boundary).length;
+        const n_interior = n_tubercles - n_boundary;
+
         return {
             n_tubercles,
             n_edges,
+            n_boundary,
+            n_interior,
             mean_diameter_um,
             std_diameter_um,
             mean_space_um,
@@ -1204,11 +1210,15 @@ window.editor = (function() {
             result.edge_ratio_score = Math.max(0, 1 - deviation / 2);
         }
 
-        // 4. Composite score
+        // 4. Composite score (use configurable weights from settings)
+        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
+
         result.hexagonalness_score = (
-            0.40 * result.spacing_uniformity +
-            0.45 * result.degree_score +
-            0.15 * result.edge_ratio_score
+            spacingWeight * result.spacing_uniformity +
+            degreeWeight * result.degree_score +
+            edgeRatioWeight * result.edge_ratio_score
         );
 
         return result;
@@ -1237,6 +1247,74 @@ window.editor = (function() {
 
         // Notify extraction module
         document.dispatchEvent(new CustomEvent('dataModified'));
+
+        // Recalculate boundaries (debounced)
+        recalculateBoundariesDebounced();
+    }
+
+    // Debounce timer for boundary recalculation
+    let boundaryRecalcTimer = null;
+
+    /**
+     * Debounced boundary recalculation - waits 300ms after last edit
+     */
+    function recalculateBoundariesDebounced() {
+        if (boundaryRecalcTimer) {
+            clearTimeout(boundaryRecalcTimer);
+        }
+        boundaryRecalcTimer = setTimeout(recalculateBoundaries, 300);
+    }
+
+    /**
+     * Recalculate boundary status for all tubercles
+     */
+    async function recalculateBoundaries() {
+        if (tubercles.length < 3) {
+            // All nodes are boundary if less than 3
+            tubercles.forEach(t => { t.is_boundary = true; });
+            refreshDisplays();
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/recalculate-boundaries', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tubercles }),
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.tubercles) {
+                // Update boundary flags in our local tubercles array
+                const boundaryMap = new Map();
+                result.tubercles.forEach(t => {
+                    boundaryMap.set(t.id, t.is_boundary);
+                });
+
+                tubercles.forEach(t => {
+                    if (boundaryMap.has(t.id)) {
+                        t.is_boundary = boundaryMap.get(t.id);
+                    }
+                });
+
+                // Sync updated data
+                window.sets?.setCurrentData(tubercles, edges);
+
+                // Refresh all displays
+                refreshDisplays();
+
+                // Update statistics with boundary counts
+                if (window.data) {
+                    const stats = calculateStatistics(tubercles, edges);
+                    stats.n_boundary = result.n_boundary;
+                    stats.n_interior = result.n_interior;
+                    window.data.setData(tubercles, edges, stats);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to recalculate boundaries:', err);
+        }
     }
 
     /**

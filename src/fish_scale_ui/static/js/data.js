@@ -37,7 +37,7 @@ window.data = (function() {
 
         if (tubercles.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="5" class="empty-table">No tubercles detected</td>';
+            row.innerHTML = '<td colspan="6" class="empty-table">No tubercles detected</td>';
             tbody.appendChild(row);
             return;
         }
@@ -45,12 +45,14 @@ window.data = (function() {
         tubercles.forEach(tub => {
             const row = document.createElement('tr');
             row.dataset.tubId = tub.id;
+            const boundaryStr = tub.is_boundary ? 'Y' : 'N';
             row.innerHTML = `
                 <td>${tub.id}</td>
                 <td>${tub.centroid_x.toFixed(1)}</td>
                 <td>${tub.centroid_y.toFixed(1)}</td>
                 <td>${tub.diameter_um.toFixed(2)}</td>
                 <td>${(tub.circularity * 100).toFixed(1)}%</td>
+                <td>${boundaryStr}</td>
             `;
             row.addEventListener('click', () => {
                 highlightTubercleRow(tub.id);
@@ -103,6 +105,17 @@ window.data = (function() {
         const stats = statistics;
 
         document.getElementById('statNTubercles').textContent = stats.n_tubercles ?? '-';
+
+        // Show boundary/interior breakdown if available
+        const boundaryDetailEl = document.getElementById('statBoundaryDetail');
+        if (boundaryDetailEl) {
+            if (stats.n_boundary !== undefined && stats.n_interior !== undefined) {
+                boundaryDetailEl.textContent = `(${stats.n_interior} interior, ${stats.n_boundary} boundary)`;
+            } else {
+                boundaryDetailEl.textContent = '';
+            }
+        }
+
         document.getElementById('statMeanDiameter').textContent =
             stats.mean_diameter_um !== undefined
                 ? `${stats.mean_diameter_um.toFixed(2)} ± ${stats.std_diameter_um?.toFixed(2) || '0.00'}`
@@ -299,6 +312,25 @@ window.data = (function() {
                 window.open(`/static/help/hexagonalness.html#${topic}`, 'help', 'width=800,height=600');
             });
         });
+
+        // Update weight displays when settings change or on init
+        updateWeightDisplays();
+        window.addEventListener('hexWeightsChanged', updateWeightDisplays);
+    }
+
+    // Update the weight percentage displays in the Data tab
+    function updateWeightDisplays() {
+        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
+
+        const spacingEl = document.getElementById('statSpacingWeight');
+        const degreeEl = document.getElementById('statDegreeWeight');
+        const edgeRatioEl = document.getElementById('statEdgeRatioWeight');
+
+        if (spacingEl) spacingEl.textContent = `(${Math.round(spacingWeight * 100)}%)`;
+        if (degreeEl) degreeEl.textContent = `(${Math.round(degreeWeight * 100)}%)`;
+        if (edgeRatioEl) edgeRatioEl.textContent = `(${Math.round(edgeRatioWeight * 100)}%)`;
     }
 
     // Initialize on DOM ready

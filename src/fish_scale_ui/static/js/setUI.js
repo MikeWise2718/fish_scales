@@ -876,6 +876,15 @@ window.setUI = (function() {
                 window.data?.setData(set.tubercles, set.edges, stats);
             }
         });
+
+        // Hexagonalness weights changed - recalculate statistics
+        window.addEventListener('hexWeightsChanged', () => {
+            const set = window.sets?.getCurrentSet();
+            if (set) {
+                const stats = calculateStatistics(set.tubercles, set.edges);
+                window.data?.setData(set.tubercles, set.edges, stats);
+            }
+        });
     }
 
     /**
@@ -913,9 +922,15 @@ window.setUI = (function() {
         // Calculate hexagonalness metrics
         const hexMetrics = calculateHexagonalness(tubercles, edges);
 
+        // Count boundary vs interior nodes
+        const n_boundary = tubercles.filter(t => t.is_boundary).length;
+        const n_interior = n_tubercles - n_boundary;
+
         return {
             n_tubercles,
             n_edges,
+            n_boundary,
+            n_interior,
             mean_diameter_um,
             std_diameter_um,
             mean_space_um,
@@ -992,11 +1007,15 @@ window.setUI = (function() {
             result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 2.5) / 2);
         }
 
-        // Composite score
+        // Composite score (use configurable weights from settings)
+        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
+
         result.hexagonalness_score = (
-            0.40 * result.spacing_uniformity +
-            0.45 * result.degree_score +
-            0.15 * result.edge_ratio_score
+            spacingWeight * result.spacing_uniformity +
+            degreeWeight * result.degree_score +
+            edgeRatioWeight * result.edge_ratio_score
         );
 
         return result;

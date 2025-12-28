@@ -14,11 +14,17 @@ window.settings = (function() {
         showTubercleIds: false,
         idTextSize: 12,
         tubercleColor: '#00ffff',
+        boundaryTubercleColor: '#ff8800', // Orange for boundary nodes
         connectionColor: '#ffff00', // Yellow for ITC (intertubercular connections)
         connectionEndpoint: 'center', // 'center' or 'edge'
+        tubercleColorMode: 'source', // 'uniform', 'source', 'boundary'
         // Calibration scale display
         showCalibrationScale: false,
         scalePosition: 'bottom-left', // top-left, top-center, top-right, middle-left, middle-right, bottom-left, bottom-center, bottom-right
+        // Hexagonalness coefficients (must sum to 1.0)
+        hexSpacingWeight: 0.40,
+        hexDegreeWeight: 0.45,
+        hexEdgeRatioWeight: 0.15,
         // Panel width
         tabsPanelWidth: 400,
     };
@@ -41,6 +47,9 @@ window.settings = (function() {
 
         // Init panel resizer
         initPanelResizer();
+
+        // Init hexagonalness calculation display listener
+        initHexCalcListener();
     }
 
     function load() {
@@ -203,6 +212,46 @@ window.settings = (function() {
             });
         }
 
+        // Tubercle color mode radio buttons
+        const colorModes = ['colorModeUniform', 'colorModeSource', 'colorModeBoundary'];
+        colorModes.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', function() {
+                    if (this.checked) {
+                        set('tubercleColorMode', this.value);
+                        // Update overlay color mode
+                        if (window.overlay && window.overlay.setColorMode) {
+                            window.overlay.setColorMode(this.value);
+                        }
+                    }
+                });
+            }
+        });
+
+        // Boundary tubercle color picker
+        const boundaryColorPicker = document.getElementById('boundaryTubercleColorPicker');
+        const boundaryColorText = document.getElementById('boundaryTubercleColorText');
+        if (boundaryColorPicker) {
+            boundaryColorPicker.addEventListener('input', function() {
+                if (boundaryColorText) {
+                    boundaryColorText.value = this.value;
+                }
+                set('boundaryTubercleColor', this.value);
+            });
+        }
+        if (boundaryColorText) {
+            boundaryColorText.addEventListener('change', function() {
+                const color = this.value;
+                if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                    if (boundaryColorPicker) {
+                        boundaryColorPicker.value = color;
+                    }
+                    set('boundaryTubercleColor', color);
+                }
+            });
+        }
+
         // Show calibration scale checkbox
         const showCalibrationScaleEl = document.getElementById('showCalibrationScale');
         if (showCalibrationScaleEl) {
@@ -229,6 +278,179 @@ window.settings = (function() {
         if (resetBtn) {
             resetBtn.addEventListener('click', reset);
         }
+
+        // Hexagonalness coefficient sliders
+        bindHexSlider('hexSpacingWeight', 'hexSpacingWeightValue');
+        bindHexSlider('hexDegreeWeight', 'hexDegreeWeightValue');
+        bindHexSlider('hexEdgeRatioWeight', 'hexEdgeRatioWeightValue');
+
+        // Reset hexagonalness to defaults button
+        const resetHexBtn = document.getElementById('resetHexWeightsBtn');
+        if (resetHexBtn) {
+            resetHexBtn.addEventListener('click', resetHexWeights);
+        }
+
+        // Normalize hexagonalness weights button
+        const normalizeHexBtn = document.getElementById('normalizeHexWeightsBtn');
+        if (normalizeHexBtn) {
+            normalizeHexBtn.addEventListener('click', normalizeHexWeights);
+        }
+    }
+
+    function bindHexSlider(sliderId, valueId) {
+        const slider = document.getElementById(sliderId);
+        const valueEl = document.getElementById(valueId);
+        if (slider) {
+            slider.addEventListener('input', function() {
+                if (valueEl) {
+                    valueEl.textContent = parseFloat(this.value).toFixed(2);
+                }
+                updateHexWeightsSum();
+            });
+            slider.addEventListener('change', function() {
+                set(sliderId, parseFloat(this.value));
+                recalculateHexagonalness();
+            });
+        }
+    }
+
+    function updateHexWeightsSum() {
+        const spacing = parseFloat(document.getElementById('hexSpacingWeight')?.value || 0);
+        const degree = parseFloat(document.getElementById('hexDegreeWeight')?.value || 0);
+        const edgeRatio = parseFloat(document.getElementById('hexEdgeRatioWeight')?.value || 0);
+        const sum = spacing + degree + edgeRatio;
+        const sumEl = document.getElementById('hexWeightsSum');
+        if (sumEl) {
+            sumEl.textContent = sum.toFixed(2);
+            sumEl.classList.toggle('sum-warning', Math.abs(sum - 1.0) > 0.01);
+        }
+    }
+
+    function resetHexWeights() {
+        set('hexSpacingWeight', defaults.hexSpacingWeight);
+        set('hexDegreeWeight', defaults.hexDegreeWeight);
+        set('hexEdgeRatioWeight', defaults.hexEdgeRatioWeight);
+        applyHexWeightsToUI();
+        recalculateHexagonalness();
+        if (window.app && window.app.showToast) {
+            window.app.showToast('Hexagonalness weights reset to defaults', 'success');
+        }
+    }
+
+    function normalizeHexWeights() {
+        const spacing = current.hexSpacingWeight;
+        const degree = current.hexDegreeWeight;
+        const edgeRatio = current.hexEdgeRatioWeight;
+        const sum = spacing + degree + edgeRatio;
+
+        if (sum === 0) {
+            if (window.app && window.app.showToast) {
+                window.app.showToast('Cannot normalize: sum is zero', 'error');
+            }
+            return;
+        }
+
+        set('hexSpacingWeight', spacing / sum);
+        set('hexDegreeWeight', degree / sum);
+        set('hexEdgeRatioWeight', edgeRatio / sum);
+        applyHexWeightsToUI();
+        recalculateHexagonalness();
+        if (window.app && window.app.showToast) {
+            window.app.showToast('Hexagonalness weights normalized', 'success');
+        }
+    }
+
+    function applyHexWeightsToUI() {
+        const spacingSlider = document.getElementById('hexSpacingWeight');
+        const spacingValue = document.getElementById('hexSpacingWeightValue');
+        if (spacingSlider) {
+            spacingSlider.value = current.hexSpacingWeight;
+            if (spacingValue) spacingValue.textContent = current.hexSpacingWeight.toFixed(2);
+        }
+
+        const degreeSlider = document.getElementById('hexDegreeWeight');
+        const degreeValue = document.getElementById('hexDegreeWeightValue');
+        if (degreeSlider) {
+            degreeSlider.value = current.hexDegreeWeight;
+            if (degreeValue) degreeValue.textContent = current.hexDegreeWeight.toFixed(2);
+        }
+
+        const edgeRatioSlider = document.getElementById('hexEdgeRatioWeight');
+        const edgeRatioValue = document.getElementById('hexEdgeRatioWeightValue');
+        if (edgeRatioSlider) {
+            edgeRatioSlider.value = current.hexEdgeRatioWeight;
+            if (edgeRatioValue) edgeRatioValue.textContent = current.hexEdgeRatioWeight.toFixed(2);
+        }
+
+        updateHexWeightsSum();
+    }
+
+    function recalculateHexagonalness() {
+        // Trigger recalculation in any module that computes hexagonalness
+        window.dispatchEvent(new CustomEvent('hexWeightsChanged'));
+        // Update the calculation display
+        updateHexCalcDisplay();
+    }
+
+    async function updateHexCalcDisplay() {
+        const jsEl = document.getElementById('hexCalcJS');
+        const pyEl = document.getElementById('hexCalcPython');
+
+        // Get current weights
+        const spacingWeight = current.hexSpacingWeight;
+        const degreeWeight = current.hexDegreeWeight;
+        const edgeRatioWeight = current.hexEdgeRatioWeight;
+
+        // Get JS-computed value from data module's current statistics
+        const stats = window.data?.getStatistics?.() || {};
+        if (stats.hexagonalness_score !== undefined) {
+            if (jsEl) jsEl.textContent = stats.hexagonalness_score.toFixed(6);
+        } else {
+            if (jsEl) jsEl.textContent = '-';
+        }
+
+        // Fetch Python-computed value
+        try {
+            const params = new URLSearchParams({
+                spacing_weight: spacingWeight,
+                degree_weight: degreeWeight,
+                edge_ratio_weight: edgeRatioWeight,
+            });
+            const response = await fetch(`/api/hexagonalness?${params}`);
+            const result = await response.json();
+            if (pyEl) {
+                if (result.hexagonalness_score !== undefined && result.reliability !== 'none') {
+                    pyEl.textContent = result.hexagonalness_score.toFixed(6);
+                } else {
+                    pyEl.textContent = '-';
+                }
+            }
+        } catch (e) {
+            if (pyEl) pyEl.textContent = 'error';
+        }
+    }
+
+    // Listen for data changes to update the calculation display
+    function initHexCalcListener() {
+        // Update display when hex weights change (already handled in recalculateHexagonalness)
+        // Also update when data changes
+        document.addEventListener('setChanged', () => {
+            setTimeout(updateHexCalcDisplay, 100);
+        });
+        document.addEventListener('setsLoaded', () => {
+            setTimeout(updateHexCalcDisplay, 100);
+        });
+        document.addEventListener('extractionComplete', () => {
+            setTimeout(updateHexCalcDisplay, 100);
+        });
+        document.addEventListener('dataModified', () => {
+            setTimeout(updateHexCalcDisplay, 100);
+        });
+        document.addEventListener('connectionsRegenerated', () => {
+            setTimeout(updateHexCalcDisplay, 100);
+        });
+        // Initial update
+        setTimeout(updateHexCalcDisplay, 500);
     }
 
     function applyToUI() {
@@ -301,11 +523,39 @@ window.settings = (function() {
             scalePositionSetting.style.display = current.showCalibrationScale ? 'block' : 'none';
         }
 
+        // Tubercle color mode
+        const colorModeRadios = {
+            'uniform': document.getElementById('colorModeUniform'),
+            'source': document.getElementById('colorModeSource'),
+            'boundary': document.getElementById('colorModeBoundary'),
+        };
+        const selectedColorMode = current.tubercleColorMode || 'source';
+        if (colorModeRadios[selectedColorMode]) {
+            colorModeRadios[selectedColorMode].checked = true;
+        }
+        // Apply color mode to overlay
+        if (window.overlay && window.overlay.setColorMode) {
+            window.overlay.setColorMode(selectedColorMode);
+        }
+
+        // Boundary tubercle color
+        const boundaryColorPicker = document.getElementById('boundaryTubercleColorPicker');
+        const boundaryColorText = document.getElementById('boundaryTubercleColorText');
+        if (boundaryColorPicker) {
+            boundaryColorPicker.value = current.boundaryTubercleColor;
+        }
+        if (boundaryColorText) {
+            boundaryColorText.value = current.boundaryTubercleColor;
+        }
+
         // Panel width
         const tabsPanel = document.getElementById('tabsPanel');
         if (tabsPanel && current.tabsPanelWidth) {
             tabsPanel.style.width = current.tabsPanelWidth + 'px';
         }
+
+        // Hexagonalness weights
+        applyHexWeightsToUI();
     }
 
     function initCollapsibleGroups() {

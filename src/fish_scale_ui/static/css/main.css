@@ -895,6 +895,12 @@ body {
     font-size: 0.75rem;
 }
 
+.stat-detail {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+}
+
 .stat-confidence {
     font-size: 0.75rem;
     color: var(--text-muted);
@@ -1155,6 +1161,55 @@ body {
     text-align: right;
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+/* Hexagonalness sum row */
+.hex-sum-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.hex-sum-value {
+    font-weight: 600;
+    font-size: 0.9rem;
+    min-width: 40px;
+}
+
+.hex-sum-value.sum-warning {
+    color: #f59e0b;
+}
+
+/* Hexagonalness calculation display */
+.hex-calc-display {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.hex-calc-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.hex-calc-row:last-child {
+    margin-bottom: 0;
+}
+
+.hex-calc-label {
+    color: var(--text-muted);
+    min-width: 50px;
+}
+
+.hex-calc-value {
+    color: var(--text-primary);
 }
 
 /* Radio button group */

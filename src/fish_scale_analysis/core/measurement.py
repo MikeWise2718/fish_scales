@@ -39,6 +39,42 @@ def build_neighbor_graph(tubercles: List[Tubercle]) -> Optional[Delaunay]:
     return tri
 
 
+def find_boundary_nodes(triangulation: Delaunay) -> set:
+    """
+    Find nodes that lie on the boundary of the Delaunay triangulation.
+
+    A boundary edge is one that belongs to only one triangle (simplex).
+    A boundary node is any node connected to a boundary edge.
+
+    Args:
+        triangulation: Delaunay triangulation object
+
+    Returns:
+        Set of node indices that are on the boundary
+    """
+    from collections import defaultdict
+
+    # Count how many triangles each edge belongs to
+    edge_count = defaultdict(int)
+    for simplex in triangulation.simplices:
+        # Each simplex is a triangle with 3 vertex indices
+        for i in range(3):
+            for j in range(i + 1, 3):
+                edge = tuple(sorted([simplex[i], simplex[j]]))
+                edge_count[edge] += 1
+
+    # Boundary edges appear in exactly one triangle
+    boundary_edges = {edge for edge, count in edge_count.items() if count == 1}
+
+    # Boundary nodes are those connected to any boundary edge
+    boundary_nodes = set()
+    for edge in boundary_edges:
+        boundary_nodes.add(edge[0])
+        boundary_nodes.add(edge[1])
+
+    return boundary_nodes
+
+
 def filter_to_rng(
     points: np.ndarray,
     delaunay_edges: set,

@@ -42,10 +42,12 @@ window.overlay = (function() {
     function getColors() {
         const tubercleColor = (window.settings && window.settings.get('tubercleColor')) || '#00ffff';
         const manualTubercleColor = (window.settings && window.settings.get('manualTubercleColor')) || '#00ff00';
+        const boundaryTubercleColor = (window.settings && window.settings.get('boundaryTubercleColor')) || '#ff8800';
         const connectionColor = (window.settings && window.settings.get('connectionColor')) || '#ffff00';
         return {
             tubercle: tubercleColor,           // Extracted tubercles (cyan)
             manualTubercle: manualTubercleColor, // Manually added (green)
+            boundaryTubercle: boundaryTubercleColor, // Boundary nodes (orange)
             edge: connectionColor,
             selectedTubercle: '#ff00ff', // Magenta for selection (distinct from yellow ITCs)
             selectedEdge: '#ff00ff',
@@ -64,6 +66,9 @@ window.overlay = (function() {
         }
         if (colorMode === 'source') {
             return tub.source === 'manual' ? colors.manualTubercle : colors.tubercle;
+        }
+        if (colorMode === 'boundary') {
+            return tub.is_boundary ? colors.boundaryTubercle : colors.tubercle;
         }
         // Default/uniform mode
         return colors.tubercle;

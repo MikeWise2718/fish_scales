@@ -694,6 +694,7 @@
                         <div class="stat-row">
                             <span class="stat-label">Tubercles:</span>
                             <span id="statNTubercles" class="stat-value">-</span>
+                            <span class="stat-detail" id="statBoundaryDetail"></span>
                         </div>
                         <div class="stat-row">
                             <span class="stat-label">Mean Diameter:</span>
@@ -725,19 +726,19 @@
                         <div class="stat-row stat-indent">
                             <span class="stat-label">Spacing Uniformity:</span>
                             <span id="statSpacingUniformity" class="stat-value">-</span>
-                            <span class="stat-unit">(40%)</span>
+                            <span class="stat-unit" id="statSpacingWeight">(40%)</span>
                             <a href="#" class="help-icon" data-help="spacing-uniformity" title="Help">?</a>
                         </div>
                         <div class="stat-row stat-indent">
                             <span class="stat-label">Degree Score:</span>
                             <span id="statDegreeScore" class="stat-value">-</span>
-                            <span class="stat-unit">(45%)</span>
+                            <span class="stat-unit" id="statDegreeWeight">(45%)</span>
                             <a href="#" class="help-icon" data-help="degree-score" title="Help">?</a>
                         </div>
                         <div class="stat-row stat-indent">
                             <span class="stat-label">Edge Ratio Score:</span>
                             <span id="statEdgeRatioScore" class="stat-value">-</span>
-                            <span class="stat-unit">(15%)</span>
+                            <span class="stat-unit" id="statEdgeRatioWeight">(15%)</span>
                             <a href="#" class="help-icon" data-help="edge-ratio-score" title="Help">?</a>
                         </div>
                         <div class="stat-row stat-secondary">
@@ -765,10 +766,11 @@
                                     <th>Y</th>
                                     <th>Diam (um)</th>
                                     <th>Circ</th>
+                                    <th>Bdry</th>
                                 </tr>
                             </thead>
                             <tbody id="tubTableBody">
-                                <tr><td colspan="5" class="empty-table">No tubercles detected</td></tr>
+                                <tr><td colspan="6" class="empty-table">No tubercles detected</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -894,6 +896,32 @@
                                 </div>
                             </div>
 
+                            <div class="setting-item">
+                                <label class="setting-label-text">Tubercle color mode</label>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="tubercleColorMode" id="colorModeUniform" value="uniform">
+                                        <span>Uniform color</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="tubercleColorMode" id="colorModeSource" value="source" checked>
+                                        <span>By source (extracted/manual)</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="tubercleColorMode" id="colorModeBoundary" value="boundary">
+                                        <span>By boundary (interior/boundary)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="setting-item" id="boundaryColorSetting">
+                                <label class="setting-label-text">Boundary tubercle color</label>
+                                <div class="color-input-row">
+                                    <input type="color" id="boundaryTubercleColorPicker" value="#ff8800">
+                                    <input type="text" id="boundaryTubercleColorText" value="#ff8800" maxlength="7">
+                                </div>
+                            </div>
+
                             <div class="setting-item setting-divider">
                                 <label class="setting-label">
                                     <input type="checkbox" id="showCalibrationScale">
@@ -914,6 +942,63 @@
                                     <option value="bottom-center">Bottom-Center</option>
                                     <option value="bottom-right">Bottom-Right</option>
                                 </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hexagonalness Calculation -->
+                    <div class="settings-group collapsed" id="settingsHexagonalness">
+                        <div class="settings-group-header">
+                            <h3>Hexagonalness Calculation</h3>
+                            <span class="settings-group-toggle">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="settings-group-content">
+                            <p class="setting-hint">Adjust the weights used in the hexagonalness formula. The sum should equal 1.0.</p>
+
+                            <div class="setting-item">
+                                <label class="setting-label-text">Spacing Uniformity Weight</label>
+                                <div class="range-with-value">
+                                    <input type="range" id="hexSpacingWeight" min="0" max="1" step="0.05" value="0.40">
+                                    <span class="range-value" id="hexSpacingWeightValue">0.40</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <label class="setting-label-text">Degree Score Weight</label>
+                                <div class="range-with-value">
+                                    <input type="range" id="hexDegreeWeight" min="0" max="1" step="0.05" value="0.45">
+                                    <span class="range-value" id="hexDegreeWeightValue">0.45</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <label class="setting-label-text">Edge Ratio Score Weight</label>
+                                <div class="range-with-value">
+                                    <input type="range" id="hexEdgeRatioWeight" min="0" max="1" step="0.05" value="0.15">
+                                    <span class="range-value" id="hexEdgeRatioWeightValue">0.15</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-item hex-sum-row">
+                                <span class="setting-label-text">Sum:</span>
+                                <span id="hexWeightsSum" class="hex-sum-value">1.00</span>
+                                <button type="button" class="btn btn-sm btn-secondary" id="normalizeHexWeightsBtn">Normalize</button>
+                                <button type="button" class="btn btn-sm btn-secondary" id="resetHexWeightsBtn">Reset</button>
+                            </div>
+
+                            <div class="setting-item hex-calc-display">
+                                <div class="hex-calc-row">
+                                    <span class="hex-calc-label">JS:</span>
+                                    <span id="hexCalcJS" class="hex-calc-value">-</span>
+                                </div>
+                                <div class="hex-calc-row">
+                                    <span class="hex-calc-label">Python:</span>
+                                    <span id="hexCalcPython" class="hex-calc-value">-</span>
+                                </div>
                             </div>
                         </div>
                     </div>

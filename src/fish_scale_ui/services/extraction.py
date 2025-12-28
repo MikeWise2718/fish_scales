@@ -11,6 +11,7 @@ from fish_scale_analysis.core.preprocessing import load_image, preprocess_pipeli
 from fish_scale_analysis.core.detection import detect_tubercles
 from fish_scale_analysis.core.measurement import (
     build_neighbor_graph,
+    find_boundary_nodes,
     get_neighbor_edges,
     measure_diameters,
     measure_nearest_neighbor_spacing,
@@ -94,6 +95,7 @@ def run_extraction(
     # Build neighbor graph and get edges
     triangulation = build_neighbor_graph(tubercles)
     edges = []
+    boundary_indices = set()
     if triangulation is not None:
         edges = get_neighbor_edges(
             tubercles,
@@ -101,6 +103,8 @@ def run_extraction(
             calibration,
             graph_type=neighbor_graph,
         )
+        # Find boundary nodes using Delaunay triangulation
+        boundary_indices = find_boundary_nodes(triangulation)
 
     # Measure statistics
     diameters, mean_diam, std_diam = measure_diameters(tubercles)
@@ -118,8 +122,12 @@ def run_extraction(
     hex_metrics = calculate_hexagonalness(tubercles, edges)
 
     # Convert to serializable format
+    # Build a mapping from tubercle ID to index for boundary lookup
+    id_to_index = {t.id: idx for idx, t in enumerate(tubercles)}
+
     tubercles_data = []
     for t in tubercles:
+        idx = id_to_index.get(t.id, -1)
         tub_data = {
             'id': t.id,
             'centroid_x': t.centroid[0],
@@ -129,6 +137,7 @@ def run_extraction(
             'radius_px': t.radius_px,
             'circularity': t.circularity,
             'source': 'extracted',  # Track origin for coloring
+            'is_boundary': idx in boundary_indices,
         }
         # Include ellipse parameters if available
         if t.major_axis_px is not None:
@@ -176,6 +185,8 @@ def run_extraction(
         'statistics': {
             'n_tubercles': len(tubercles),
             'n_edges': len(edges_data),  # Use culled count
+            'n_boundary': len(boundary_indices),
+            'n_interior': len(tubercles) - len(boundary_indices),
             'mean_diameter_um': round(mean_diam, 2),
             'std_diameter_um': round(std_diam, 2),
             'mean_space_um': round(mean_space, 2),

@@ -458,11 +458,14 @@ def regenerate_connections():
         }
 
     Returns:
-        {"success": true, "edges": [...], "statistics": {...}}
+        {"success": true, "edges": [...], "tubercles": [...], "statistics": {...}}
+
+    Note: Returns updated tubercles with is_boundary flag set based on Delaunay boundary detection.
     """
     from fish_scale_ui.services.logging import log_event
     from fish_scale_analysis.core.measurement import filter_to_gabriel, filter_to_rng
     from scipy.spatial import Delaunay
+    from collections import defaultdict
     import numpy as np
     import math
 
@@ -479,10 +482,13 @@ def regenerate_connections():
         return jsonify({'error': f'Invalid graph_type: {graph_type}'}), 400
 
     if len(tubercles) < 2:
+        # Mark all as boundary since there's no triangulation
+        updated_tubercles = [{**t, 'is_boundary': True} for t in tubercles]
         return jsonify({
             'success': True,
             'edges': [],
-            'statistics': {'n_edges': 0, 'mean_space_um': 0, 'std_space_um': 0}
+            'tubercles': updated_tubercles,
+            'statistics': {'n_edges': 0, 'mean_space_um': 0, 'std_space_um': 0, 'n_boundary': len(tubercles), 'n_interior': 0}
         })
 
     um_per_px = _current_image['calibration'].get('um_per_px', 0.33)
@@ -493,18 +499,31 @@ def regenerate_connections():
         radii = np.array([t.get('radius_px', 10) for t in tubercles])
 
         # Build Delaunay triangulation
+        boundary_indices = set()
         if len(tubercles) < 3:
             # With only 2 tubercles, just connect them directly
             edge_indices = [(0, 1)]
+            # Both are boundary nodes
+            boundary_indices = {0, 1}
         else:
             tri = Delaunay(centroids)
 
-            # Extract all Delaunay edges
-            delaunay_edges = set()
+            # Extract all Delaunay edges and count triangles per edge
+            edge_count = defaultdict(int)
             for simplex in tri.simplices:
                 for i in range(3):
                     edge = tuple(sorted([simplex[i], simplex[(i + 1) % 3]]))
-                    delaunay_edges.add(edge)
+                    edge_count[edge] += 1
+
+            delaunay_edges = set(edge_count.keys())
+
+            # Find boundary edges (appear in only one triangle)
+            boundary_edges = {edge for edge, count in edge_count.items() if count == 1}
+
+            # Find boundary nodes
+            for edge in boundary_edges:
+                boundary_indices.add(edge[0])
+                boundary_indices.add(edge[1])
 
             # Filter based on graph type
             if graph_type == 'delaunay':
@@ -513,6 +532,12 @@ def regenerate_connections():
                 edge_indices = list(filter_to_gabriel(centroids, delaunay_edges))
             else:  # rng
                 edge_indices = list(filter_to_rng(centroids, delaunay_edges))
+
+        # Update tubercles with boundary flag
+        updated_tubercles = []
+        for idx, t in enumerate(tubercles):
+            updated_t = {**t, 'is_boundary': idx in boundary_indices}
+            updated_tubercles.append(updated_t)
 
         # Convert to edge objects with distance calculations
         edges = []
@@ -545,7 +570,13 @@ def regenerate_connections():
             edges = [e for e in edges if e['center_distance_um'] <= max_allowed]
 
         # Calculate statistics
-        statistics = {'n_edges': len(edges), 'mean_space_um': 0, 'std_space_um': 0}
+        statistics = {
+            'n_edges': len(edges),
+            'mean_space_um': 0,
+            'std_space_um': 0,
+            'n_boundary': len(boundary_indices),
+            'n_interior': len(tubercles) - len(boundary_indices),
+        }
         if edges:
             edge_distances = [e['edge_distance_um'] for e in edges]
             statistics['mean_space_um'] = float(np.mean(edge_distances))
@@ -555,6 +586,7 @@ def regenerate_connections():
             'graph_type': graph_type,
             'n_tubercles': len(tubercles),
             'n_edges': len(edges),
+            'n_boundary': len(boundary_indices),
             'cull_long_edges': cull_long_edges,
             'cull_factor': cull_factor,
         })
@@ -562,6 +594,7 @@ def regenerate_connections():
         return jsonify({
             'success': True,
             'edges': edges,
+            'tubercles': updated_tubercles,
             'statistics': statistics,
         })
 
@@ -957,3 +990,158 @@ def autocrop_image():
 
     except Exception as e:
         return jsonify({'error': f'Failed to autocrop image: {str(e)}'}), 400
+
+
+@api_bp.route('/recalculate-boundaries', methods=['POST'])
+def recalculate_boundaries():
+    """Recalculate boundary status for tubercles based on Delaunay triangulation.
+
+    POST body:
+        {
+            "tubercles": [...]
+        }
+
+    Returns:
+        {"success": true, "tubercles": [...], "n_boundary": int, "n_interior": int}
+    """
+    from scipy.spatial import Delaunay
+    from collections import defaultdict
+
+    data = request.get_json() or {}
+    tubercles = data.get('tubercles', [])
+
+    if len(tubercles) < 3:
+        # All nodes are boundary if less than 3
+        updated = [{**t, 'is_boundary': True} for t in tubercles]
+        return jsonify({
+            'success': True,
+            'tubercles': updated,
+            'n_boundary': len(tubercles),
+            'n_interior': 0,
+        })
+
+    try:
+        # Build centroids array
+        centroids = np.array([[t['centroid_x'], t['centroid_y']] for t in tubercles])
+
+        # Build Delaunay triangulation
+        tri = Delaunay(centroids)
+
+        # Count triangles per edge to find boundary edges
+        edge_count = defaultdict(int)
+        for simplex in tri.simplices:
+            for i in range(3):
+                edge = tuple(sorted([simplex[i], simplex[(i + 1) % 3]]))
+                edge_count[edge] += 1
+
+        # Boundary edges appear in exactly one triangle
+        boundary_edges = {edge for edge, count in edge_count.items() if count == 1}
+
+        # Find boundary nodes
+        boundary_indices = set()
+        for edge in boundary_edges:
+            boundary_indices.add(edge[0])
+            boundary_indices.add(edge[1])
+
+        # Update tubercles with boundary flag
+        updated = []
+        for idx, t in enumerate(tubercles):
+            updated.append({**t, 'is_boundary': idx in boundary_indices})
+
+        return jsonify({
+            'success': True,
+            'tubercles': updated,
+            'n_boundary': len(boundary_indices),
+            'n_interior': len(tubercles) - len(boundary_indices),
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Boundary calculation failed: {str(e)}'}), 500
+
+
+@api_bp.route('/hexagonalness', methods=['GET'])
+def calculate_hexagonalness():
+    """Calculate hexagonalness with custom weights.
+
+    Query parameters:
+        spacing_weight: float (default 0.40)
+        degree_weight: float (default 0.45)
+        edge_ratio_weight: float (default 0.15)
+
+    Returns component scores and weighted hexagonalness score.
+    """
+    from collections import defaultdict
+
+    # Get weights from query params
+    spacing_weight = float(request.args.get('spacing_weight', 0.40))
+    degree_weight = float(request.args.get('degree_weight', 0.45))
+    edge_ratio_weight = float(request.args.get('edge_ratio_weight', 0.15))
+
+    tubercles = _extraction_data.get('tubercles', [])
+    edges = _extraction_data.get('edges', [])
+
+    result = {
+        'spacing_uniformity': 0.0,
+        'degree_score': 0.0,
+        'edge_ratio_score': 0.0,
+        'hexagonalness_score': 0.0,
+        'reliability': 'none',
+        'n_nodes': 0,
+    }
+
+    if not tubercles or len(tubercles) < 4:
+        return jsonify(result)
+
+    n_nodes = len(tubercles)
+    result['n_nodes'] = n_nodes
+    result['reliability'] = 'high' if n_nodes >= 15 else 'low'
+
+    # 1. Spacing uniformity
+    if edges:
+        spacings = [e.get('edge_distance_um', 0) for e in edges]
+        spacings = [s for s in spacings if s > 0]
+        if spacings:
+            mean_spacing = float(np.mean(spacings))
+            std_spacing = float(np.std(spacings))
+            cv = std_spacing / mean_spacing if mean_spacing > 0 else 1.0
+            result['spacing_uniformity'] = float(max(0, 1 - 2 * cv))
+
+    # 2. Degree distribution
+    degree = defaultdict(int)
+    for t in tubercles:
+        degree[t['id']] = 0
+    for e in edges:
+        a_id = e.get('tubercle_a_id') or e.get('id1')
+        b_id = e.get('tubercle_b_id') or e.get('id2')
+        if a_id in degree:
+            degree[a_id] += 1
+        if b_id in degree:
+            degree[b_id] += 1
+
+    degrees = list(degree.values())
+    if degrees:
+        weighted_score = 0
+        for d in degrees:
+            if 5 <= d <= 7:
+                weighted_score += 1.0
+            elif d == 4 or d == 8:
+                weighted_score += 0.7
+            elif d == 3 or d == 9:
+                weighted_score += 0.3
+        result['degree_score'] = float(weighted_score / len(degrees))
+
+    # 3. Edge/node ratio
+    if n_nodes > 0:
+        ratio = len(edges) / n_nodes
+        deviation = abs(ratio - 2.5)
+        result['edge_ratio_score'] = float(max(0, 1 - deviation / 2))
+
+    # 4. Composite score with custom weights
+    score = (
+        spacing_weight * result['spacing_uniformity'] +
+        degree_weight * result['degree_score'] +
+        edge_ratio_weight * result['edge_ratio_score']
+    )
+    result['hexagonalness_score'] = float(score)
+
+    return jsonify(result)

@@ -53,23 +53,31 @@ window.extraction = (function() {
                 return;
             }
 
-            // Update edges in sets module (keep existing tubercles)
-            window.sets.setCurrentData(currentSet.tubercles, result.edges);
+            // Use updated tubercles with boundary flags from API
+            const updatedTubercles = result.tubercles || currentSet.tubercles;
+
+            // Update data in sets module
+            window.sets.setCurrentData(updatedTubercles, result.edges);
 
             // Update overlay
             if (window.overlay) {
-                window.overlay.setData(currentSet.tubercles, result.edges);
+                window.overlay.setData(updatedTubercles, result.edges);
             }
 
-            // Update data tables with new edge statistics
+            // Update data tables with new statistics
             if (window.data) {
-                const stats = calculateStatistics(currentSet.tubercles, result.edges);
-                window.data.setData(currentSet.tubercles, result.edges, stats);
+                const stats = calculateStatistics(updatedTubercles, result.edges);
+                // Include boundary counts from API response
+                if (result.statistics) {
+                    stats.n_boundary = result.statistics.n_boundary;
+                    stats.n_interior = result.statistics.n_interior;
+                }
+                window.data.setData(updatedTubercles, result.edges, stats);
             }
 
             // Update editor
             if (window.editor) {
-                window.editor.setData(currentSet.tubercles, result.edges);
+                window.editor.setData(updatedTubercles, result.edges);
             }
 
             // Mark set as dirty
@@ -79,7 +87,7 @@ window.extraction = (function() {
             // Dispatch event
             document.dispatchEvent(new CustomEvent('connectionsRegenerated', {
                 detail: {
-                    tubercles: currentSet.tubercles,
+                    tubercles: updatedTubercles,
                     edges: result.edges,
                 }
             }));
@@ -345,9 +353,15 @@ window.extraction = (function() {
         // Calculate hexagonalness metrics
         const hexMetrics = calculateHexagonalness(tubercles, edges);
 
+        // Count boundary vs interior nodes
+        const n_boundary = tubercles.filter(t => t.is_boundary).length;
+        const n_interior = n_tubercles - n_boundary;
+
         return {
             n_tubercles,
             n_edges,
+            n_boundary,
+            n_interior,
             mean_diameter_um,
             std_diameter_um,
             mean_space_um,
@@ -421,11 +435,15 @@ window.extraction = (function() {
             result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 2.5) / 2);
         }
 
-        // Composite score
+        // Composite score (use configurable weights from settings)
+        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
+
         result.hexagonalness_score = (
-            0.40 * result.spacing_uniformity +
-            0.45 * result.degree_score +
-            0.15 * result.edge_ratio_score
+            spacingWeight * result.spacing_uniformity +
+            degreeWeight * result.degree_score +
+            edgeRatioWeight * result.edge_ratio_score
         );
 
         return result;

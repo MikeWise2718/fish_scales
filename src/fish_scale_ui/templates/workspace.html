@@ -27,6 +27,7 @@
                     <!-- Set list populated by JavaScript -->
                 </div>
             </div>
+            <button type="button" class="btn btn-xs btn-secondary stats-bar-new-set" id="statsBarNewSetBtn" title="Create new set">+ New</button>
             <div class="stats-bar-item">
                 <span class="stats-bar-label">TUB:</span>
                 <span id="statsBarTubercles" class="stats-bar-value">-</span>
@@ -102,6 +103,10 @@
                 <input type="checkbox" id="toggleScale">
                 <span>Scale</span>
             </label>
+            <label class="overlay-toggle" title="Show fitted ellipses instead of circles">
+                <input type="checkbox" id="showEllipses">
+                <span>Ellipses</span>
+            </label>
         </div>
 
         <!-- Set selector bar -->
@@ -157,6 +162,7 @@
             <button class="tab-header" data-tab="log">Log</button>
             <button class="tab-header" data-tab="settings">Settings</button>
             <button class="tab-header" data-tab="about">About</button>
+            <!-- DEBUG: agent_tabs.extraction = {{ agent_tabs.extraction }} -->
             {% if agent_tabs.extraction %}
             <button class="tab-header" data-tab="agent-extraction">Agent Extraction</button>
             {% endif %}
@@ -308,7 +314,6 @@
                             <!-- Set list populated by JavaScript -->
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-secondary" id="extractionTabNewSetBtn">+ New Set</button>
                 </div>
 
                 <div class="config-section collapsible-section">
@@ -481,15 +486,6 @@
                     </span>
                 </div>
 
-                <div class="extraction-display-options">
-                    <h3>Display Options</h3>
-                    <label class="overlay-toggle" title="Show fitted ellipses instead of circles">
-                        <input type="checkbox" id="showEllipses">
-                        <span>Show Ellipses</span>
-                    </label>
-                    <p class="hint">Display the fitted ellipses used for diameter calculation.</p>
-                </div>
-
                 <div class="slo-actions">
                     <h3>SLO Files</h3>
                     <button type="button" class="btn btn-secondary btn-sm" id="loadSloBtn">Load Existing SLO</button>
@@ -506,7 +502,6 @@
                 <div class="editing-set-indicator" id="editTabSetIndicator">
                     <span class="editing-set-label">Editing:</span>
                     <span class="editing-set-name" id="editTabSetName">Base</span>
-                    <button type="button" class="btn btn-sm btn-secondary" id="editTabNewSetBtn">+ New Set</button>
                 </div>
 
                 <div class="edit-section">
@@ -712,7 +707,6 @@
                             <!-- Set list populated by JavaScript -->
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-secondary" id="dataTabNewSetBtn">+ New Set</button>
                 </div>
 
                 <div class="data-section">
@@ -1248,11 +1242,20 @@
                     <div class="agent-collapsible collapsed">
                         <div class="agent-collapsible-header">
                             <h4>Last Prompt Sent</h4>
-                            <span class="agent-collapsible-toggle">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </span>
+                            <div class="agent-collapsible-actions">
+                                <button type="button" class="btn btn-small btn-copy" id="copyPromptBtn" title="Copy to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <span class="agent-collapsible-toggle">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                            </div>
                         </div>
                         <div class="agent-collapsible-content">
                             <pre id="agentLastPrompt">No prompt sent yet.</pre>
@@ -1263,6 +1266,59 @@
                     <div class="agent-collapsible collapsed">
                         <div class="agent-collapsible-header">
                             <h4>Last LLM Response</h4>
+                            <div class="agent-collapsible-actions">
+                                <button type="button" class="btn btn-small btn-copy" id="copyResponseBtn" title="Copy to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <span class="agent-collapsible-toggle">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <pre id="agentLastResponse">No response received yet.</pre>
+                        </div>
+                    </div>
+
+                    <!-- Action Summary -->
+                    <div class="agent-collapsible collapsed">
+                        <div class="agent-collapsible-header">
+                            <h4>Action Summary</h4>
+                            <div class="agent-collapsible-actions">
+                                <button type="button" class="btn btn-small btn-copy" id="copyActionsBtn" title="Copy to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <button type="button" class="btn btn-small" id="clearActionsBtn" title="Clear actions">
+                                    Clear
+                                </button>
+                                <span class="agent-collapsible-toggle">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <pre id="agentActionSummary">No actions yet.</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Costs Section (Collapsible) -->
+                <div class="config-section agent-section">
+                    <div class="agent-collapsible collapsed">
+                        <div class="agent-collapsible-header">
+                            <h3 style="margin: 0;">Costs</h3>
                             <span class="agent-collapsible-toggle">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -1270,7 +1326,32 @@
                             </span>
                         </div>
                         <div class="agent-collapsible-content">
-                            <pre id="agentLastResponse">No response received yet.</pre>
+                            <div class="agent-costs-panel">
+                                <div class="agent-cost-row">
+                                    <span class="agent-cost-label">Model:</span>
+                                    <span id="agentCostModel" class="agent-cost-value">-</span>
+                                </div>
+                                <div class="agent-cost-row">
+                                    <span class="agent-cost-label">Input Tokens:</span>
+                                    <span id="agentCostInputTokens" class="agent-cost-value">0</span>
+                                </div>
+                                <div class="agent-cost-row">
+                                    <span class="agent-cost-label">Output Tokens:</span>
+                                    <span id="agentCostOutputTokens" class="agent-cost-value">0</span>
+                                </div>
+                                <div class="agent-cost-row">
+                                    <span class="agent-cost-label">Total Tokens:</span>
+                                    <span id="agentCostTotalTokens" class="agent-cost-value">0</span>
+                                </div>
+                                <div class="agent-cost-row agent-cost-total">
+                                    <span class="agent-cost-label">Estimated Cost:</span>
+                                    <span id="agentCostEstimate" class="agent-cost-value">$0.0000</span>
+                                </div>
+                                <div class="agent-cost-row">
+                                    <span class="agent-cost-label">Last Step Cost:</span>
+                                    <span id="agentCostLastStep" class="agent-cost-value">$0.0000</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

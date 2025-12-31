@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 import httpx
 
+from .agent_run_logger import AgentRunLogger
 from .providers.base import AgentLLMProvider, ToolDefinition
 
 
@@ -692,6 +693,7 @@ class ExtractionOptimizer:
         ui_base_url: str = "http://localhost:5010",
         verbose: bool = False,
         log_callback: Callable[[str], None] | None = None,
+        run_logger: AgentRunLogger | None = None,
     ):
         """Initialize the optimizer.
 
@@ -700,12 +702,16 @@ class ExtractionOptimizer:
             ui_base_url: Base URL of the fish-scale-ui Flask application
             verbose: Whether to print detailed logs
             log_callback: Optional callback for log messages
+            run_logger: Optional logger for detailed prompt/response logging
         """
         self.provider = provider
         self.ui_url = ui_base_url.rstrip("/")
         self.verbose = verbose
         self.log_callback = log_callback
         self._client = httpx.Client(timeout=120)
+
+        # Run logger for detailed prompt/response tracking
+        self.run_logger = run_logger or AgentRunLogger()
 
         # Optimization state
         self._state: OptimizationState | None = None
@@ -1130,6 +1136,20 @@ Start by running extraction with the current parameters to establish a baseline,
 
 When you achieve hexagonalness >= {target_hexagonalness} or believe no further improvement is possible, call accept_result with your reasoning."""
 
+        # Start run logging
+        log_file = self.run_logger.start_run(
+            image_path=image_path,
+            calibration=calibration,
+            provider=self.provider.provider_name,
+            model=self.provider.model_name,
+            target_hexagonalness=target_hexagonalness,
+            max_iterations=max_iterations,
+            initial_profile=starting_profile,
+            system_prompt=OPTIMIZER_SYSTEM_PROMPT,
+            user_message=user_message,
+        )
+        self._log(f"Run log: {log_file}")
+
         # Reset usage tracking if provider supports it
         if hasattr(self.provider, "reset_usage"):
             self.provider.reset_usage()
@@ -1139,18 +1159,64 @@ When you achieve hexagonalness >= {target_hexagonalness} or believe no further i
 
         def on_agent_iteration(agent_iter):
             """Handle each agent iteration from the provider."""
+            # Log usage after every LLM call for real-time cost tracking
+            if hasattr(self.provider, "get_usage"):
+                usage = self.provider.get_usage()
+                input_tokens = usage.get("input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+                cost_usd = usage.get("cost_usd", 0)
+                model = usage.get("model", self.provider.model_name)
+                self._log(f"Usage: {input_tokens} input, {output_tokens} output, ${cost_usd:.4f} ({model})")
+
+            # Log the full LLM response as JSON (includes text and tool calls)
+            if agent_iter and agent_iter.response_json:
+                # Replace newlines with pipe separator for single-line logging
+                response_oneline = agent_iter.response_json.replace('\n', ' | ')
+                self._log(f"LLM-Response: {response_oneline}")
+
+            # Log prompt statistics and content
+            if agent_iter and agent_iter.prompt_size_bytes > 0:
+                self._log(f"Prompt-Stats: size={agent_iter.prompt_size_bytes}")
+                # Log full prompt content (with base64 already truncated by provider)
+                if agent_iter.prompt_content:
+                    # Replace newlines with pipe separator for single-line logging
+                    prompt_oneline = agent_iter.prompt_content.replace('\n', ' | ')
+                    # No truncation - user wants full prompt for analysis
+                    # Base64 data is already truncated by the provider
+                    self._log(f"LLM-Prompt: {prompt_oneline}")
+
             # Only notify callback when extraction count changes
             if self._state and self._state.iteration != last_iteration[0]:
+                # End previous iteration log if any
+                if last_iteration[0] > 0:
+                    self.run_logger.end_iteration()
+
                 last_iteration[0] = self._state.iteration
+
+                # Start new iteration log
+                phase = "profile_selection" if self._state.iteration == 1 else "tuning"
+                self.run_logger.start_iteration(self._state.iteration, phase)
+                self.run_logger.log_metrics(
+                    self._state.current_metrics,
+                    self._state.current_params
+                )
+
                 if on_iteration:
                     on_iteration(self._state)
 
+        # Wrap tool executor to log tool calls
+        def logged_tool_executor(name: str, args: dict):
+            result = self._execute_tool(name, args)
+            self.run_logger.log_tool_call(name, args, result)
+            return result
+
         # Execute agent loop
         final_response = ""
+        final_status = "completed"
         try:
             final_response = await self.provider.run_agent_loop(
                 tools=OPTIMIZATION_TOOLS,
-                tool_executor=self._execute_tool,
+                tool_executor=logged_tool_executor,
                 system_prompt=OPTIMIZER_SYSTEM_PROMPT,
                 user_message=user_message,
                 max_iterations=max_iterations * 5,  # Allow more LLM calls than extraction iterations
@@ -1160,12 +1226,19 @@ When you achieve hexagonalness >= {target_hexagonalness} or believe no further i
         except StopOptimization as e:
             # Expected termination - optimization goal reached
             self._log(f"Optimization stopped: {e.reason}")
+            final_status = "completed"
         except Exception as e:
             self._log(f"Agent error: {e}")
-            # Don't re-raise - we still want to return what we have
-            # But log the full traceback for debugging
+            final_status = "error"
+            # Log error to run log
             import traceback
-            self._log(f"Traceback: {traceback.format_exc()}")
+            error_msg = traceback.format_exc()
+            self._log(f"Traceback: {error_msg}")
+            self.run_logger.log_error(error_msg)
+
+        # End final iteration log
+        if last_iteration[0] > 0:
+            self.run_logger.end_iteration()
 
         # Final callback notification
         if on_iteration and self._state:
@@ -1185,9 +1258,20 @@ When you achieve hexagonalness >= {target_hexagonalness} or believe no further i
             self._log("=" * 50)
 
         # Log usage stats if available
+        usage = {}
         if hasattr(self.provider, "get_usage"):
             usage = self.provider.get_usage()
             self._log(f"Usage: {usage.get('total_tokens', 0):,} tokens, ${usage.get('cost_usd', 0):.4f}")
+
+        # End run logging
+        self.run_logger.end_run(
+            status=final_status,
+            final_metrics=self._state.current_metrics if self._state else None,
+            final_params=self._state.best_params if self._state else None,
+            best_iteration=self._state.best_iteration if self._state else 0,
+            best_hexagonalness=self._state.best_metrics.get("hexagonalness", 0) if self._state else 0,
+            accept_reason=self._accept_reason,
+        )
 
         return self._state
 

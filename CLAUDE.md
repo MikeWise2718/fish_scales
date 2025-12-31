@@ -268,6 +268,90 @@ export GEMINI_API_KEY=your_key_here
 uv run fish-scale-agent run image.tif --provider gemini
 ```
 
+## Extraction Parameter Optimization Agent
+
+A separate LLM-powered agent for finding optimal extraction parameters, complementing the pattern completion agent above.
+
+### Purpose
+Find optimal extraction parameters by iteratively adjusting settings and evaluating results, eliminating manual trial-and-error parameter tuning.
+
+### Comparison with Pattern Completion Agent
+| Aspect | Pattern Completion Agent | Extraction Optimizer |
+|--------|-------------------------|---------------------|
+| Goal | Add missing tubercles | Find optimal parameters |
+| Output | Full annotation set | Optimal parameter values |
+| Method | Manual tubercle addition | Parameter adjustment |
+| Iterations | 10-30 (adding tubercles) | 5-10 (tuning params) |
+
+### Two-Phase Optimization Strategy
+1. **Profile Selection** - Try candidate profiles, select best as starting point
+2. **Parameter Fine-Tuning** - LLM analyzes visuals + metrics, proposes targeted adjustments
+
+### Enabling Agent Tabs
+```bash
+export FISH_SCALE_AGENT_TABS=1           # All agent tabs
+export FISH_SCALE_AGENT_TABS=extraction  # Just extraction tab
+uv run fish-scale-ui
+```
+
+### CLI Usage
+```bash
+uv run fish-scale-agent optimize image.tif --calibration 0.1 \
+    --provider claude --target-score 0.7 --max-iterations 10
+```
+
+### Parameter Effects Reference
+
+**Detection Parameters:**
+| Parameter | Range | Default | Effect |
+|-----------|-------|---------|--------|
+| Threshold | 0.01–0.50 | 0.05 | Lower = more sensitive (may include noise); Higher = only strong features |
+| Min Diameter | 0.5–20.0 µm | 2.0 | Filters out smaller blobs |
+| Max Diameter | 1.0–50.0 µm | 10.0 | Filters out larger blobs |
+| Circularity | 0.0–1.0 | 0.5 | 0.0 = any shape; 1.0 = perfect circles only |
+
+**Preprocessing Parameters:**
+| Parameter | Range | Default | Effect |
+|-----------|-------|---------|--------|
+| CLAHE Clip | 0.01–0.20 | 0.03 | Higher = stronger contrast enhancement |
+| CLAHE Kernel | 4–32 | 8 | Smaller = more local contrast; Larger = smoother |
+| Blur Sigma | 0.0–5.0 | 1.0 | Higher = more smoothing, may merge features |
+
+**Tuning Guidelines:**
+- **Too many detections**: Increase threshold, increase min_diameter, increase circularity
+- **Too few detections**: Decrease threshold, decrease circularity (try 0.2-0.3), decrease min_diameter
+- **Noisy detections**: Increase blur_sigma, adjust CLAHE clip
+- **Missing faint tubercles**: Decrease threshold, increase CLAHE clip
+
+### Key Implementation Files
+```
+src/fish_scale_agent/
+├── extraction_optimizer.py    # Core optimizer module
+└── cli.py                     # optimize subcommand
+
+src/fish_scale_ui/
+├── routes/agent_api.py        # Agent control endpoints
+├── templates/workspace.html   # Agent tabs HTML
+└── static/js/agent_extraction.js  # Agent tab JavaScript
+```
+
+### Known Challenges & Mitigations
+1. **VLM parameter understanding** (40-55% confidence): VLMs may not deeply understand parameter→visual effect mapping
+2. **Complex parameter interactions**: 9 parameters with non-linear interactions
+3. **Convergence not guaranteed**: May oscillate without gradient-like reasoning
+
+**Recommended approach**: Use VLM for qualitative feedback ("too many false positives", "gaps in corners") and let controller apply deterministic adjustments, rather than asking VLM for specific parameter values.
+
+### Workflow Integration
+```
+1. Load image, set calibration
+2. [OPTIMIZER] Run Extraction Optimizer → get optimal params
+3. Run extraction with optimal params
+4. [PATTERN AGENT] Run Pattern Completion Agent → add missed tubercles
+5. Generate connections
+6. Save results
+```
+
 ## Hexagonalness Metrics
 
 The hexagonalness score measures how well detected tubercle patterns match an ideal hexagonal lattice. The formula is:
@@ -308,7 +392,7 @@ User guides and reference documentation are in `docs/`:
 - `slo-persistence.md` - SLO file format and storage details
 - `openrouter-how-to.md` - Guide to using OpenRouter with the LLM agent
 - `fish-scale-metrics-extraction.md` - High-level algorithm description
-- `implementation-history.md` - Development history (Dec 2025)
+- `implementation-history.md` - Development history (Dec 2025), includes detailed Extraction Optimizer implementation notes
 
 ## Specifications
 
@@ -320,3 +404,5 @@ Detailed specifications are in the `specs/` folder:
 - `mcp-agent-tubercle-detection-spec.md` - MCP server and agent specification
 - `mcp-testing.md` - MCP server testing strategy and results
 - `dataset-history-tracking.md` - Dataset provenance/history tracking (proposed)
+- `AI-Extraction-Assistent.md` - AI parameter optimization assistant spec with open questions and feasibility analysis
+- `extraction-agent.md` - Extraction agent specification

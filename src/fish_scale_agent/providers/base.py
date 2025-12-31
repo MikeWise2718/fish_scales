@@ -37,6 +37,11 @@ class AgentIteration:
     tool_calls: list[ToolCall]
     done: bool
     final_response: str | None = None
+    # Prompt information (for logging/debugging)
+    prompt_content: str | None = None  # Full prompt with base64 truncated
+    prompt_size_bytes: int = 0  # Size of full prompt in bytes
+    # Response information (for logging/debugging)
+    response_json: str | None = None  # Full response as JSON (text + tool calls)
 
 
 class AgentLLMProvider(ABC):

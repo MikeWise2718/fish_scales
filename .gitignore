@@ -31,6 +31,11 @@ tests/log/
 
 # Logs
 *.log
+agent_logs/
+log/
+
+# Saved annotation files
+slo/
 
 # OS
 .DS_Store

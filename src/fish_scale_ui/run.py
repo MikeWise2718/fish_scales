@@ -1,6 +1,7 @@
 """Entry point for Fish Scale Measurement UI."""
 
 import argparse
+import os
 import webbrowser
 import threading
 import time
@@ -60,6 +61,17 @@ def main():
 
     print("Starting Fish Scale Measurement UI...")
     print(f"Image directory: {image_dir}")
+
+    # Debug: Show environment variable configuration
+    agent_tabs_env = os.environ.get('FISH_SCALE_AGENT_TABS', '')
+    fish_user_env = os.environ.get('FISH_SCALE_USER', '')
+    print(f"FISH_SCALE_AGENT_TABS: {repr(agent_tabs_env) if agent_tabs_env else '(not set)'}")
+    print(f"FISH_SCALE_USER: {repr(fish_user_env) if fish_user_env else '(not set)'}")
+
+    from fish_scale_ui.app import get_agent_tabs_config
+    agent_tabs = get_agent_tabs_config()
+    print(f"Agent tabs enabled: extraction={agent_tabs['extraction']}, editing={agent_tabs['editing']}")
+
     print(f"Opening browser at http://127.0.0.1:{args.port}")
     print("Press Ctrl+C to stop the server.")
 

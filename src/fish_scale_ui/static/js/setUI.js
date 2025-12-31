@@ -514,9 +514,6 @@ window.setUI = (function() {
         // Divider and actions
         html += `
             <hr class="stats-bar-set-menu-divider">
-            <button class="stats-bar-set-menu-action" id="statsBarNewSetBtn">
-                + New Set...
-            </button>
             <button class="stats-bar-set-menu-action" id="statsBarManageSetsBtn">
                 Manage Sets...
             </button>
@@ -532,14 +529,6 @@ window.setUI = (function() {
                 handleSetClick(setId);
             });
         });
-
-        const newSetBtn = document.getElementById('statsBarNewSetBtn');
-        if (newSetBtn) {
-            newSetBtn.addEventListener('click', () => {
-                closeStatsBarMenu();
-                showCreateSetDialog();
-            });
-        }
 
         const manageSetsBtn = document.getElementById('statsBarManageSetsBtn');
         if (manageSetsBtn) {
@@ -768,6 +757,14 @@ window.setUI = (function() {
             statsBarSetBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 toggleStatsBarMenu();
+            });
+        }
+
+        // Stats bar "+ New" button
+        const statsBarNewSetBtn = document.getElementById('statsBarNewSetBtn');
+        if (statsBarNewSetBtn) {
+            statsBarNewSetBtn.addEventListener('click', () => {
+                showCreateSetDialog();
             });
         }
 

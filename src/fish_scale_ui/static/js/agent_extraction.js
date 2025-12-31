@@ -15,6 +15,12 @@ window.agentExtraction = (function() {
         maxIterations: 30,
         currentPhase: null,         // Current agent phase (e.g., "Phase 1: Initial Detection")
         currentTubercleCount: null, // Current number of detected tubercles
+        currentITCCount: null,      // Current number of ITC connections
+        currentReasoning: null,     // LLM's reasoning for current adjustment
+        lastPrompt: null,           // Full prompt text (with truncated base64)
+        lastPromptSize: 0,          // Size of last prompt in bytes
+        actionSummary: [],          // Array of { timestamp, elapsed, action }
+        seenLogLines: new Set(),    // Track processed log lines to avoid duplicates
         bestScore: 0,
         bestParams: null,
         bestSetName: null,
@@ -23,6 +29,16 @@ window.agentExtraction = (function() {
         providers: [],  // Available providers from API
         chart: null,    // Chart.js instance or canvas context
         startTime: null, // Timestamp when agent started
+        // Cost tracking
+        costs: {
+            provider: null,
+            model: null,
+            inputTokens: 0,
+            outputTokens: 0,
+            estimatedCost: 0,
+            lastStepCost: 0,        // Cost of last LLM call
+            previousCost: 0,        // Previous total cost (for delta calculation)
+        },
     };
 
     // Default optimization configuration
@@ -156,10 +172,19 @@ window.agentExtraction = (function() {
         state.bestParams = null;
         state.bestSetName = null;
         state.startTime = Date.now();
+        // Initialize costs with selected provider/model
+        state.costs = {
+            provider: provider,
+            model: model || providerInfo?.default_model || null,
+            inputTokens: 0,
+            outputTokens: 0,
+            estimatedCost: 0,
+        };
 
         updateUI();
         updateStatus('Starting agent...');
         updateElapsed();
+        updateCosts();
 
         try {
             const response = await fetch('/api/agent/start', {
@@ -282,16 +307,33 @@ window.agentExtraction = (function() {
         state.currentIteration = 0;
         state.currentPhase = null;
         state.currentTubercleCount = null;
+        state.currentITCCount = null;
+        state.currentReasoning = null;
+        state.lastPrompt = null;
+        state.lastPromptSize = 0;
+        state.actionSummary = [];
+        state.seenLogLines = new Set();
         state.bestScore = 0;
         state.bestParams = null;
         state.bestSetName = null;
         state.history = [];
         state.startTime = null;
+        // Reset costs
+        state.costs = {
+            provider: null,
+            model: null,
+            inputTokens: 0,
+            outputTokens: 0,
+            estimatedCost: 0,
+            lastStepCost: 0,
+            previousCost: 0,
+        };
 
         updateUI();
         updateChart();
         updateStatus('Ready');
         updateElapsed();
+        updateCosts();
     }
 
     /**
@@ -306,6 +348,90 @@ window.agentExtraction = (function() {
             return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
         return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    /**
+     * Format bytes as human readable string (KB, MB, etc.)
+     */
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    /**
+     * Copy text to clipboard and show feedback
+     * @param {string} text - Text to copy
+     * @param {HTMLElement} button - Button element for visual feedback
+     */
+    async function copyToClipboard(text, button) {
+        try {
+            await navigator.clipboard.writeText(text);
+            // Visual feedback
+            if (button) {
+                button.classList.add('copied');
+                const originalText = button.innerHTML;
+                button.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                    button.innerHTML = originalText;
+                }, 1500);
+            }
+            return true;
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            window.app?.showToast('Failed to copy to clipboard', 'error');
+            return false;
+        }
+    }
+
+    /**
+     * Add an action to the action summary
+     * @param {string} action - Description of the action
+     */
+    function addAction(action) {
+        if (!state.startTime) return;
+
+        const now = Date.now();
+        const elapsedMs = now - state.startTime;
+        const elapsedSec = (elapsedMs / 1000).toFixed(1);
+
+        state.actionSummary.push({
+            timestamp: now,
+            elapsed: elapsedSec,
+            action: action,
+        });
+
+        updateActionSummary();
+    }
+
+    /**
+     * Update the action summary display
+     */
+    function updateActionSummary() {
+        const summaryEl = document.getElementById('agentActionSummary');
+        if (!summaryEl) return;
+
+        if (state.actionSummary.length === 0) {
+            summaryEl.textContent = 'No actions yet.';
+            return;
+        }
+
+        const lines = state.actionSummary.map(a => `[${a.elapsed}s] ${a.action}`);
+        summaryEl.textContent = lines.join('\n');
+
+        // Auto-scroll to bottom
+        summaryEl.scrollTop = summaryEl.scrollHeight;
+    }
+
+    /**
+     * Clear the action summary
+     */
+    function clearActions() {
+        state.actionSummary = [];
+        updateActionSummary();
     }
 
     /**
@@ -613,6 +739,91 @@ window.agentExtraction = (function() {
     }
 
     /**
+     * Update the costs panel display
+     * @param {object} data - Status data containing usage information
+     */
+    function updateCosts(data) {
+        const modelEl = document.getElementById('agentCostModel');
+        const inputTokensEl = document.getElementById('agentCostInputTokens');
+        const outputTokensEl = document.getElementById('agentCostOutputTokens');
+        const totalTokensEl = document.getElementById('agentCostTotalTokens');
+        const estimateEl = document.getElementById('agentCostEstimate');
+
+        // Update from status data if available
+        if (data) {
+            if (data.provider) {
+                state.costs.provider = data.provider;
+            }
+            if (data.model) {
+                state.costs.model = data.model;
+            }
+            if (data.usage) {
+                state.costs.inputTokens = data.usage.input_tokens || data.usage.prompt_tokens || 0;
+                state.costs.outputTokens = data.usage.output_tokens || data.usage.completion_tokens || 0;
+                state.costs.estimatedCost = data.usage.cost_usd || data.usage.estimated_cost || 0;
+            }
+            // Also check for direct token counts
+            if (data.input_tokens !== undefined) {
+                state.costs.inputTokens = data.input_tokens;
+            }
+            if (data.output_tokens !== undefined) {
+                state.costs.outputTokens = data.output_tokens;
+            }
+            if (data.cost_usd !== undefined) {
+                state.costs.estimatedCost = data.cost_usd;
+            }
+        }
+
+        // Update model display
+        if (modelEl) {
+            if (state.costs.model) {
+                modelEl.textContent = state.costs.model;
+            } else if (state.costs.provider) {
+                modelEl.textContent = `${state.costs.provider} (default)`;
+            } else {
+                modelEl.textContent = '-';
+            }
+        }
+
+        // Update token counts
+        if (inputTokensEl) {
+            inputTokensEl.textContent = state.costs.inputTokens.toLocaleString();
+        }
+        if (outputTokensEl) {
+            outputTokensEl.textContent = state.costs.outputTokens.toLocaleString();
+        }
+        if (totalTokensEl) {
+            const total = state.costs.inputTokens + state.costs.outputTokens;
+            totalTokensEl.textContent = total.toLocaleString();
+        }
+
+        // Update cost estimate
+        if (estimateEl) {
+            if (state.costs.estimatedCost > 0) {
+                estimateEl.textContent = `$${state.costs.estimatedCost.toFixed(4)}`;
+            } else if (state.costs.inputTokens > 0 || state.costs.outputTokens > 0) {
+                // Estimate cost if not provided (rough estimates based on typical pricing)
+                const inputCost = state.costs.inputTokens * 0.000003;  // ~$3/M
+                const outputCost = state.costs.outputTokens * 0.000015; // ~$15/M
+                const estimated = inputCost + outputCost;
+                estimateEl.textContent = `~$${estimated.toFixed(4)}`;
+            } else {
+                estimateEl.textContent = '$0.0000';
+            }
+        }
+
+        // Update last step cost
+        const lastStepEl = document.getElementById('agentCostLastStep');
+        if (lastStepEl) {
+            if (state.costs.lastStepCost > 0) {
+                lastStepEl.textContent = `$${state.costs.lastStepCost.toFixed(4)}`;
+            } else {
+                lastStepEl.textContent = '$0.0000';
+            }
+        }
+    }
+
+    /**
      * Poll the agent status API for updates
      */
     async function pollStatus() {
@@ -657,6 +868,7 @@ window.agentExtraction = (function() {
             updateChart();
             updateParams({ current_params: currentParams });
             updateLLMDisplay(status);
+            updateCosts(status);
 
             // Refresh overlay when iteration changes (new extraction completed)
             if (state.currentIteration !== prevIteration && state.currentIteration > 0) {
@@ -719,6 +931,53 @@ window.agentExtraction = (function() {
                 state.currentTubercleCount = parseInt(tubMatch[1] || tubMatch[2], 10);
             }
 
+            // Parse usage/cost information
+            // Format: "Usage: 1234 input, 567 output, $0.0123 (model-name)"
+            const usageMatch = line.match(/Usage:\s*(\d+)\s*input,\s*(\d+)\s*output,\s*\$([0-9.]+)(?:\s*\(([^)]+)\))?/i);
+            if (usageMatch) {
+                const newCost = parseFloat(usageMatch[3]);
+                // Calculate last step cost as delta from previous
+                if (state.costs.estimatedCost > 0) {
+                    state.costs.lastStepCost = newCost - state.costs.previousCost;
+                }
+                state.costs.previousCost = state.costs.estimatedCost;
+                state.costs.inputTokens = parseInt(usageMatch[1], 10);
+                state.costs.outputTokens = parseInt(usageMatch[2], 10);
+                state.costs.estimatedCost = newCost;
+                if (usageMatch[4]) {
+                    state.costs.model = usageMatch[4];
+                }
+            }
+
+            // Parse ITC (edge) count
+            // Format: "edges: 42" or "42 edges" or "n_edges: 42"
+            const itcMatch = line.match(/(?:edges|n_edges)[:\s]+(\d+)|(\d+)\s+edges/i);
+            if (itcMatch) {
+                state.currentITCCount = parseInt(itcMatch[1] || itcMatch[2], 10);
+            }
+
+            // Parse prompt statistics
+            // Format: "Prompt-Stats: size=12345"
+            const promptStatsMatch = line.match(/Prompt-Stats:\s*size=(\d+)/i);
+            if (promptStatsMatch) {
+                state.lastPromptSize = parseInt(promptStatsMatch[1], 10);
+            }
+
+            // Parse full prompt (multiline, pipe-separated)
+            // Format: "LLM-Prompt: prompt text here | with pipes for newlines"
+            const promptMatch = line.match(/LLM-Prompt:\s*(.+)$/i);
+            if (promptMatch) {
+                state.lastPrompt = promptMatch[1].replace(/ \| /g, '\n');
+            }
+
+            // Parse full LLM response JSON
+            // Format: "LLM-Response: { | "text": "...", | "tool_calls": [...] | }"
+            const responseMatch = line.match(/LLM-Response:\s*(.+)$/i);
+            if (responseMatch) {
+                // Convert pipe separators back to newlines for display
+                state.currentReasoning = responseMatch[1].replace(/ \| /g, '\n');
+            }
+
             // Parse hexagonalness scores - but NOT "Target hexagonalness" which is a config value
             // Match patterns like "Hexagonalness: 0.72" or "hexagonalness 0.72" but not "Target hexagonalness: 0.7"
             if (!line.toLowerCase().includes('target')) {
@@ -746,6 +1005,41 @@ window.agentExtraction = (function() {
                     }
                 }
             }
+
+            // Track actions for action summary (avoid duplicates)
+            // Use the full log line for important events
+            if (!state.seenLogLines.has(line)) {
+                state.seenLogLines.add(line);
+
+                // Skip large data lines (prompt, response, usage) - they're not actions
+                const isDataLine = line.includes('LLM-Prompt:') ||
+                    line.includes('LLM-Response:') ||
+                    line.includes('Prompt-Stats:') ||
+                    line.includes('Usage:');
+
+                if (!isDataLine) {
+                    // Track significant events with full log line text
+                    // Strip timestamp prefix if present (format: [HH:MM:SS])
+                    const cleanLine = line.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '');
+
+                    if (line.includes('Tool:') ||
+                        line.includes('Iteration') ||
+                        line.includes('AUTO-ACCEPT') ||
+                        line.includes('MAX ITERATIONS') ||
+                        line.includes('Agent completed') ||
+                        line.includes('Optimization stopped') ||
+                        line.includes('Extraction completed') ||
+                        line.includes('Profile:') ||
+                        line.includes('hexagonalness') ||
+                        line.includes('tubercles') ||
+                        line.includes('Starting') ||
+                        line.includes('Trying profile') ||
+                        line.includes('Best score')) {
+                        // Add the full log line (without timestamp) to action summary
+                        addAction(cleanLine);
+                    }
+                }
+            }
         }
     }
 
@@ -768,26 +1062,42 @@ window.agentExtraction = (function() {
             }
         }
 
-        // Update prompt display with recent activity
+        // Update prompt display with full prompt and statistics header
         const promptEl = document.getElementById('agentLastPrompt');
         if (promptEl) {
-            if (status.last_prompt) {
-                promptEl.textContent = status.last_prompt;
+            // Build statistics header
+            const statsLines = [
+                `--- Prompt Statistics ---`,
+                `Iteration: ${state.currentIteration}/${state.maxIterations}`,
+                `Hexagonalness: ${state.bestScore.toFixed(3)}`,
+                `Tubercles: ${state.currentTubercleCount || '-'}`,
+                `ITC: ${state.currentITCCount || '-'}`,
+                `Prompt Size: ${state.lastPromptSize > 0 ? formatBytes(state.lastPromptSize) : '-'}`,
+                `-------------------------`,
+                ``
+            ].join('\n');
+
+            if (state.lastPrompt) {
+                // Show statistics header followed by full prompt
+                promptEl.textContent = statsLines + state.lastPrompt;
+            } else if (status.last_prompt) {
+                promptEl.textContent = statsLines + status.last_prompt;
             } else {
-                // Show current iteration context as "prompt"
-                promptEl.textContent = `Iteration ${state.currentIteration}/${state.maxIterations}\n` +
-                    `Current hexagonalness: ${state.bestScore.toFixed(3)}\n` +
-                    `Tubercles: ${state.currentTubercleCount || '-'}`;
+                // Show just statistics if no prompt yet
+                promptEl.textContent = statsLines + '(Waiting for first LLM call...)';
             }
         }
 
-        // Update response display with tool calls
+        // Update response display with LLM reasoning
         const responseEl = document.getElementById('agentLastResponse');
         if (responseEl) {
-            if (status.last_response) {
+            if (state.currentReasoning) {
+                // Show the LLM's reasoning for its parameter adjustments
+                responseEl.textContent = state.currentReasoning;
+            } else if (status.last_response) {
                 responseEl.textContent = status.last_response;
             } else if (toolCalls.length > 0 || otherLogs.length > 0) {
-                // Show recent tool calls as "response"
+                // Show recent tool calls as fallback
                 const recentCalls = toolCalls.slice(-5).join('\n');
                 const recentLogs = otherLogs.slice(-3).join('\n');
                 responseEl.textContent = (recentCalls + '\n' + recentLogs).trim() || 'Waiting for agent actions...';
@@ -951,6 +1261,48 @@ window.agentExtraction = (function() {
         // Initialize collapsible sections
         initCollapsibles();
 
+        // Bind copy button handlers
+        const copyPromptBtn = document.getElementById('copyPromptBtn');
+        if (copyPromptBtn) {
+            copyPromptBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const promptEl = document.getElementById('agentLastPrompt');
+                if (promptEl) {
+                    copyToClipboard(promptEl.textContent, copyPromptBtn);
+                }
+            });
+        }
+
+        const copyResponseBtn = document.getElementById('copyResponseBtn');
+        if (copyResponseBtn) {
+            copyResponseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const responseEl = document.getElementById('agentLastResponse');
+                if (responseEl) {
+                    copyToClipboard(responseEl.textContent, copyResponseBtn);
+                }
+            });
+        }
+
+        const copyActionsBtn = document.getElementById('copyActionsBtn');
+        if (copyActionsBtn) {
+            copyActionsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const actionsEl = document.getElementById('agentActionSummary');
+                if (actionsEl) {
+                    copyToClipboard(actionsEl.textContent, copyActionsBtn);
+                }
+            });
+        }
+
+        const clearActionsBtn = document.getElementById('clearActionsBtn');
+        if (clearActionsBtn) {
+            clearActionsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                clearActions();
+            });
+        }
+
         // Initialize UI state
         updateUI();
         updateStatus('Ready');
@@ -963,7 +1315,11 @@ window.agentExtraction = (function() {
     function initCollapsibles() {
         const collapsibles = document.querySelectorAll('.agent-collapsible-header');
         collapsibles.forEach(header => {
-            header.addEventListener('click', () => {
+            header.addEventListener('click', (e) => {
+                // Don't toggle if clicking on a button
+                if (e.target.closest('button')) {
+                    return;
+                }
                 const parent = header.closest('.agent-collapsible');
                 if (parent) {
                     parent.classList.toggle('collapsed');
@@ -984,6 +1340,7 @@ window.agentExtraction = (function() {
         updateStatus,
         updateChart,
         updateParams,
+        updateCosts,
         pollStatus,
         getState,
         loadProviders,

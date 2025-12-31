@@ -27,6 +27,7 @@ output/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/log/
 
 # Logs
 *.log

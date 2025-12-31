@@ -693,10 +693,38 @@ def load_image():
         return jsonify({'error': f'File not found: {image_path}'}), 404
 
     try:
-        # Copy to uploads folder
+        # Check if this image is already loaded (by original filename)
+        # Skip re-copying if same image is already in memory
+        already_loaded = (
+            _current_image.get('filename') == image_path.name and
+            _current_image.get('web_path') and
+            Path(_current_image['web_path']).exists()
+        )
+
+        if already_loaded:
+            # Image already loaded, just return current state
+            web_path = Path(_current_image['web_path'])
+            with Image.open(web_path) as img:
+                width, height = img.size
+
+            log_event('mcp_image_already_loaded', {
+                'filename': image_path.name,
+                'width': width,
+                'height': height,
+            })
+
+            return jsonify({
+                'success': True,
+                'filename': _current_image['filename'],
+                'width': width,
+                'height': height,
+                'already_loaded': True,
+            })
+
+        # Copy to uploads folder (new image)
         ext = image_path.suffix.lower().lstrip('.')
         unique_id = uuid.uuid4().hex
-        unique_name = f"{unique_id}.{ext}"
+        unique_name = f"{unique_id}_{image_path.name}"  # Preserve original name
         save_path = current_app.config['UPLOAD_FOLDER'] / unique_name
         shutil.copy2(image_path, save_path)
 
@@ -1029,3 +1057,73 @@ def _calculate_hexagonalness_from_dicts(
     result['hexagonalness_score'] = float(score)
 
     return result
+
+
+@mcp_bp.route('/user', methods=['GET'])
+def get_user():
+    """Get the current user name for history tracking.
+
+    Returns:
+        {
+            "user": "Mike Wise",
+            "source": "config"  # or "environment" or "default"
+        }
+    """
+    from fish_scale_ui.services.user import get_current_user, get_user_source
+
+    return jsonify({
+        'user': get_current_user(),
+        'source': get_user_source(),
+    })
+
+
+@mcp_bp.route('/history', methods=['POST'])
+def add_history_event():
+    """Add a history event to the current set.
+
+    This endpoint is used by the LLM agent to record agent_phase events.
+
+    Request body:
+        {
+            "type": "agent_phase",
+            "phase": 1,
+            "summary": "Initial extraction with conservative params",
+            "n_tubercles": 45,
+            "n_edges": 120,
+            ...additional event-specific data
+        }
+
+    Returns:
+        {"success": true}
+    """
+    _current_image, _extraction_data = get_state_refs()
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    event_type = data.get('type', 'agent_phase')
+
+    # Get current user for the event
+    from fish_scale_ui.services.user import get_current_user
+    user = get_current_user()
+
+    # Build the event
+    from datetime import datetime
+    event = {
+        'timestamp': datetime.now().isoformat(),
+        'type': event_type,
+        'user': user,
+    }
+
+    # Add all other fields from the request
+    for key, value in data.items():
+        if key != 'type':
+            event[key] = value
+
+    # Add to extraction data history (will be saved when user saves SLO)
+    if 'history' not in _extraction_data:
+        _extraction_data['history'] = []
+    _extraction_data['history'].append(event)
+
+    return jsonify({'success': True})

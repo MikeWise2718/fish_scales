@@ -418,6 +418,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('added_tubercles');
         logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1) });
 
         // Stay in add mode for multiple additions
@@ -511,6 +512,11 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('added_tubercles');
+        // Track connection if one was created
+        if (chainParents[newTub.id] !== null) {
+            window.sets?.trackEdit('added_connections');
+        }
         updateChainNeighbors();
         updateModeUI();
         logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1), chain: true });
@@ -742,6 +748,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('added_connections');
         logEdit('add_itc', { id1: tub1.id, id2: tub2.id });
 
         window.app?.showToast(`Added connection ${tub1.id}-${tub2.id}`, 'success');
@@ -788,6 +795,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('moved_tubercles');
         logEdit('move_tub', { id, from: `(${oldX.toFixed(1)}, ${oldY.toFixed(1)})`, to: `(${newX.toFixed(1)}, ${newY.toFixed(1)})` });
     }
 
@@ -823,6 +831,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('moved_tubercles');
     }
 
     /**
@@ -857,6 +866,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('resized_tubercles');
     }
 
     /**
@@ -891,6 +901,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('resized_tubercles');
     }
 
     /**
@@ -949,6 +960,11 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('deleted_tubercles');
+        // Also count deleted connections
+        if (connectedEdgesCopy.length > 0) {
+            window.sets?.trackEdit('deleted_connections', connectedEdgesCopy.length);
+        }
         logEdit('delete_tub', { id });
 
         window.app?.showToast(`Deleted tubercle #${id}`, 'success');
@@ -984,6 +1000,7 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        window.sets?.trackEdit('deleted_connections');
         logEdit('delete_itc', { id1: edge.id1, id2: edge.id2 });
 
         window.app?.showToast(`Deleted connection ${edge.id1}-${edge.id2}`, 'success');
@@ -1628,6 +1645,13 @@ window.editor = (function() {
         // Update displays
         refreshDisplays();
         markDirty();
+        // Track edits
+        if (deletedTubs.length > 0) {
+            window.sets?.trackEdit('deleted_tubercles', deletedTubs.length);
+        }
+        if (deletedEdges.length > 0) {
+            window.sets?.trackEdit('deleted_connections', deletedEdges.length);
+        }
         logEdit('delete_multi', {
             tubCount: deletedTubs.length,
             edgeCount: deletedEdges.length

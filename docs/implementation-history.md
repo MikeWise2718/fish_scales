@@ -1,7 +1,8 @@
 # History of Implementation: Fish Scale Tubercle Analysis
 
-**Date:** 11 December 2025
-**Status:** Working implementation that passes acceptance criteria for Paralepidosteus reference image
+**Initial Date:** 11 December 2025
+**Last Updated:** 31 December 2025
+**Status:** Full-featured application with CLI, Web UI, MCP Server, and LLM Agent
 
 ---
 
@@ -279,13 +280,258 @@ fish-scale-measure process \
 
 ---
 
-## Future Work
+## Development: December 11-31, 2025
 
-1. **Validate on other test images** - Apply methodology to Lepisosteus, Polypterus, Atractosteus samples
-2. **Update genus reference ranges** - Current Paralepidosteus range in models.py is too narrow
-3. **Batch processing** - Process multiple images and generate comparison scatter plots
-4. **ROI selection** - Allow user to select region of interest for dense tubercle areas
-5. **Confidence metrics** - Report detection confidence based on circularity, contrast, etc.
+This section documents the major features added after the initial CLI implementation.
+
+### Web UI (fish-scale-ui)
+
+A complete Flask-based web interface was implemented in three phases:
+
+**Phase 1: Core Infrastructure**
+- Flask app with Jinja2 templates
+- Image loading, zoom, pan, rotation, crop
+- Calibration tools (automatic estimate, manual input, graphical scale bar)
+- Recent images sidebar
+
+**Phase 2: Extraction & Data**
+- Integration with CLI extraction pipeline
+- Parameter configuration UI with profile presets
+- TUB/ITC data tables with click-to-select sync
+- Statistics display (mean, std, counts)
+- CSV export functionality
+
+**Phase 3: Manual Editing**
+- Add/delete/move/resize tubercles
+- Add/delete connections
+- Auto-connect (Delaunay/Gabriel/RNG)
+- Undo/redo system
+- SLO file save/load
+
+**Post-Implementation Tweaks:**
+- Always-visible statistics bar
+- Combined Extraction/Configure tabs
+- Ellipse display option
+- Edge culling controls
+- Chain Mode for DAG-based editing with arrow key navigation
+- Parameter persistence across sessions
+- Slider precision improvements (3 decimal places)
+
+### Multiple Annotation Sets (SLO v2)
+
+Extended the SLO file format to support multiple annotation sets per image:
+- Each set contains its own tubercles and edges
+- Users can compare different extraction parameters or editing states
+- Active set selection with set management UI
+- Backward compatibility with v1 format
+
+See `docs/slo-persistence.md` for format details.
+
+### MCP Server (fish-scale-mcp)
+
+Model Context Protocol server enabling LLM agents to control the UI programmatically:
+
+| Tool Category | Tools |
+|--------------|-------|
+| State | `get_state`, `get_screenshot` |
+| Image | `load_image`, `set_calibration` |
+| Params | `get_params`, `set_params` |
+| Detection | `run_extraction` |
+| Tubercles | `add_tubercle`, `move_tubercle`, `delete_tubercle` |
+| Connections | `add_connection`, `delete_connection`, `clear_connections`, `auto_connect` |
+| Output | `get_statistics`, `save_slo` |
+
+Server-side screenshot rendering using PIL for consistent visual feedback.
+
+### LLM Agent (fish-scale-agent)
+
+Automated tubercle detection using vision-capable LLMs:
+
+**Three-Phase Detection Process:**
+1. **High-Confidence Detection** - Run extraction with conservative parameters
+2. **Pattern Completion** - LLM analyzes screenshots to identify gaps in hexagonal pattern
+3. **Connection Generation** - Generate neighbor connections using Gabriel graph
+
+**Supported Providers:**
+| Provider | Default Model | Env Var |
+|----------|---------------|---------|
+| Claude | claude-sonnet-4-20250514 | `ANTHROPIC_API_KEY` |
+| Gemini | gemini-2.0-flash | `GEMINI_API_KEY` |
+| OpenRouter | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` |
+
+OpenRouter provides access to many models (GPT-4o, Gemini, Llama, Mistral, etc.) through a single API.
+
+See `docs/openrouter-how-to.md` for detailed setup guide.
+
+### Hexagonalness Metrics
+
+New metric measuring how well detected patterns match ideal hexagonal lattice:
+
+```
+Hexagonalness = 0.40 × Spacing Uniformity + 0.45 × Degree Score + 0.15 × Edge Ratio Score
+```
+
+**Components:**
+- **Spacing Uniformity** (40%): Based on coefficient of variation of edge lengths
+- **Degree Score** (45%): Weighted score based on neighbor counts (ideal: 6)
+- **Edge Ratio Score** (15%): Ratio of edges to nodes (ideal: ~2.5)
+
+**Boundary Detection:** Delaunay triangulation identifies boundary nodes (excluded from degree calculations) to avoid penalizing edge tubercles.
+
+**Configurable Coefficients:** Weights can be adjusted via UI or API.
+
+Implementations synchronized across:
+- Python core: `measurement.py`
+- Python MCP API: `mcp_api.py`
+- JavaScript: `extraction.js`, `setUI.js`, `editor.js`
+
+### Files Added
+
+```
+src/
+├── fish_scale_ui/           # Complete Flask web UI
+│   ├── app.py, run.py
+│   ├── routes/              # main.py, api.py, mcp_api.py
+│   ├── services/            # extraction.py, persistence.py, logging.py
+│   ├── templates/           # Jinja2 templates
+│   └── static/              # CSS, JavaScript modules
+│
+├── fish_scale_mcp/          # MCP server
+│   ├── server.py            # FastMCP with tool definitions
+│   ├── screenshot.py        # PIL-based rendering
+│   └── cli.py
+│
+└── fish_scale_agent/        # LLM agent
+    ├── runner.py            # Agent orchestration
+    ├── prompts.py           # System prompts
+    └── providers/           # claude.py, gemini.py, openrouter.py
+
+docs/
+├── slo-persistence.md       # SLO format documentation
+└── openrouter-how-to.md     # OpenRouter setup guide
+```
+
+### Extraction Parameter Optimization Agent (31 December 2025)
+
+A new LLM-powered agent for automated parameter optimization, complementing the existing pattern completion agent:
+
+**Purpose:** Find optimal extraction parameters by iteratively adjusting settings and evaluating results, eliminating manual trial-and-error parameter tuning.
+
+**Key Differentiator from Existing Agent:**
+| Aspect | Pattern Completion Agent | Extraction Optimizer |
+|--------|-------------------------|---------------------|
+| Goal | Add missing tubercles | Find optimal parameters |
+| Output | Full annotation set | Optimal parameter values |
+| Method | Manual tubercle addition | Parameter adjustment |
+| Iterations | 10-30 (adding tubercles) | 5-10 (tuning params) |
+
+**Two-Phase Optimization Strategy:**
+1. **Profile Selection** - Try candidate profiles, select best as starting point
+2. **Parameter Fine-Tuning** - LLM analyzes visuals + metrics, proposes targeted adjustments
+
+**Implementation (8 Phases):**
+
+1. **Logging Infrastructure** - Added hexagonalness to all log events (extraction, auto_connect, manual_edit) with color-coded display in Log tab
+
+2. **Agent Tab Infrastructure** - New `FISH_SCALE_AGENT_TABS` env var controls visibility of Agent Extraction/Editing tabs; context processor injects config to templates
+
+3. **Core Agent Module** - `extraction_optimizer.py` with:
+   - `ExtractionOptimizer` class for orchestration
+   - `OptimizationState` and `TrialRecord` dataclasses
+   - `OPTIMIZATION_TOOLS` definitions (8 tools)
+   - `is_duplicate()` helper to avoid parameter loops
+
+4. **Agent Loop Implementation** - Full `optimize()` method with:
+   - Tool execution via HTTP API calls
+   - Stopping conditions (target achieved, plateau, max iterations)
+   - Best result tracking across iterations
+   - Flask endpoints: `/api/agent/start`, `/status`, `/stop`, `/providers`
+
+5. **Prompt Engineering** - Comprehensive prompts with:
+   - Parameter effects table (threshold, diameter, circularity, CLAHE, blur)
+   - Two-phase strategy instructions
+   - Diagnostic guide for common scenarios
+   - Few-shot examples showing good reasoning
+   - `build_iteration_prompt()` for context-aware iteration guidance
+
+6. **CLI Integration** - New `optimize` subcommand:
+   ```bash
+   uv run fish-scale-agent optimize image.tif --calibration 0.1 \
+       --provider claude --target-score 0.7 --max-iterations 10
+   ```
+
+7. **UI Tab Implementation** - Complete Agent Extraction tab with:
+   - Configuration panel (provider, model, profile, target, iterations)
+   - Status panel (state, phase, iteration, best score, elapsed time)
+   - Parameters display with change highlighting
+   - Hexagonalness progress chart (Chart.js)
+   - Collapsible LLM prompt/response containers
+   - Start/Stop/Accept Best/Reset controls
+
+8. **Testing & Validation** - All syntax checks passed, 142/143 tests pass
+
+**Enabling Agent Tabs:**
+```bash
+export FISH_SCALE_AGENT_TABS=1        # All agent tabs
+export FISH_SCALE_AGENT_TABS=extraction  # Just extraction tab
+uv run fish-scale-ui
+```
+
+**Files Added/Modified:**
+```
+src/fish_scale_agent/
+├── extraction_optimizer.py    # NEW: Core optimizer module
+└── cli.py                     # Modified: Added optimize subcommand
+
+src/fish_scale_ui/
+├── app.py                     # Modified: Agent tabs config, blueprint
+├── routes/agent_api.py        # NEW: Agent control endpoints
+├── templates/workspace.html   # Modified: Agent tabs HTML
+└── static/
+    ├── js/agent_extraction.js # NEW: Agent tab JavaScript
+    ├── js/extraction.js       # Modified: Hexagonalness logging
+    ├── js/sets.js             # Modified: Hexagonalness in edits
+    ├── js/main.js             # Modified: Log display formatting
+    └── css/main.css           # Modified: Agent tab styles
+
+src/fish_scale_mcp/server.py   # Modified: StatisticsData model
+```
+
+**Workflow Integration:**
+```
+1. Load image, set calibration
+2. [NEW] Run Extraction Optimizer → get optimal params
+3. Run extraction with optimal params
+4. [EXISTING] Run Pattern Completion Agent → add missed tubercles
+5. Generate connections
+6. Save results
+```
+
+**Bug Fixes & Refinements (31 December 2025):**
+
+- **API Endpoint Rename**: Changed `/api/mcp/*` → `/api/tools/*` for clarity (these are REST endpoints, not MCP protocol)
+- **Agent Start Fix**: Fixed image path and calibration not being passed to subprocess; now fetches from `_current_image` state
+- **Polling Fix**: Agent subprocess now uses `PYTHONUNBUFFERED=1` and `flush=True` for immediate output capture
+- **Overlay Refresh**: UI now refreshes tubercle/ITC overlay on each iteration (was only refreshing on completion)
+- **Parameters Display**: Polling now fetches current params from `/api/tools/params` to show live parameter values
+- **LLM Display**: Shows tool calls extracted from log lines in the "Last LLM Response" section
+- **Score Parsing Fix**: Hexagonalness regex now excludes "Target hexagonalness" config lines to avoid showing target as actual score
+- **Tubercle Count Regex**: Fixed to match both "42 tubercles" and "Tubercles: 42" formats
+- **Image Copy Prevention**: `/api/tools/load-image` now skips copying if same image already loaded (prevents GUID file accumulation)
+- **Circularity Guidance**: Enhanced prompts to emphasize min_circularity as key parameter; recommend trying 0.2-0.3 for missing tubercles
+
+### Future Work (Updated)
+
+**Completed from original list:**
+- ~~ROI selection~~ → Crop tool in Image tab
+- ~~Confidence metrics~~ → Circularity scores displayed per tubercle
+- ~~Agent improvements~~ → Extraction Parameter Optimization Agent
+
+**Remaining:**
+1. **Validate on other test images** - Systematic validation across species
+2. **Update genus reference ranges** - Expand models.py with more species
+3. **Batch processing with comparison** - Generate multi-image scatter plots
+4. **Agent editing tab** - Automated pattern completion and outlier detection
 
 ---
 

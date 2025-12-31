@@ -80,6 +80,16 @@ window.extraction = (function() {
                 window.editor.setData(updatedTubercles, result.edges);
             }
 
+            // Record history event for auto_connect
+            window.sets?.addHistoryEvent('auto_connect', {
+                graph_type: graphType,
+                n_tubercles: updatedTubercles.length,
+                n_edges: result.edges.length,
+                hexagonalness: stats.hexagonalness_score,
+                cull_long_edges: cullLongEdges,
+                cull_factor: cullFactor,
+            });
+
             // Mark set as dirty
             window.sets.markDirty();
             updateDirtyIndicator();
@@ -167,9 +177,29 @@ window.extraction = (function() {
                 window.configure.markExtracted(result.parameters);
             }
 
+            // Record history event for extraction
+            window.sets?.addHistoryEvent('extraction', {
+                method: params.method || 'log',
+                n_tubercles: result.statistics.n_tubercles,
+                n_edges: result.statistics.n_edges,
+                parameters: { ...params },
+            });
+
             // Mark set as dirty
             window.sets.markDirty();
             updateDirtyIndicator();
+
+            // Log extraction event
+            window.app.logEvent('extraction', {
+                params: params,
+                result: {
+                    n_tubercles: result.statistics.n_tubercles,
+                    n_edges: result.statistics.n_edges,
+                    hexagonalness: result.statistics.hexagonalness_score,
+                    mean_diameter_um: result.statistics.mean_diameter_um,
+                    mean_space_um: result.statistics.mean_space_um,
+                }
+            });
 
             // Dispatch event for editor
             document.dispatchEvent(new CustomEvent('extractionComplete', {
@@ -603,5 +633,6 @@ window.extraction = (function() {
         checkDirty,
         markDirty,
         confirmUnsavedChanges,
+        calculateHexagonalness,
     };
 })();

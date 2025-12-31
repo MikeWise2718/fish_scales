@@ -397,6 +397,38 @@ body {
     color: var(--text-muted);
 }
 
+/* Log Hexagonalness Display */
+.log-hex {
+    font-weight: 600;
+}
+
+.log-hex-score {
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    font-weight: 700;
+}
+
+.log-hex-score.score-good {
+    color: #16a34a;
+    background-color: #dcfce7;
+}
+
+.log-hex-score.score-medium {
+    color: #ca8a04;
+    background-color: #fef9c3;
+}
+
+.log-hex-score.score-poor {
+    color: #dc2626;
+    background-color: #fee2e2;
+}
+
+.log-hex-reliability {
+    font-size: 0.7rem;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
 /* About Table */
 .about-content h3 {
     margin-bottom: 0.5rem;
@@ -1031,6 +1063,152 @@ body {
     padding: 1rem;
 }
 
+/* Dataset History Section */
+.history-section {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin: -0.5rem;
+    border-radius: 0.25rem;
+}
+
+.history-header:hover {
+    background-color: var(--bg-color);
+}
+
+.history-header h3 {
+    margin: 0;
+}
+
+.history-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.history-section.collapsed .history-toggle {
+    transform: rotate(-90deg);
+}
+
+.history-content {
+    margin-top: 0.75rem;
+}
+
+.history-section.collapsed .history-content {
+    display: none;
+}
+
+.history-empty {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+}
+
+.history-timeline {
+    border-left: 2px solid var(--border-color);
+    margin-left: 8px;
+    padding-left: 16px;
+}
+
+.history-event {
+    position: relative;
+    padding: 0.5rem 0;
+    font-size: 0.85rem;
+}
+
+.history-event::before {
+    content: '';
+    position: absolute;
+    left: -21px;
+    top: 0.75rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--border-color);
+    border: 2px solid var(--panel-bg);
+}
+
+.history-event[data-type="extraction"]::before {
+    background-color: var(--primary-color);
+}
+
+.history-event[data-type="auto_connect"]::before {
+    background-color: var(--success-color);
+}
+
+.history-event[data-type="manual_edit"]::before {
+    background-color: var(--warning-color);
+}
+
+.history-event[data-type="agent_phase"]::before {
+    background-color: #8b5cf6;
+}
+
+.history-event[data-type="clone"]::before {
+    background-color: #06b6d4;
+}
+
+.history-event[data-type="import"]::before {
+    background-color: #6b7280;
+}
+
+.history-event-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.history-event-type {
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.history-event-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.history-event-user {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.history-event-user::before {
+    content: 'by ';
+}
+
+.history-event-details {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.history-event-restore {
+    display: inline-block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--primary-color);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.history-event-restore:hover {
+    text-decoration: underline;
+}
+
 /* Save SLO button with changes indicator */
 #saveSloBtn.has-changes {
     background-color: var(--warning-color);
@@ -1143,6 +1321,44 @@ body {
     border-radius: 0.25rem;
     font-size: 0.8rem;
     font-family: monospace;
+}
+
+/* User Input */
+.user-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.user-name-input {
+    flex: 1;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.user-name-input:disabled {
+    background-color: var(--bg-color);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+.user-source-hint {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.user-source-hint.locked {
+    color: var(--warning-color);
+}
+
+.user-source-hint.default {
+    color: var(--text-muted);
 }
 
 /* Range with value display */
@@ -2226,4 +2442,424 @@ body {
 
 .btn-delete-profile .icon-delete {
     font-weight: bold;
+}
+
+/* ========================================
+   Agent Extraction Tab Styles
+   ======================================== */
+
+/* Agent Tab Sections */
+.agent-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.agent-section:last-child {
+    border-bottom: none;
+}
+
+.agent-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+}
+
+/* Agent Configuration Form */
+.agent-config-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.agent-config-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.agent-config-row label {
+    flex: 0 0 120px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.agent-config-row select,
+.agent-config-row input[type="number"] {
+    flex: 1;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    background: white;
+}
+
+.agent-config-row input[type="number"] {
+    max-width: 80px;
+}
+
+/* Agent Control Buttons */
+.agent-controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+}
+
+.agent-controls .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+#stopAgentBtn {
+    background-color: var(--error-color);
+    color: white;
+}
+
+#stopAgentBtn:hover:not(:disabled) {
+    background-color: #dc2626;
+}
+
+#acceptBestBtn {
+    background-color: var(--success-color);
+    color: white;
+}
+
+#acceptBestBtn:hover:not(:disabled) {
+    background-color: #16a34a;
+}
+
+/* Agent Status Section */
+.agent-status-section {
+    background-color: var(--bg-color);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+}
+
+.agent-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.agent-status-row:last-child {
+    margin-bottom: 0;
+}
+
+.agent-status-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    min-width: 80px;
+}
+
+.agent-status-value {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.agent-status-value.status-idle {
+    color: var(--text-muted);
+}
+
+.agent-status-value.status-running {
+    color: var(--primary-color);
+}
+
+.agent-status-value.status-completed {
+    color: var(--success-color);
+}
+
+.agent-status-value.status-error {
+    color: var(--error-color);
+}
+
+.agent-status-value.status-stopped {
+    color: var(--warning-color);
+}
+
+/* Agent Progress Bar */
+.agent-progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.agent-progress-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* Agent Parameters Display */
+.agent-params-display {
+    background-color: var(--bg-color);
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+    font-size: 0.8rem;
+}
+
+.agent-params-display .param-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.agent-params-display .param-item:last-child {
+    margin-bottom: 0;
+}
+
+.agent-params-display .param-name {
+    color: var(--text-muted);
+}
+
+.agent-params-display .param-value {
+    font-weight: 500;
+}
+
+/* Agent Progress Chart Container */
+.agent-chart-container {
+    width: 100%;
+    height: 200px;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+}
+
+/* Agent Collapsible Prompt/Response Containers */
+.agent-collapsible {
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+}
+
+.agent-collapsible:last-child {
+    margin-bottom: 0;
+}
+
+.agent-collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0.75rem;
+    background-color: var(--bg-color);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
+}
+
+.agent-collapsible-header:hover {
+    background-color: #e2e8f0;
+}
+
+.agent-collapsible-header h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.agent-collapsible-toggle {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.agent-collapsible.collapsed .agent-collapsible-toggle {
+    transform: rotate(-90deg);
+}
+
+.agent-collapsible-content {
+    padding: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    max-height: 300px;
+    overflow: auto;
+}
+
+.agent-collapsible.collapsed .agent-collapsible-content {
+    display: none;
+}
+
+.agent-collapsible-content pre {
+    margin: 0;
+    padding: 0.5rem;
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-x: auto;
+}
+
+/* Agent Iteration Log */
+.agent-iteration-log {
+    max-height: 250px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+}
+
+.agent-iteration-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.agent-iteration-item:last-child {
+    border-bottom: none;
+}
+
+.agent-iteration-num {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.agent-iteration-details {
+    flex: 1;
+}
+
+.agent-iteration-action {
+    font-weight: 500;
+    margin-bottom: 0.125rem;
+}
+
+.agent-iteration-result {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* Agent Best Result Highlight */
+.agent-best-result {
+    background-color: rgba(34, 197, 94, 0.1);
+    border: 1px solid var(--success-color);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.agent-best-result h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--success-color);
+    margin-bottom: 0.5rem;
+}
+
+.agent-best-stats {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.85rem;
+}
+
+.agent-best-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.agent-best-stat-label {
+    color: var(--text-muted);
+}
+
+.agent-best-stat-value {
+    font-weight: 600;
+}
+
+/* Agent Progress Chart */
+.agent-progress-chart {
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    min-height: 150px;
+}
+
+.agent-progress-chart canvas {
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.agent-progress-chart .chart-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.agent-progress-chart .chart-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.agent-progress-chart .chart-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.agent-progress-chart .chart-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Agent Parameter Rows */
+.agent-param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.agent-param-row:last-child {
+    border-bottom: none;
+}
+
+.agent-param-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.agent-param-value {
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+/* Agent Status Panel */
+.agent-status-panel {
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
 }

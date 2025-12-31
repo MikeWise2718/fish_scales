@@ -333,8 +333,178 @@ window.data = (function() {
         if (edgeRatioEl) edgeRatioEl.textContent = `(${Math.round(edgeRatioWeight * 100)}%)`;
     }
 
+    // ===== History Rendering =====
+
+    let historyCollapsed = false;
+
+    /**
+     * Render the history timeline for the current set
+     */
+    function renderHistory() {
+        const timeline = document.getElementById('historyTimeline');
+        const empty = document.getElementById('historyEmpty');
+        if (!timeline || !empty) return;
+
+        const history = window.sets?.getHistory() || [];
+
+        if (history.length === 0) {
+            empty.style.display = 'block';
+            timeline.style.display = 'none';
+            timeline.innerHTML = '';
+            return;
+        }
+
+        empty.style.display = 'none';
+        timeline.style.display = 'block';
+
+        // Render events in reverse chronological order
+        timeline.innerHTML = history.slice().reverse().map(event => renderHistoryEvent(event)).join('');
+
+        // Bind restore buttons
+        timeline.querySelectorAll('.history-event-restore').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const params = JSON.parse(btn.dataset.params);
+                restoreParameters(params);
+            });
+        });
+    }
+
+    /**
+     * Render a single history event
+     */
+    function renderHistoryEvent(event) {
+        const time = formatEventTime(event.timestamp);
+        const typeLabel = formatEventType(event.type);
+        const details = formatEventDetails(event);
+
+        // Check if this event has restorable parameters
+        const hasParams = event.type === 'extraction' && event.parameters;
+        const restoreBtn = hasParams
+            ? `<a href="#" class="history-event-restore" data-params='${JSON.stringify(event.parameters)}'>Restore params</a>`
+            : '';
+
+        return `
+            <div class="history-event" data-type="${event.type}">
+                <div class="history-event-header">
+                    <span class="history-event-type">${typeLabel}</span>
+                    <span class="history-event-time">${time}</span>
+                    <span class="history-event-user">${event.user || 'Unknown'}</span>
+                </div>
+                ${details ? `<div class="history-event-details">${details}</div>` : ''}
+                ${restoreBtn}
+            </div>
+        `;
+    }
+
+    /**
+     * Format event timestamp for display
+     */
+    function formatEventTime(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        return date.toLocaleDateString();
+    }
+
+    /**
+     * Format event type for display
+     */
+    function formatEventType(type) {
+        const labels = {
+            extraction: 'Extraction',
+            auto_connect: 'Auto Connect',
+            manual_edit: 'Manual Edit',
+            agent_phase: 'Agent',
+            clone: 'Cloned',
+            import: 'Import',
+        };
+        return labels[type] || type;
+    }
+
+    /**
+     * Format event details for display
+     */
+    function formatEventDetails(event) {
+        switch (event.type) {
+            case 'extraction':
+                return `${event.n_tubercles} tubercles, ${event.n_edges} connections (${event.method || 'auto'})`;
+            case 'auto_connect':
+                return `${event.n_edges} connections (${event.graph_type || 'auto'})`;
+            case 'manual_edit':
+                return event.summary || '';
+            case 'agent_phase':
+                return `Phase ${event.phase}: ${event.summary || ''}`;
+            case 'clone':
+                return `from "${event.source_set_name}"`;
+            case 'import':
+                return event.source || '';
+            default:
+                return '';
+        }
+    }
+
+    /**
+     * Restore extraction parameters from a history event
+     */
+    function restoreParameters(params) {
+        if (!window.configure) {
+            window.app?.showToast('Configure module not loaded', 'error');
+            return;
+        }
+
+        window.configure.setParams(params);
+        window.app?.showToast('Parameters restored', 'success');
+
+        // Switch to Configure tab
+        const configBtn = document.querySelector('[data-tab="configure"]');
+        if (configBtn) configBtn.click();
+    }
+
+    /**
+     * Toggle history section collapsed state
+     */
+    function toggleHistory() {
+        const section = document.querySelector('.history-section');
+        if (!section) return;
+
+        historyCollapsed = !historyCollapsed;
+        section.classList.toggle('collapsed', historyCollapsed);
+    }
+
+    /**
+     * Initialize history UI
+     */
+    function initHistory() {
+        const header = document.getElementById('historyHeader');
+        if (header) {
+            header.addEventListener('click', toggleHistory);
+        }
+
+        // Listen for set changes and history updates
+        document.addEventListener('setChanged', renderHistory);
+        document.addEventListener('setsLoaded', renderHistory);
+        document.addEventListener('historyChanged', renderHistory);
+
+        // Initial render
+        renderHistory();
+    }
+
     // Initialize on DOM ready
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        init();
+        initHistory();
+    });
 
     return {
         setData,
@@ -346,5 +516,6 @@ window.data = (function() {
         highlightEdgeRow,
         clearHighlights,
         getStatistics,
+        renderHistory,
     };
 })();

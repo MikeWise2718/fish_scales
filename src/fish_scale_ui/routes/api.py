@@ -1059,6 +1059,47 @@ def recalculate_boundaries():
         return jsonify({'error': f'Boundary calculation failed: {str(e)}'}), 500
 
 
+@api_bp.route('/user', methods=['GET', 'POST'])
+def user_endpoint():
+    """Get or set the current user.
+
+    GET: Returns current user name and source
+    POST: Sets user name (if not locked by env var)
+    """
+    from fish_scale_ui.services.user import (
+        get_current_user,
+        set_user,
+        get_user_source,
+        is_user_overridable
+    )
+
+    if request.method == 'GET':
+        return jsonify({
+            'user': get_current_user(),
+            'source': get_user_source(),
+            'overridable': is_user_overridable(),
+        })
+
+    # POST - set user
+    data = request.get_json() or {}
+    new_user = data.get('user', '').strip()
+
+    if not new_user:
+        return jsonify({'error': 'User name cannot be empty'}), 400
+
+    if not is_user_overridable():
+        return jsonify({
+            'error': 'User is set by FISH_SCALE_USER environment variable and cannot be changed'
+        }), 403
+
+    set_user(new_user)
+    return jsonify({
+        'success': True,
+        'user': get_current_user(),
+        'source': get_user_source(),
+    })
+
+
 @api_bp.route('/hexagonalness', methods=['GET'])
 def calculate_hexagonalness():
     """Calculate hexagonalness with custom weights.

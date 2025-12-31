@@ -157,6 +157,12 @@
             <button class="tab-header" data-tab="log">Log</button>
             <button class="tab-header" data-tab="settings">Settings</button>
             <button class="tab-header" data-tab="about">About</button>
+            {% if agent_tabs.extraction %}
+            <button class="tab-header" data-tab="agent-extraction">Agent Extraction</button>
+            {% endif %}
+            {% if agent_tabs.editing %}
+            <button class="tab-header" data-tab="agent-editing">Agent Editing</button>
+            {% endif %}
         </div>
 
         <div class="tab-content">
@@ -815,6 +821,24 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Dataset History Section -->
+                <div class="data-section history-section">
+                    <div class="history-header" id="historyHeader">
+                        <h3>Dataset History</h3>
+                        <span class="history-toggle" id="historyToggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="history-content" id="historyContent">
+                        <div class="history-empty" id="historyEmpty">No history events recorded</div>
+                        <div class="history-timeline" id="historyTimeline">
+                            <!-- History events populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Log Tab -->
@@ -839,6 +863,29 @@
             <div class="tab-pane" data-tab="settings">
                 <h2>Settings</h2>
                 <div class="settings-content">
+                    <!-- User Settings -->
+                    <div class="settings-group" id="settingsUser">
+                        <div class="settings-group-header">
+                            <h3>User</h3>
+                            <span class="settings-group-toggle">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="settings-group-content">
+                            <div class="setting-item">
+                                <label class="setting-label-text">Your Name</label>
+                                <p class="setting-hint">Used for attribution in dataset history tracking.</p>
+                                <div class="user-input-row">
+                                    <input type="text" id="userNameInput" class="user-name-input" placeholder="Enter your name...">
+                                    <button type="button" class="btn btn-sm btn-primary" id="saveUserBtn">Save</button>
+                                </div>
+                                <span id="userSourceIndicator" class="user-source-hint"></span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Navigation Settings -->
                     <div class="settings-group" id="settingsNavigation">
                         <div class="settings-group-header">
@@ -1090,6 +1137,185 @@
                     </table>
                 </div>
             </div>
+
+            {% if agent_tabs.extraction %}
+            <!-- Agent Extraction Tab -->
+            <div class="tab-pane" data-tab="agent-extraction">
+                <h2>Agent Extraction</h2>
+                <p class="tab-description">Configure and run LLM-powered automated tubercle detection.</p>
+
+                <!-- Configuration Section -->
+                <div class="config-section agent-section">
+                    <h3>Agent Configuration</h3>
+                    <div class="agent-config-form">
+                        <div class="param-row agent-config-row">
+                            <label for="agentProvider">Provider</label>
+                            <select id="agentProvider" class="param-input param-select">
+                                <option value="claude">Claude (Anthropic)</option>
+                                <option value="gemini">Gemini (Google)</option>
+                                <option value="openrouter">OpenRouter</option>
+                            </select>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="agentModel">Model</label>
+                            <select id="agentModel" class="param-input param-select">
+                                <option value="">-- Select Model --</option>
+                            </select>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="agentProfile">Detection Profile</label>
+                            <select id="agentProfile" class="param-input param-select">
+                                <option value="default">Default</option>
+                                <option value="conservative">Conservative (fewer false positives)</option>
+                                <option value="aggressive">Aggressive (fewer false negatives)</option>
+                            </select>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="agentTargetScore">Target Hexagonalness</label>
+                            <input type="number" id="agentTargetScore" class="param-input param-number"
+                                   min="0" max="1" step="0.05" value="0.70"
+                                   placeholder="0.0-1.0">
+                            <span class="param-hint">Target score (0.0-1.0)</span>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="agentMaxIterations">Max Iterations</label>
+                            <input type="number" id="agentMaxIterations" class="param-input param-number"
+                                   min="5" max="100" step="5" value="30">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Section -->
+                <div class="config-section agent-section">
+                    <h3>Status</h3>
+                    <div id="agentStatusPanel" class="agent-status-section">
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">State:</span>
+                            <span id="agentState" class="agent-status-value status-idle">Idle</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Phase:</span>
+                            <span id="agentPhase" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Iteration:</span>
+                            <span id="agentIteration" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Best Score:</span>
+                            <span id="agentBestScore" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Tubercles:</span>
+                            <span id="agentTubercleCount" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Last Action:</span>
+                            <span id="agentLastAction" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Elapsed:</span>
+                            <span id="agentElapsed" class="agent-status-value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Parameters Section -->
+                <div class="config-section agent-section">
+                    <h3>Current Parameters</h3>
+                    <div id="agentParamsDisplay" class="agent-params-display">
+                        <p class="hint">Parameters will be displayed when agent is configured.</p>
+                    </div>
+                </div>
+
+                <!-- Progress Chart Section -->
+                <div class="config-section agent-section">
+                    <h3>Progress</h3>
+                    <div class="agent-chart-container">
+                        <canvas id="agentChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- LLM Communication Section (Collapsible) -->
+                <div class="config-section agent-section">
+                    <h3>LLM Communication</h3>
+
+                    <!-- Last Prompt -->
+                    <div class="agent-collapsible collapsed">
+                        <div class="agent-collapsible-header">
+                            <h4>Last Prompt Sent</h4>
+                            <span class="agent-collapsible-toggle">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <pre id="agentLastPrompt">No prompt sent yet.</pre>
+                        </div>
+                    </div>
+
+                    <!-- Last Response -->
+                    <div class="agent-collapsible collapsed">
+                        <div class="agent-collapsible-header">
+                            <h4>Last LLM Response</h4>
+                            <span class="agent-collapsible-toggle">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <pre id="agentLastResponse">No response received yet.</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions Section -->
+                <div class="extraction-actions agent-section">
+                    <h3>Run Agent</h3>
+                    <div class="extraction-buttons agent-controls">
+                        <button type="button" class="btn btn-primary" id="startAgentBtn">
+                            Start Agent Extraction
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="stopAgentBtn" disabled>
+                            Stop
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="acceptBestBtn" disabled>
+                            Accept Best
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="resetAgentBtn">
+                            Reset
+                        </button>
+                        <span class="spinner" id="agentSpinner" style="display: none;"></span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if agent_tabs.editing %}
+            <!-- Agent Editing Tab -->
+            <div class="tab-pane" data-tab="agent-editing">
+                <h2>Agent Editing</h2>
+                <p class="tab-description">LLM-assisted editing and refinement of detected tubercles.</p>
+
+                <div class="config-section">
+                    <h3>Coming Soon</h3>
+                    <p class="hint">Agent-assisted editing features will be available in a future update.</p>
+                    <p class="hint">Planned features:</p>
+                    <ul class="feature-list">
+                        <li>Automatic pattern completion</li>
+                        <li>Outlier detection and removal</li>
+                        <li>Edge case refinement</li>
+                        <li>Quality assessment</li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
     </div>
@@ -1110,6 +1336,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/user.js') }}"></script>
 <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sets.js') }}"></script>
 <script src="{{ url_for('static', filename='js/image.js') }}"></script>
@@ -1121,6 +1348,9 @@
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/extraction.js') }}"></script>
 <script src="{{ url_for('static', filename='js/setUI.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="{{ url_for('static', filename='js/agent_extraction.js') }}"></script>
 <script>
     // MCP state polling for auto-refresh
     let mcpPollingEnabled = true;

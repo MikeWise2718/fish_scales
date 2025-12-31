@@ -73,6 +73,63 @@ def create_parser() -> argparse.ArgumentParser:
         help="List available LLM providers",
     )
 
+    # Optimize command
+    optimize_parser = subparsers.add_parser(
+        "optimize",
+        help="Optimize extraction parameters using LLM agent",
+    )
+    optimize_parser.add_argument(
+        "image",
+        help="Path to image file",
+    )
+    optimize_parser.add_argument(
+        "--calibration",
+        type=float,
+        required=True,
+        help="Calibration in micrometers per pixel (required)",
+    )
+    optimize_parser.add_argument(
+        "--provider",
+        choices=["claude", "gemini", "openrouter"],
+        default="claude",
+        help="LLM provider (default: claude)",
+    )
+    optimize_parser.add_argument(
+        "--model",
+        help="Specific model name (default depends on provider)",
+    )
+    optimize_parser.add_argument(
+        "--api-key",
+        help="API key (or use ANTHROPIC_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY env var)",
+    )
+    optimize_parser.add_argument(
+        "--profile",
+        default="default",
+        help="Starting parameter profile (default: default)",
+    )
+    optimize_parser.add_argument(
+        "--target-score",
+        type=float,
+        default=0.7,
+        help="Target hexagonalness score (default: 0.7)",
+    )
+    optimize_parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=10,
+        help="Maximum optimization iterations (default: 10)",
+    )
+    optimize_parser.add_argument(
+        "--ui-url",
+        default="http://localhost:5010",
+        help="URL of fish-scale-ui (default: http://localhost:5010)",
+    )
+    optimize_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Verbose output",
+    )
+
     return parser
 
 
@@ -139,7 +196,7 @@ def check_ui_available(ui_url: str) -> bool:
     import httpx
 
     try:
-        resp = httpx.get(f"{ui_url}/api/mcp/state", timeout=5)
+        resp = httpx.get(f"{ui_url}/api/tools/state", timeout=5)
         return resp.status_code == 200
     except Exception:
         return False
@@ -242,6 +299,143 @@ def cmd_providers(args):
     )
 
 
+def cmd_optimize(args):
+    """Optimize extraction parameters using LLM agent."""
+    from .extraction_optimizer import ExtractionOptimizer, OptimizationState
+
+    # Check if UI is available
+    if not check_ui_available(args.ui_url):
+        console.print(
+            Panel(
+                f"[red]fish-scale-ui not available at {args.ui_url}[/red]\n\n"
+                "Please start the UI first:\n"
+                "  [cyan]uv run fish-scale-ui[/cyan]",
+                title="Connection Error",
+            )
+        )
+        sys.exit(1)
+
+    # Validate image path
+    image_path = Path(args.image)
+    if not image_path.exists():
+        console.print(f"[red]Error:[/red] Image not found: {image_path}")
+        sys.exit(1)
+
+    # Get provider
+    provider = get_provider(args.provider, args.model, getattr(args, 'api_key', None))
+
+    # Print header
+    console.print()
+    console.print("[bold]Fish Scale Extraction Optimizer[/bold]")
+    console.print("=" * 34)
+    console.print(f"Image: [cyan]{image_path.name}[/cyan]")
+    console.print(f"Provider: [cyan]{args.provider}[/cyan] ({provider.model_name})")
+    console.print(f"Starting profile: [cyan]{args.profile}[/cyan]")
+    console.print(f"Target hexagonalness: [cyan]{args.target_score:.2f}[/cyan]")
+    console.print()
+
+    # Track last printed iteration to avoid duplicates
+    last_printed_iteration = [0]
+
+    def on_iteration(state: OptimizationState):
+        """Callback for each optimization iteration."""
+        if state.iteration <= last_printed_iteration[0]:
+            return  # Already printed this iteration
+        last_printed_iteration[0] = state.iteration
+
+        hex_score = state.current_metrics.get("hexagonalness", 0)
+        n_tubercles = state.current_metrics.get("n_tubercles", 0)
+
+        # Print iteration progress - use plain print with flush for subprocess capture
+        # Rich console output may be buffered, so we print plain text for parsing
+        print(
+            f"Iteration {state.iteration}/{args.max_iterations}: "
+            f"Hexagonalness: {hex_score:.3f}, "
+            f"Tubercles: {n_tubercles}",
+            flush=True
+        )
+
+        # Note if this is the new best
+        if state.iteration == state.best_iteration and state.iteration > 1:
+            print("  ^ New best result", flush=True)
+
+    # Create optimizer
+    optimizer = ExtractionOptimizer(
+        provider=provider,
+        ui_base_url=args.ui_url,
+        verbose=args.verbose,
+    )
+
+    # Run optimization
+    try:
+        console.print("[dim]Running initial extraction...[/dim]")
+
+        result = optimizer.optimize_sync(
+            image_path=str(image_path.resolve()),
+            calibration=args.calibration,
+            starting_profile=args.profile,
+            target_hexagonalness=args.target_score,
+            max_iterations=args.max_iterations,
+            on_iteration=on_iteration,
+        )
+
+        # Print final summary
+        console.print()
+        console.print("[bold]Optimization Complete[/bold]")
+        console.print("-" * 21)
+        console.print(f"Best result: Iteration {result.best_iteration}")
+        console.print(f"  Hexagonalness: [green]{result.best_metrics.get('hexagonalness', 0):.3f}[/green]")
+        console.print(f"  Tubercles: [cyan]{result.best_metrics.get('n_tubercles', 0)}[/cyan]")
+
+        mean_diam = result.best_metrics.get("mean_diameter_um", 0)
+        mean_space = result.best_metrics.get("mean_space_um", 0)
+        if mean_diam:
+            console.print(f"  Mean diameter: [cyan]{mean_diam:.1f} um[/cyan]")
+        if mean_space:
+            console.print(f"  Mean spacing: [cyan]{mean_space:.1f} um[/cyan]")
+
+        console.print()
+        console.print("[bold]Optimal parameters:[/bold]")
+        key_params = [
+            "threshold", "min_diameter_um", "max_diameter_um",
+            "min_circularity", "clahe_clip", "blur_sigma", "neighbor_graph"
+        ]
+        for key in key_params:
+            if key in result.best_params:
+                val = result.best_params[key]
+                if isinstance(val, float):
+                    console.print(f"  {key}: [cyan]{val:.3f}[/cyan]")
+                else:
+                    console.print(f"  {key}: [cyan]{val}[/cyan]")
+
+        # Print usage stats if available
+        if hasattr(provider, "get_usage"):
+            usage = provider.get_usage()
+            input_tokens = usage.get("input_tokens", 0)
+            output_tokens = usage.get("output_tokens", 0)
+            cost = usage.get("cost_usd", 0)
+            estimated = usage.get("cost_estimated", False)
+
+            console.print()
+            cost_str = f"~${cost:.2f}" if estimated else f"${cost:.2f}"
+            console.print(
+                f"[dim]Usage: {input_tokens:,} input + {output_tokens:,} output tokens "
+                f"({cost_str})[/dim]"
+            )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Optimization interrupted by user[/yellow]")
+        sys.exit(130)
+    except Exception as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+    finally:
+        optimizer.close()
+
+
 def main():
     """Main entry point."""
     parser = create_parser()
@@ -251,6 +445,8 @@ def main():
         cmd_run(args)
     elif args.command == "providers":
         cmd_providers(args)
+    elif args.command == "optimize":
+        cmd_optimize(args)
     else:
         parser.print_help()
         sys.exit(1)

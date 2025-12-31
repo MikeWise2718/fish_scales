@@ -114,7 +114,9 @@ fish_scales/
 │       └── providers/
 │           ├── __init__.py
 │           ├── base.py                # AgentLLMProvider ABC
-│           └── gemini.py              # Gemini provider implementation
+│           ├── claude.py              # Anthropic Claude provider (default)
+│           ├── gemini.py              # Google Gemini provider
+│           └── openrouter.py          # OpenRouter provider (multi-model)
 │
 ├── tests/                             # Pytest test suite
 ├── test_images/                       # Reference images with known values
@@ -122,6 +124,7 @@ fish_scales/
 ├── slo/                               # Saved annotation files (gitignored)
 ├── log/                               # JSONL session logs (gitignored)
 ├── output/                            # CLI output (gitignored)
+├── docs/                              # Documentation (slo-persistence.md, etc.)
 ├── specs/                             # Specification documents
 └── pyproject.toml
 ```
@@ -174,6 +177,8 @@ Users can save multiple annotation sets per image for comparison (e.g., differen
 - `*_tub.csv` - Tubercle data export
 - `*_itc.csv` - Connection data export
 
+See [docs/slo-persistence.md](docs/slo-persistence.md) for detailed format specification.
+
 ## Test Images and Validation
 
 Test images in `test_images/` have known expected values from original research papers (see `test_images/test_cases.md`). The `benchmark` command validates measurements against these values.
@@ -192,33 +197,30 @@ Each CLI run creates a timestamped directory in `output/` containing:
 - `*_edges.csv` - Neighbor edge measurements
 - `*_detection.png` - Two-panel visualization (detected tubercles + geometry diagram)
 
-## MCP Server
+## MCP Server & Tool Endpoints
 
-The MCP (Model Context Protocol) server enables LLM agents to control the fish-scale-ui application programmatically. This supports an agentic workflow where an LLM can:
+The MCP (Model Context Protocol) server enables LLM agents to control the fish-scale-ui application programmatically. The underlying REST API endpoints are at `/api/tools/*` and can be called directly by agents or via the MCP server.
 
-1. Load images and set calibration
-2. Run automated tubercle extraction
-3. Add/move/delete tubercles manually
-4. Generate connections (Delaunay/Gabriel/RNG graphs)
-5. Capture screenshots for visual analysis
-6. Save results to SLO files
+**Architecture:**
+- **Direct HTTP agents** (like `fish-scale-agent`) call `/api/tools/*` endpoints directly
+- **MCP server** (`fish-scale-mcp`) wraps these same endpoints with MCP protocol (stdio JSON-RPC)
 
-### MCP Tools Available
+### Tool Endpoints (`/api/tools/*`)
 
-| Tool | Description |
-|------|-------------|
-| `get_screenshot` | Capture current view as base64 PNG |
-| `get_state` | Get complete current state |
-| `load_image` | Load an image file |
-| `set_calibration` | Set µm/pixel calibration |
-| `get_params` / `set_params` | Get/set extraction parameters |
-| `run_extraction` | Run automated tubercle detection |
-| `add_tubercle` / `move_tubercle` / `delete_tubercle` | Tubercle CRUD |
-| `add_connection` / `delete_connection` | Connection CRUD |
-| `clear_connections` | Remove all connections |
-| `auto_connect` | Generate connections (delaunay/gabriel/rng) |
-| `get_statistics` | Get measurement statistics |
-| `save_slo` | Save annotations to file |
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/tools/screenshot` | Capture current view as base64 PNG |
+| `GET /api/tools/state` | Get complete current state |
+| `POST /api/tools/load-image` | Load an image file |
+| `POST /api/tools/calibration` | Set µm/pixel calibration |
+| `GET/POST /api/tools/params` | Get/set extraction parameters |
+| `POST /api/tools/extract` | Run automated tubercle detection |
+| `POST /api/tools/add-tubercle` | Add a tubercle |
+| `POST /api/tools/move-tubercle` | Move a tubercle |
+| `POST /api/tools/delete-tubercle` | Delete a tubercle |
+| `POST /api/tools/auto-connect` | Generate connections (delaunay/gabriel/rng) |
+| `GET /api/tools/statistics` | Get measurement statistics |
+| `POST /api/tools/save-slo` | Save annotations to file |
 
 ### Running the MCP Server
 
@@ -300,6 +302,14 @@ C:\Users\mike\Pictures\screenshots\
 
 Use the Read tool to view screenshot images when debugging visual issues.
 
+## Documentation
+
+User guides and reference documentation are in `docs/`:
+- `slo-persistence.md` - SLO file format and storage details
+- `openrouter-how-to.md` - Guide to using OpenRouter with the LLM agent
+- `fish-scale-metrics-extraction.md` - High-level algorithm description
+- `implementation-history.md` - Development history (Dec 2025)
+
 ## Specifications
 
 Detailed specifications are in the `specs/` folder:
@@ -309,3 +319,4 @@ Detailed specifications are in the `specs/` folder:
 - `ui-multiple-tubelinksets.md` - Multiple annotation sets feature spec
 - `mcp-agent-tubercle-detection-spec.md` - MCP server and agent specification
 - `mcp-testing.md` - MCP server testing strategy and results
+- `dataset-history-tracking.md` - Dataset provenance/history tracking (proposed)

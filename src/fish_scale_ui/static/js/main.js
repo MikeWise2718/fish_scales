@@ -87,10 +87,7 @@ window.app = (function() {
                     eventCell.textContent = entry.event_type.replace(/_/g, ' ');
 
                     const detailsCell = document.createElement('td');
-                    const details = Object.entries(entry.details || {})
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join(', ');
-                    detailsCell.textContent = details;
+                    detailsCell.innerHTML = formatLogDetails(entry.details);
 
                     row.appendChild(timeCell);
                     row.appendChild(eventCell);
@@ -99,6 +96,45 @@ window.app = (function() {
                 });
             })
             .catch(err => console.error('Failed to load log:', err));
+    }
+
+    // Format log entry details, highlighting hexagonalness when present
+    function formatLogDetails(details) {
+        if (!details || Object.keys(details).length === 0) {
+            return '';
+        }
+
+        const parts = [];
+        const hexScore = details.hexagonalness_score;
+        const reliability = details.reliability;
+
+        // Process all details except hexagonalness-related ones first
+        for (const [key, value] of Object.entries(details)) {
+            if (key === 'hexagonalness_score' || key === 'reliability') {
+                continue;  // Handle separately
+            }
+            parts.push(`${key}: ${value}`);
+        }
+
+        // Add hexagonalness with special formatting if present
+        if (hexScore !== undefined && hexScore !== null) {
+            const scoreNum = parseFloat(hexScore);
+            let scoreClass = 'score-poor';
+            if (scoreNum >= 0.7) {
+                scoreClass = 'score-good';
+            } else if (scoreNum >= 0.4) {
+                scoreClass = 'score-medium';
+            }
+
+            let hexText = `<span class="log-hex">Hex: <span class="log-hex-score ${scoreClass}">${scoreNum.toFixed(3)}</span>`;
+            if (reliability && reliability !== 'high') {
+                hexText += ` <span class="log-hex-reliability">(${reliability})</span>`;
+            }
+            hexText += '</span>';
+            parts.push(hexText);
+        }
+
+        return parts.join(', ');
     }
 
     // Toolbar buttons

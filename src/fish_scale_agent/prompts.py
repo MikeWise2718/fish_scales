@@ -103,6 +103,15 @@ Good detection typically shows:
 - Mean spacing: 3-15 micrometers
 - Low standard deviation relative to mean (< 30%)
 
+## History Tracking
+Record your progress by calling `add_history_event` after each major phase:
+
+- After Phase 1 extraction: `add_history_event(event_type="agent_phase", phase=1, summary="Initial extraction", n_tubercles=N, n_edges=0)`
+- After Phase 2 additions: `add_history_event(event_type="agent_phase", phase=2, summary="Pattern completion: added X tubercles", n_tubercles=N)`
+- After Phase 3 connections: `add_history_event(event_type="agent_phase", phase=3, summary="Connection generation", n_tubercles=N, n_edges=M)`
+
+This creates a record of how the dataset evolved, which helps with reproducibility.
+
 ## When Done
 1. Call `get_statistics` to report final metrics
 2. Call `save_slo` to save the annotations
@@ -124,6 +133,8 @@ Good detection typically shows:
 - `get_statistics()` - Get measurement statistics
 - `save_slo()` - Save annotations to file
 - `add_debug_rectangle(x, y, width, height, label, color)` - Draw debug rectangle (keep visible for comparison)
+- `get_user()` - Get current user name for history tracking
+- `add_history_event(event_type, phase, summary, n_tubercles, n_edges)` - Record agent phase to history
 """
 
 

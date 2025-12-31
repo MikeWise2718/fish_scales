@@ -293,8 +293,8 @@ class TubercleDetectionAgent:
             self.log_callback(log_line)
 
     def _api_url(self, endpoint: str) -> str:
-        """Build full API URL."""
-        return f"{self.ui_url}/api/mcp/{endpoint.lstrip('/')}"
+        """Build full API URL for tool endpoints."""
+        return f"{self.ui_url}/api/tools/{endpoint.lstrip('/')}"
 
     def _execute_tool(self, name: str, args: dict) -> Any:
         """Execute a tool by calling the appropriate API endpoint.

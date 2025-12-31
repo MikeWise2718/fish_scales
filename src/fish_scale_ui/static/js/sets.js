@@ -105,6 +105,15 @@ window.sets = (function() {
             redoStack: [],
             createdAt: now,
             modifiedAt: now,
+            history: options.history ? JSON.parse(JSON.stringify(options.history)) : [],
+            pendingEdits: {
+                added_tubercles: 0,
+                deleted_tubercles: 0,
+                moved_tubercles: 0,
+                resized_tubercles: 0,
+                added_connections: 0,
+                deleted_connections: 0,
+            },
         };
 
         sets[id] = newSet;
@@ -274,10 +283,24 @@ window.sets = (function() {
         }
 
         const name = newName || (source.name + ' Copy');
-        return createSet(name, {
+        const newSet = createSet(name, {
             tubercles: source.tubercles,
             edges: source.edges,
+            // Start with empty history for the clone
+            history: [],
         });
+
+        if (newSet) {
+            // Add clone event to the new set's history
+            addHistoryEvent('clone', {
+                source_set_id: source.id,
+                source_set_name: source.name,
+                n_tubercles: source.tubercles.length,
+                n_edges: source.edges.length,
+            }, newSet.id);
+        }
+
+        return newSet;
     }
 
     /**
@@ -458,11 +481,145 @@ window.sets = (function() {
         return set ? set.redoStack.length > 0 : false;
     }
 
+    // ===== History Management =====
+
+    /**
+     * Add a history event to a set
+     * @param {string} eventType - Event type (extraction, auto_connect, manual_edit, agent_phase, clone, import)
+     * @param {Object} data - Event-specific data
+     * @param {string} setId - Set ID (defaults to current)
+     */
+    function addHistoryEvent(eventType, data = {}, setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        if (!set) return;
+
+        // Get current user
+        const user = window.user?.getCurrentUser() || 'Unknown';
+
+        const event = {
+            timestamp: new Date().toISOString(),
+            type: eventType,
+            user: user,
+            ...data,
+        };
+
+        set.history.push(event);
+
+        // Dispatch event so UI can update
+        document.dispatchEvent(new CustomEvent('historyChanged', {
+            detail: { setId: id, event }
+        }));
+    }
+
+    /**
+     * Get history for a set
+     * @param {string} setId - Set ID (defaults to current)
+     * @returns {Array} History events
+     */
+    function getHistory(setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        return set ? set.history : [];
+    }
+
+    /**
+     * Track a pending edit (for consolidation on save)
+     * @param {string} editType - Edit type (added_tubercles, deleted_tubercles, etc.)
+     * @param {number} count - Number to add (default 1)
+     * @param {string} setId - Set ID (defaults to current)
+     */
+    function trackEdit(editType, count = 1, setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        if (!set || !set.pendingEdits.hasOwnProperty(editType)) return;
+
+        set.pendingEdits[editType] += count;
+    }
+
+    /**
+     * Consolidate pending edits into a history event
+     * Called before save to record all edits since last save
+     * @param {string} setId - Set ID (defaults to current)
+     */
+    function consolidateEdits(setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        if (!set) return;
+
+        const edits = set.pendingEdits;
+
+        // Check if any edits were made
+        const hasEdits = Object.values(edits).some(v => v > 0);
+        if (!hasEdits) return;
+
+        // Create summary
+        const summary = [];
+        if (edits.added_tubercles > 0) summary.push(`+${edits.added_tubercles} tubercles`);
+        if (edits.deleted_tubercles > 0) summary.push(`-${edits.deleted_tubercles} tubercles`);
+        if (edits.moved_tubercles > 0) summary.push(`${edits.moved_tubercles} moved`);
+        if (edits.resized_tubercles > 0) summary.push(`${edits.resized_tubercles} resized`);
+        if (edits.added_connections > 0) summary.push(`+${edits.added_connections} connections`);
+        if (edits.deleted_connections > 0) summary.push(`-${edits.deleted_connections} connections`);
+
+        // Calculate hexagonalness for result
+        const tubercles = set.tubercles;
+        const edges = set.edges;
+        const hexStats = window.extraction?.calculateHexagonalness?.(tubercles, edges);
+
+        // Add history event
+        addHistoryEvent('manual_edit', {
+            summary: summary.join(', '),
+            details: { ...edits },
+            result: {
+                n_tubercles: tubercles.length,
+                n_edges: edges.length,
+                hexagonalness: hexStats?.hexagonalness_score || 0,
+            },
+        }, id);
+
+        // Reset pending edits
+        resetPendingEdits(id);
+    }
+
+    /**
+     * Reset pending edits for a set
+     * @param {string} setId - Set ID (defaults to current)
+     */
+    function resetPendingEdits(setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        if (!set) return;
+
+        set.pendingEdits = {
+            added_tubercles: 0,
+            deleted_tubercles: 0,
+            moved_tubercles: 0,
+            resized_tubercles: 0,
+            added_connections: 0,
+            deleted_connections: 0,
+        };
+    }
+
+    /**
+     * Get pending edits for a set
+     * @param {string} setId - Set ID (defaults to current)
+     * @returns {Object} Pending edits counts
+     */
+    function getPendingEdits(setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        return set ? { ...set.pendingEdits } : {};
+    }
+
     /**
      * Export all sets data for saving to SLO
      * @returns {Object} Data structure for v2 SLO format
      */
     function exportForSave() {
+        // Consolidate pending edits for all sets before exporting
+        setOrder.forEach(id => consolidateEdits(id));
+
         return {
             activeSetId: currentSetId,
             sets: setOrder.map(id => ({
@@ -472,6 +629,7 @@ window.sets = (function() {
                 modifiedAt: sets[id].modifiedAt,
                 tubercles: sets[id].tubercles,
                 edges: sets[id].edges,
+                history: sets[id].history,
             })),
         };
     }
@@ -503,6 +661,15 @@ window.sets = (function() {
                 redoStack: [],
                 createdAt: setData.createdAt || now,
                 modifiedAt: setData.modifiedAt || now,
+                history: setData.history || [],
+                pendingEdits: {
+                    added_tubercles: 0,
+                    deleted_tubercles: 0,
+                    moved_tubercles: 0,
+                    resized_tubercles: 0,
+                    added_connections: 0,
+                    deleted_connections: 0,
+                },
             };
             setOrder.push(id);
         });
@@ -592,6 +759,14 @@ window.sets = (function() {
         exportForSave,
         importFromLoad,
         importFromV1,
+
+        // History
+        addHistoryEvent,
+        getHistory,
+        trackEdit,
+        consolidateEdits,
+        resetPendingEdits,
+        getPendingEdits,
 
         // Utility
         getSetCount,

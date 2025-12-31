@@ -38,6 +38,14 @@ class StatisticsData(BaseModel):
     std_space_um: Optional[float] = Field(default=None, description="Standard deviation of spacing")
     suggested_genus: Optional[str] = Field(default=None, description="Suggested genus based on measurements")
     classification_confidence: Optional[str] = Field(default=None, description="Confidence level: high, medium, or low")
+    # Hexagonalness metrics
+    hexagonalness_score: Optional[float] = Field(default=None, description="Overall hexagonalness score (0-1, 1=perfect)")
+    spacing_uniformity: Optional[float] = Field(default=None, description="Spacing uniformity component (0-1)")
+    degree_score: Optional[float] = Field(default=None, description="Degree distribution score (0-1)")
+    edge_ratio_score: Optional[float] = Field(default=None, description="Edge/node ratio score (0-1)")
+    mean_degree: Optional[float] = Field(default=None, description="Mean number of neighbors per interior node")
+    spacing_cv: Optional[float] = Field(default=None, description="Coefficient of variation of edge spacings")
+    reliability: Optional[str] = Field(default=None, description="Reliability: 'high', 'low', or 'none'")
 
 
 class FishScaleMCPServer:
@@ -81,8 +89,8 @@ Typical workflow:
         self._register_tools()
 
     def _api_url(self, endpoint: str) -> str:
-        """Build full API URL."""
-        return f"{self.ui_url}/api/mcp/{endpoint.lstrip('/')}"
+        """Build full API URL for tool endpoints."""
+        return f"{self.ui_url}/api/tools/{endpoint.lstrip('/')}"
 
     def _register_tools(self):
         """Register all MCP tools."""
@@ -501,6 +509,61 @@ Typical workflow:
             if not data.get('success'):
                 raise Exception(data.get('error', 'Save failed'))
             return data
+
+        @self.mcp.tool()
+        def get_user() -> dict:
+            """Get the current user name for history tracking.
+
+            Returns:
+                Dictionary with user name and source (config, environment, or default)
+            """
+            resp = httpx.get(self._api_url('/user'), timeout=10)
+            resp.raise_for_status()
+            return resp.json()
+
+        @self.mcp.tool()
+        def add_history_event(
+            event_type: str = "agent_phase",
+            phase: Optional[int] = None,
+            summary: Optional[str] = None,
+            n_tubercles: Optional[int] = None,
+            n_edges: Optional[int] = None,
+        ) -> bool:
+            """Add a history event to track agent actions.
+
+            Use this to record significant actions the agent takes, such as
+            completing extraction phases or major edits.
+
+            Args:
+                event_type: Type of event (default: "agent_phase")
+                phase: Phase number (1, 2, 3, etc.)
+                summary: Brief description of what was done
+                n_tubercles: Number of tubercles after this action
+                n_edges: Number of edges/connections after this action
+
+            Returns:
+                True if successful
+            """
+            payload = {'type': event_type}
+            if phase is not None:
+                payload['phase'] = phase
+            if summary is not None:
+                payload['summary'] = summary
+            if n_tubercles is not None:
+                payload['n_tubercles'] = n_tubercles
+            if n_edges is not None:
+                payload['n_edges'] = n_edges
+
+            resp = httpx.post(
+                self._api_url('/history'),
+                json=payload,
+                timeout=10
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not data.get('success'):
+                raise Exception(data.get('error', 'Add history event failed'))
+            return True
 
 
 def create_server(ui_base_url: str = "http://localhost:5010") -> FastMCP:

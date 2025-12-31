@@ -520,12 +520,94 @@ src/fish_scale_mcp/server.py   # Modified: StatisticsData model
 - **Image Copy Prevention**: `/api/tools/load-image` now skips copying if same image already loaded (prevents GUID file accumulation)
 - **Circularity Guidance**: Enhanced prompts to emphasize min_circularity as key parameter; recommend trying 0.2-0.3 for missing tubercles
 
+### Agent Extraction Tab Monitoring Enhancements (31 December 2025)
+
+Comprehensive improvements to the Agent Extraction tab for better observability and debugging of the LLM optimization process:
+
+**Real-Time Cost Tracking:**
+- Token counts (input/output) update after each LLM API call
+- Running cost estimate displayed in real-time
+- New "Last Step Cost" field shows incremental cost per API call
+- Cost delta calculated by tracking previous total
+
+**Full Prompt Display:**
+- Complete prompt JSON shown (system prompt + tools + message history)
+- Base64 image data automatically truncated to `...[N bytes base64 truncated]...`
+- Prompt statistics header showing: iteration, hexagonalness, tubercles, ITC count, prompt size
+- Scrollable container with styled scrollbars
+
+**Full LLM Response Display:**
+- Changed from text-only "reasoning" to complete response JSON
+- Response includes: text, tool_calls (with id, name, arguments), stop_reason, usage
+- Enables full analysis of what the LLM decided and why
+
+**Action Summary Section:**
+- New collapsible section logging all agent actions with timestamps
+- Shows seconds elapsed since run start for each action
+- Full log line text (not simplified summaries)
+- Excludes data lines (LLM-Prompt, LLM-Response, Usage) to keep focused on actions
+- Deduplication via `seenLogLines` Set to prevent repeated entries
+
+**Copy Buttons:**
+- Copy button on "Last Prompt Sent" - copies full prompt JSON
+- Copy button on "Last LLM Response" - copies full response JSON
+- Copy button on "Action Summary" - copies timestamped action log
+- Clear button on Action Summary
+- Visual feedback (green checkmark) on successful copy
+
+**Technical Implementation:**
+
+*Provider Layer (claude.py):*
+- `_truncate_base64()` - Truncates base64 strings while preserving structure
+- `_serialize_prompt()` - Serializes system + tools + messages to JSON
+- Response serialization with text, tool_calls, stop_reason, usage
+- AgentIteration extended with `prompt_content`, `prompt_size_bytes`, `response_json`
+
+*Optimizer (extraction_optimizer.py):*
+- Logs `Usage:` with token counts and cost after each LLM call
+- Logs `LLM-Response:` with full response JSON (pipe-separated for single line)
+- Logs `Prompt-Stats:` with byte size
+- Logs `LLM-Prompt:` with full prompt (base64 pre-truncated)
+
+*JavaScript (agent_extraction.js):*
+- State tracking: `actionSummary[]`, `seenLogLines` Set, `lastStepCost`, `previousCost`
+- `parseLogLines()` extracts Usage, LLM-Response, Prompt-Stats, LLM-Prompt
+- `addAction()` logs actions with elapsed time
+- `copyToClipboard()` with visual feedback
+- `formatBytes()` helper for human-readable sizes
+
+*CSS (main.css):*
+- `.agent-collapsible-actions` container for header buttons
+- `.btn-small` and `.btn-copy` button styles
+- `.btn-copy.copied` green feedback state
+- Scrollbar styling for prompt/response containers
+
+*HTML (workspace.html):*
+- Copy buttons added to Last Prompt, Last Response, Action Summary headers
+- Clear button for Action Summary
+- Last Step Cost row in Costs section
+- `agentActionSummary` pre element
+
+**Files Modified:**
+```
+src/fish_scale_agent/
+├── providers/base.py          # AgentIteration extended
+├── providers/claude.py        # Prompt/response serialization
+└── extraction_optimizer.py    # Logging enhancements
+
+src/fish_scale_ui/
+├── templates/workspace.html   # Copy buttons, Action Summary section
+├── static/css/main.css        # Button styles, scrollbars
+└── static/js/agent_extraction.js  # Parsing, state, copy functions
+```
+
 ### Future Work (Updated)
 
 **Completed from original list:**
 - ~~ROI selection~~ → Crop tool in Image tab
 - ~~Confidence metrics~~ → Circularity scores displayed per tubercle
 - ~~Agent improvements~~ → Extraction Parameter Optimization Agent
+- ~~Agent observability~~ → Real-time monitoring, full prompt/response display
 
 **Remaining:**
 1. **Validate on other test images** - Systematic validation across species

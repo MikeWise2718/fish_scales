@@ -327,12 +327,50 @@ uv run fish-scale-agent optimize image.tif --calibration 0.1 \
 ```
 src/fish_scale_agent/
 ├── extraction_optimizer.py    # Core optimizer module
+├── agent_run_logger.py        # JSONL run logging
 └── cli.py                     # optimize subcommand
 
 src/fish_scale_ui/
 ├── routes/agent_api.py        # Agent control endpoints
 ├── templates/workspace.html   # Agent tabs HTML
 └── static/js/agent_extraction.js  # Agent tab JavaScript
+```
+
+### Agent Extraction Tab Monitoring
+
+The Agent Extraction tab provides comprehensive real-time monitoring:
+
+**Costs Section:**
+- Model name and provider
+- Input/Output token counts (updated after each LLM call)
+- Total estimated cost
+- **Last Step Cost** - incremental cost of the most recent API call
+
+**LLM Communication Section (collapsible):**
+
+| Section | Content | Copy Button |
+|---------|---------|-------------|
+| Last Prompt Sent | Full prompt JSON (system + tools + messages) with base64 truncated | Yes |
+| Last LLM Response | Full response JSON (text + tool_calls + stop_reason + usage) | Yes |
+| Action Summary | Timestamped log of all agent actions | Yes + Clear |
+
+**Prompt Statistics Header:**
+```
+--- Prompt Statistics ---
+Iteration: 3/10
+Hexagonalness: 0.720
+Tubercles: 45
+ITC: 89
+Prompt Size: 156.2 KB
+-------------------------
+```
+
+**Log Line Formats (for debugging):**
+```
+[HH:MM:SS] Usage: 12345 input, 567 output, $0.0234 (claude-sonnet-4-20250514)
+[HH:MM:SS] LLM-Response: { | "text": "...", | "tool_calls": [...] | }
+[HH:MM:SS] Prompt-Stats: size=123456
+[HH:MM:SS] LLM-Prompt: { | "system": "...", | "tools": [...], | "messages": [...] | }
 ```
 
 ### Known Challenges & Mitigations

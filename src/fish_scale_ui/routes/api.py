@@ -314,23 +314,35 @@ def get_current_image():
 
 @api_bp.route('/browse', methods=['GET'])
 def browse_images():
-    """Browse images in the configured image directory."""
+    """Browse images in a directory.
+
+    Query parameters:
+        path: Absolute path to browse (optional, defaults to IMAGE_DIR)
+        subdir: Subdirectory relative to IMAGE_DIR (legacy, for backwards compatibility)
+
+    Returns directory listing with files and subdirectories.
+    """
     image_dir = Path(current_app.config['IMAGE_DIR'])
+
+    # Support both absolute path and relative subdir
+    abs_path = request.args.get('path', '')
     subdir = request.args.get('subdir', '')
 
-    # Resolve the target directory, preventing directory traversal
-    if subdir:
+    if abs_path:
+        # Absolute path navigation
+        target_dir = Path(abs_path).resolve()
+    elif subdir:
+        # Legacy: relative to IMAGE_DIR
         target_dir = (image_dir / subdir).resolve()
-        # Security check: ensure we're still within image_dir
-        try:
-            target_dir.relative_to(image_dir)
-        except ValueError:
-            return jsonify({'error': 'Invalid directory'}), 400
     else:
-        target_dir = image_dir
+        # Default to IMAGE_DIR
+        target_dir = image_dir.resolve()
 
     if not target_dir.exists():
         return jsonify({'error': 'Directory not found'}), 404
+
+    if not target_dir.is_dir():
+        return jsonify({'error': 'Not a directory'}), 400
 
     allowed_ext = current_app.config['ALLOWED_EXTENSIONS']
 
@@ -340,26 +352,32 @@ def browse_images():
     try:
         for entry in sorted(target_dir.iterdir()):
             if entry.is_dir():
+                # Skip hidden directories
+                if entry.name.startswith('.'):
+                    continue
                 directories.append({
                     'name': entry.name,
-                    'path': str(entry.relative_to(image_dir)) if subdir else entry.name
+                    'path': str(entry.resolve())  # Always use absolute paths
                 })
             elif entry.is_file():
                 ext = entry.suffix.lower().lstrip('.')
                 if ext in allowed_ext:
                     files.append({
                         'name': entry.name,
-                        'path': str(entry),
+                        'path': str(entry.resolve()),
                         'size': entry.stat().st_size,
                         'modified': entry.stat().st_mtime
                     })
     except PermissionError:
         return jsonify({'error': 'Permission denied'}), 403
 
+    # Determine parent directory (None if at filesystem root)
+    parent_dir = target_dir.parent
+    has_parent = parent_dir != target_dir  # At root, parent == self
+
     return jsonify({
         'directory': str(target_dir),
-        'relative_path': subdir or '',
-        'parent': str(Path(subdir).parent) if subdir and subdir != '.' else None,
+        'parent': str(parent_dir) if has_parent else None,
         'directories': directories,
         'files': files
     })

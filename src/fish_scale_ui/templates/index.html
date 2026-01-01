@@ -176,10 +176,11 @@
         </svg>`;
     }
 
-    function loadDirectory(subdir = '') {
+    function loadDirectory(path = '') {
         fileBrowserList.innerHTML = '<div class="file-browser-loading">Loading...</div>';
 
-        const url = subdir ? `/api/browse?subdir=${encodeURIComponent(subdir)}` : '/api/browse';
+        // Use path parameter for absolute paths, empty for default IMAGE_DIR
+        const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse';
 
         fetch(url)
             .then(response => response.json())
@@ -193,9 +194,9 @@
 
                 let html = '';
 
-                // Parent directory link
+                // Parent directory link (always show unless at filesystem root)
                 if (data.parent !== null) {
-                    html += `<div class="file-browser-item" data-type="parent" data-path="${data.parent || ''}">
+                    html += `<div class="file-browser-item" data-type="parent" data-path="${data.parent}">
                         ${getParentIcon()}
                         <span class="file-browser-item-name">..</span>
                     </div>`;
@@ -228,12 +229,12 @@
                 fileBrowserList.querySelectorAll('.file-browser-item').forEach(item => {
                     item.addEventListener('click', () => {
                         const type = item.dataset.type;
-                        const path = item.dataset.path;
+                        const itemPath = item.dataset.path;
 
                         if (type === 'parent' || type === 'directory') {
-                            loadDirectory(path);
+                            loadDirectory(itemPath);
                         } else if (type === 'file') {
-                            loadImageFromPath(path);
+                            loadImageFromPath(itemPath);
                         }
                     });
                 });

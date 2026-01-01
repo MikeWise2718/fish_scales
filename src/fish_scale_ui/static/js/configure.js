@@ -69,15 +69,25 @@ window.configure = (function() {
                 } else {
                     input.value = value;
                 }
-                // Update range display if exists (3 decimal places)
-                const display = document.getElementById(`${id}_value`);
-                if (display) {
-                    const val = parseFloat(value);
-                    display.textContent = isNaN(val) ? value : val.toFixed(3);
-                }
+                // Update range display if exists
+                updateValueDisplay(id, value);
             }
         }
         updateCullFactorVisibility();
+    }
+
+    // Update a value display element (span or input)
+    function updateValueDisplay(id, value) {
+        const display = document.getElementById(`${id}_value`);
+        if (display) {
+            const val = parseFloat(value);
+            const formatted = isNaN(val) ? value : val.toFixed(2);
+            if (display.tagName === 'INPUT') {
+                display.value = formatted;
+            } else {
+                display.textContent = formatted;
+            }
+        }
     }
 
     // ==================== Undo System ====================
@@ -320,12 +330,7 @@ window.configure = (function() {
             const input = document.getElementById(id);
             if (input && value !== undefined && value !== null) {
                 input.value = value;
-                // Update range display if exists (3 decimal places)
-                const display = document.getElementById(`${id}_value`);
-                if (display) {
-                    const val = parseFloat(value);
-                    display.textContent = isNaN(val) ? value : val.toFixed(3);
-                }
+                updateValueDisplay(id, value);
             }
         }
 
@@ -415,12 +420,7 @@ window.configure = (function() {
                 } else {
                     input.value = value;
                 }
-                // Update range display with 3 decimal places
-                const display = document.getElementById(`${id}_value`);
-                if (display) {
-                    const val = parseFloat(value);
-                    display.textContent = isNaN(val) ? value : val.toFixed(3);
-                }
+                updateValueDisplay(id, value);
             }
         }
         // Update cull factor row visibility
@@ -480,13 +480,31 @@ window.configure = (function() {
         paramInputs.forEach(input => {
             input.addEventListener('change', onParamChange);
             input.addEventListener('input', () => {
-                // Update range display with 3 decimal places for sliders
-                const display = document.getElementById(`${input.id}_value`);
-                if (display) {
-                    const val = parseFloat(input.value);
-                    display.textContent = isNaN(val) ? input.value : val.toFixed(3);
-                }
+                // Update range display for sliders
+                updateValueDisplay(input.id, input.value);
             });
+        });
+
+        // Add bidirectional sync for editable value inputs
+        const editableValues = document.querySelectorAll('.param-value-editable');
+        editableValues.forEach(valueInput => {
+            // Get the corresponding slider (id without _value suffix)
+            const sliderId = valueInput.id.replace('_value', '');
+            const slider = document.getElementById(sliderId);
+
+            if (slider) {
+                // Sync number input -> slider
+                valueInput.addEventListener('input', () => {
+                    const val = parseFloat(valueInput.value);
+                    if (!isNaN(val)) {
+                        // Clamp to slider range
+                        const min = parseFloat(slider.min) || 0;
+                        const max = parseFloat(slider.max) || 1;
+                        slider.value = Math.max(min, Math.min(max, val));
+                    }
+                });
+                valueInput.addEventListener('change', onParamChange);
+            }
         });
 
         // Cull long edges checkbox handler

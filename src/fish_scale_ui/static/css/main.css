@@ -835,6 +835,28 @@ body {
     min-width: 40px;
 }
 
+.param-value-editable {
+    width: 60px;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.8rem;
+    text-align: right;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.param-value-editable:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.param-value-editable::-webkit-inner-spin-button,
+.param-value-editable::-webkit-outer-spin-button {
+    opacity: 1;
+}
+
 .help-icon {
     display: inline-flex;
     align-items: center;

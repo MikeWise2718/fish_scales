@@ -74,9 +74,13 @@ def convert_to_web_format(image_path, output_path):
 
 @api_bp.route('/upload', methods=['POST'])
 def upload_image():
-    """Handle image upload."""
+    """Handle image upload (drag-drop).
+
+    Note: Drag-drop uploads are NOT added to recent images because we don't
+    have access to the original file path (browser security restriction).
+    Only files loaded via the file browser are tracked in recents.
+    """
     from fish_scale_ui.services.logging import log_event
-    from fish_scale_ui.services.recent_images import add_recent_image, init_recent_images
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -112,10 +116,6 @@ def upload_image():
         _current_image['rotation'] = 0
         _current_image['calibration'] = None
         _current_image['slo_saved'] = False  # Reset on new image
-
-        # Add to recent images
-        init_recent_images(current_app.config['APP_ROOT'])
-        add_recent_image(str(save_path), file.filename)
 
         # Log the event
         log_event('image_loaded', {

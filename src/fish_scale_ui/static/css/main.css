@@ -2028,6 +2028,107 @@ body {
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
+/* File Browser Modal */
+.file-browser-modal {
+    max-width: 600px;
+    width: 95%;
+}
+
+.file-browser-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.file-browser-modal .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    line-height: 1;
+}
+
+.file-browser-modal .modal-close:hover {
+    color: var(--text-primary);
+}
+
+.file-browser-modal .modal-body {
+    padding: 0;
+}
+
+.file-browser-path {
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.file-browser-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.file-browser-loading {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.file-browser-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    gap: 0.75rem;
+}
+
+.file-browser-item:hover {
+    background-color: var(--bg-secondary);
+}
+
+.file-browser-item:last-child {
+    border-bottom: none;
+}
+
+.file-browser-item-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.file-browser-item-icon.folder {
+    color: #f59e0b;
+}
+
+.file-browser-item-icon.image {
+    color: var(--primary-color);
+}
+
+.file-browser-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-browser-item-size {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.file-browser-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
 .modal-radio-group {
     display: flex;
     flex-direction: column;

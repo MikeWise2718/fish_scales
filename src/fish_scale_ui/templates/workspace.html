@@ -229,25 +229,25 @@
                 <div class="image-tab-section save-section">
                     <h3>Save</h3>
                     <div class="save-controls">
-                        <button type="button" class="btn btn-primary" id="saveSloBtn">
-                            Save SLO
+                        <button type="button" class="btn btn-primary" id="saveAnnotationsBtn">
+                            Save Annotations
                         </button>
                         <span id="unsavedIndicatorImage" class="unsaved-indicator" style="display: none;">Unsaved</span>
                     </div>
-                    <p class="hint">Save tubercle and connection data to SLO files.</p>
+                    <p class="hint">Save tubercle and connection data to annotation files.</p>
                 </div>
             </div>
 
             <!-- Calibration Tab -->
             <div class="tab-pane" data-tab="calibration">
-                <h2>Calibration</h2>
+                <h2>Calibration <a href="/static/help/calibration.html#default-estimate" class="help-icon" target="_blank" title="Calibration Help">?</a></h2>
                 <p class="tab-description">Set the scale for measurements.</p>
 
                 <div class="calibration-display-section">
                     <h3>Current Calibration</h3>
                     <div class="calibration-display">
                         <span id="calibrationValue">Not set</span>
-                        <span id="calibrationWarning" class="warning-badge" style="display: none;">Auto-estimated</span>
+                        <span id="calibrationMethod" class="calibration-method-badge" style="display: none;"></span>
                     </div>
                 </div>
 
@@ -255,7 +255,7 @@
 
                 <div class="calibration-method-section">
                     <h3>Auto-Estimate</h3>
-                    <p class="hint">Use estimated calibration based on 700x magnification (~0.14 µm/pixel).</p>
+                    <p class="hint">Use estimated calibration based on 700x magnification and 1024px image width (~0.14 µm/pixel). See <a href="/static/help/calibration.html#default-estimate" target="_blank">help</a> for details.</p>
                     <div class="estimate-controls">
                         <button type="button" class="btn btn-secondary" id="applyEstimateBtn">Apply Estimate</button>
                     </div>
@@ -487,10 +487,6 @@
                     </span>
                 </div>
 
-                <div class="slo-actions">
-                    <h3>SLO Files</h3>
-                    <button type="button" class="btn btn-secondary btn-sm" id="loadSloBtn">Load Existing SLO</button>
-                </div>
             </div>
 
             <!-- Edit Tab -->
@@ -682,7 +678,7 @@
                         <tr><td><kbd>Tab</kbd></td><td>Cycle selection</td></tr>
                         <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td></tr>
                         <tr><td><kbd>Ctrl+Y</kbd></td><td>Redo</td></tr>
-                        <tr><td><kbd>Ctrl+S</kbd></td><td>Save SLO</td></tr>
+                        <tr><td><kbd>Ctrl+S</kbd></td><td>Save Annotations</td></tr>
                         <tr><td><kbd>Ctrl+N</kbd></td><td>New set</td></tr>
                         <tr><td><kbd>Ctrl+1-9</kbd></td><td>Switch to set</td></tr>
                         <tr><td><kbd>Arrow keys</kbd></td><td>Nudge 1px</td></tr>

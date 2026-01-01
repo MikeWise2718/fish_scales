@@ -83,7 +83,7 @@ Typical workflow:
 3. run_extraction() - Run automated detection OR get_screenshot() + add tubercles manually
 4. auto_connect() - Generate neighbor connections
 5. get_statistics() - Check results
-6. save_slo() - Save the annotations
+6. save_annotations() - Save the annotations
 """
         )
         self._register_tools()
@@ -497,8 +497,8 @@ Typical workflow:
             return resp.json().get('success', True)
 
         @self.mcp.tool()
-        def save_slo() -> dict:
-            """Save current annotations to SLO file.
+        def save_annotations() -> dict:
+            """Save current annotations to file.
 
             Returns:
                 Dictionary with saved file paths

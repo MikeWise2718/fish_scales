@@ -63,7 +63,7 @@ class TestToolRegistration:
             'clear_connections',
             'auto_connect',
             'get_statistics',
-            'save_slo',
+            'save_annotations',
         ]
 
         # FastMCP stores tools internally - we can verify by checking the mcp object

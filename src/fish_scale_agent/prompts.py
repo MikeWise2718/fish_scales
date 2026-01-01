@@ -114,7 +114,7 @@ This creates a record of how the dataset evolved, which helps with reproducibili
 
 ## When Done
 1. Call `get_statistics` to report final metrics
-2. Call `save_slo` to save the annotations
+2. Call `save_annotations` to save the annotations
 3. Provide a summary of what was detected and any observations
 
 ## Tools Available
@@ -131,7 +131,7 @@ This creates a record of how the dataset evolved, which helps with reproducibili
 - `clear_connections()` - Remove all connections
 - `auto_connect(method)` - Auto-generate connections (delaunay/gabriel/rng)
 - `get_statistics()` - Get measurement statistics
-- `save_slo()` - Save annotations to file
+- `save_annotations()` - Save annotations to file
 - `add_debug_rectangle(x, y, width, height, label, color)` - Draw debug rectangle (keep visible for comparison)
 - `get_user()` - Get current user name for history tracking
 - `add_history_event(event_type, phase, summary, n_tubercles, n_edges)` - Record agent phase to history

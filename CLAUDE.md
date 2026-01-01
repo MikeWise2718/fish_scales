@@ -78,7 +78,7 @@ fish_scales/
 │   │   │   └── mcp_api.py             # MCP server API endpoints
 │   │   ├── services/
 │   │   │   ├── extraction.py          # Wrapper around CLI extraction
-│   │   │   ├── persistence.py         # SLO save/load
+│   │   │   ├── persistence.py         # Annotation save/load
 │   │   │   ├── logging.py             # JSONL logging
 │   │   │   └── recent_images.py       # Recent images management
 │   │   ├── templates/                 # Jinja2 templates
@@ -121,10 +121,10 @@ fish_scales/
 ├── tests/                             # Pytest test suite
 ├── test_images/                       # Reference images with known values
 ├── images/                            # High-resolution SEM images
-├── slo/                               # Saved annotation files (gitignored)
+├── annotations/                       # Saved annotation files (gitignored)
 ├── log/                               # JSONL session logs (gitignored)
 ├── output/                            # CLI output (gitignored)
-├── docs/                              # Documentation (slo-persistence.md, etc.)
+├── docs/                              # Documentation (annotations-persistence.md, etc.)
 ├── specs/                             # Specification documents
 └── pyproject.toml
 ```
@@ -134,7 +134,7 @@ fish_scales/
 ### Terminology
 - **TUB** (Tubercle) - A single detected tubercle, displayed as a circle
 - **ITC** (Intertubercular Connection) - A link between neighboring tubercles
-- **SLO** (Scales and Links Overlay) - Complete set of TUB/ITC annotations for an image
+- **Annotations** - Complete set of TUB/ITC annotations for an image (formerly "SLO")
 
 ### Data Models (`models.py`)
 - `CalibrationData` - Pixel-to-micrometer conversion with `px_to_um()` and `um_to_px()` methods
@@ -170,14 +170,14 @@ Predefined parameter sets: `default`, `paralepidosteus`, `lepisosteus`, `polypte
 9. **About** - Version info
 
 ### Multiple Annotation Sets
-Users can save multiple annotation sets per image for comparison (e.g., different parameters, before/after editing). Sets are stored in v2 SLO format with backward compatibility for v1 files.
+Users can save multiple annotation sets per image for comparison (e.g., different parameters, before/after editing). Sets are stored in v2 annotations format with backward compatibility for v1 files.
 
 ### File Formats
-- `*_slo.json` - Complete annotation data (v2 supports multiple sets)
+- `*_annotations.json` - Complete annotation data (v2 supports multiple sets)
 - `*_tub.csv` - Tubercle data export
 - `*_itc.csv` - Connection data export
 
-See [docs/slo-persistence.md](docs/slo-persistence.md) for detailed format specification.
+See [docs/annotations-persistence.md](docs/annotations-persistence.md) for detailed format specification.
 
 ## Test Images and Validation
 
@@ -220,7 +220,7 @@ The MCP (Model Context Protocol) server enables LLM agents to control the fish-s
 | `POST /api/tools/delete-tubercle` | Delete a tubercle |
 | `POST /api/tools/auto-connect` | Generate connections (delaunay/gabriel/rng) |
 | `GET /api/tools/statistics` | Get measurement statistics |
-| `POST /api/tools/save-slo` | Save annotations to file |
+| `POST /api/tools/save` | Save annotations to file |
 
 ### Running the MCP Server
 
@@ -427,7 +427,7 @@ Use the Read tool to view screenshot images when debugging visual issues.
 ## Documentation
 
 User guides and reference documentation are in `docs/`:
-- `slo-persistence.md` - SLO file format and storage details
+- `annotations-persistence.md` - Annotation file format and storage details
 - `openrouter-how-to.md` - Guide to using OpenRouter with the LLM agent
 - `fish-scale-metrics-extraction.md` - High-level algorithm description
 - `implementation-history.md` - Development history (Dec 2025), includes detailed Extraction Optimizer implementation notes

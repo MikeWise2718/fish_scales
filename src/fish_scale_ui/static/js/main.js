@@ -172,7 +172,7 @@ window.app = (function() {
             });
         }
 
-        // Save SLO button - handled by extraction.js
+        // Save Annotations button - handled by extraction.js
     }
 
     // Keyboard shortcuts

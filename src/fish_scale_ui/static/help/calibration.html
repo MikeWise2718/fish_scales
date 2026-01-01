@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calibration Help</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #333;
+        }
+        h1 { color: #2563eb; margin-bottom: 0.5rem; }
+        h2 { color: #1e40af; margin-top: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; }
+        h3 { color: #3b82f6; margin-top: 1.5rem; }
+        .warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        code { background: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 3px; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #e5e7eb; padding: 0.75rem; text-align: left; }
+        th { background: #f9fafb; }
+        .method-indicator {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+        }
+        .method-estimate { background: #fef3c7; color: #92400e; }
+        .method-manual { background: #d1fae5; color: #065f46; }
+    </style>
+</head>
+<body>
+    <h1>Calibration</h1>
+    <p>Calibration converts pixel measurements to real-world units (micrometers). Accurate calibration is essential for meaningful tubercle diameter and spacing measurements.</p>
+
+    <h2 id="default-estimate">The Default Estimate</h2>
+
+    <div class="warning">
+        <strong>Important:</strong> When no calibration has been set, the system displays a default estimate of <strong>0.14 µm/pixel</strong>. This value is specific to a particular imaging setup and may not be accurate for your images.
+    </div>
+
+    <h3>Where does 0.14 µm/pixel come from?</h3>
+    <p>This estimate is based on:</p>
+    <ul>
+        <li><strong>Magnification:</strong> 700x</li>
+        <li><strong>Image width:</strong> 1024 pixels</li>
+        <li><strong>Field of view:</strong> ~140 µm across</li>
+    </ul>
+    <p>The calculation: 140 µm ÷ 1024 pixels = <strong>0.137 µm/pixel</strong> (rounded to 0.14)</p>
+
+    <h3>When is 0.14 µm/pixel accurate?</h3>
+    <p>This estimate is only reasonable if your images were captured with similar settings. If your images have different dimensions or magnification, the actual calibration will differ significantly:</p>
+
+    <table>
+        <tr>
+            <th>Image Width</th>
+            <th>At 700x Magnification</th>
+        </tr>
+        <tr>
+            <td>1024 px</td>
+            <td>~0.14 µm/pixel</td>
+        </tr>
+        <tr>
+            <td>2048 px</td>
+            <td>~0.07 µm/pixel</td>
+        </tr>
+        <tr>
+            <td>4096 px</td>
+            <td>~0.035 µm/pixel</td>
+        </tr>
+    </table>
+
+    <p>Different magnifications also change the calibration proportionally. <strong>Always verify calibration using a scale bar when available.</strong></p>
+
+    <h2>Calibration Methods</h2>
+
+    <h3>1. Graphical Scale Bar Measurement (Recommended)</h3>
+    <p>The most accurate method when your image contains a scale bar:</p>
+    <ol>
+        <li>Click <strong>"Manually Draw Scale Bar"</strong></li>
+        <li>Click the start of a known scale bar in the image</li>
+        <li>Click the end of the scale bar</li>
+        <li>Enter the known length (e.g., 10 µm)</li>
+    </ol>
+    <p>This method directly measures pixels against a known reference in your specific image.</p>
+
+    <h3>2. Scale Bar Values</h3>
+    <p>If you know the scale bar dimensions:</p>
+    <ol>
+        <li>Enter the scale bar length in µm</li>
+        <li>Enter the scale bar length in pixels</li>
+        <li>Click <strong>Apply</strong></li>
+    </ol>
+
+    <h3>3. Direct Input</h3>
+    <p>If you know the exact µm/pixel value from your microscope settings:</p>
+    <ol>
+        <li>Enter the value directly (e.g., 0.165)</li>
+        <li>Click <strong>Apply</strong></li>
+    </ol>
+
+    <h3>4. Auto-Estimate</h3>
+    <p>Uses the default 0.14 µm/pixel estimate. Only use this if:</p>
+    <ul>
+        <li>Your image has no scale bar</li>
+        <li>You don't know the microscope settings</li>
+        <li>You only need approximate measurements</li>
+    </ul>
+
+    <h2>Calibration Status Indicators</h2>
+
+    <table>
+        <tr>
+            <th>Indicator</th>
+            <th>Meaning</th>
+        </tr>
+        <tr>
+            <td><span class="method-indicator method-estimate">Estimated</span></td>
+            <td>Using default 0.14 µm/pixel - measurements may be inaccurate</td>
+        </tr>
+        <tr>
+            <td><span class="method-indicator method-manual">Measured</span></td>
+            <td>Calibration set via scale bar measurement</td>
+        </tr>
+        <tr>
+            <td><span class="method-indicator method-manual">Manual</span></td>
+            <td>Calibration entered directly or via scale bar values</td>
+        </tr>
+        <tr>
+            <td><span class="method-indicator method-manual">Loaded</span></td>
+            <td>Calibration loaded from saved annotations</td>
+        </tr>
+    </table>
+
+    <h2>Persistence</h2>
+
+    <div class="info">
+        Calibration is saved with your annotations. When you load an image that has saved annotations, the calibration will be restored automatically.
+    </div>
+
+    <h2>Verification</h2>
+    <p>To verify your calibration is correct:</p>
+    <ol>
+        <li>Run extraction on a few tubercles</li>
+        <li>Check the <strong>Data</strong> tab for diameter values</li>
+        <li>Compare against expected values from literature or known samples</li>
+    </ol>
+    <p>Typical ganoid fish scale tubercle diameters range from 3-15 µm depending on species.</p>
+
+</body>
+</html>

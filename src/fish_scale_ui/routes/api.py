@@ -18,7 +18,7 @@ _current_image = {
     'filename': None,
     'rotation': 0,
     'calibration': None,
-    'slo_saved': False,  # Track if we've saved SLO this session (skip overwrite warning)
+    'annotations_saved': False,  # Track if we've saved annotations this session (skip overwrite warning)
 }
 
 # In-memory storage for extraction results
@@ -115,7 +115,7 @@ def upload_image():
         _current_image['filename'] = file.filename
         _current_image['rotation'] = 0
         _current_image['calibration'] = None
-        _current_image['slo_saved'] = False  # Reset on new image
+        _current_image['annotations_saved'] = False  # Reset on new image
 
         # Log the event
         log_event('image_loaded', {
@@ -172,7 +172,7 @@ def load_recent():
         _current_image['filename'] = image_path.name
         _current_image['rotation'] = 0
         _current_image['calibration'] = None
-        _current_image['slo_saved'] = False  # Reset on new image
+        _current_image['annotations_saved'] = False  # Reset on new image
 
         init_recent_images(current_app.config['APP_ROOT'])
         add_recent_image(str(image_path), image_path.name)
@@ -621,15 +621,15 @@ def regenerate_connections():
         return jsonify({'error': f'Regenerate connections failed: {str(e)}'}), 500
 
 
-@api_bp.route('/save-slo', methods=['POST'])
-def save_slo():
-    """Save SLO data to files.
+@api_bp.route('/save-annotations', methods=['POST'])
+def save_annotations():
+    """Save annotation data to files.
 
     Supports both v1 (legacy) and v2 (multiple sets) formats.
     v2 format includes 'version': 2 and 'sets': [...] in the request.
     """
     from fish_scale_ui.services.logging import log_event
-    from fish_scale_ui.services.persistence import save_slo as persist_slo
+    from fish_scale_ui.services.persistence import save_annotations as persist_annotations
 
     if not _current_image['filename']:
         return jsonify({'error': 'No image loaded'}), 400
@@ -653,11 +653,11 @@ def save_slo():
         if len(sets) == 0:
             return jsonify({'error': 'No sets to save'}), 400
 
-        slo_dir = current_app.config['APP_ROOT'] / 'slo'
+        annotations_dir = current_app.config['APP_ROOT'] / 'annotations'
 
         try:
-            result = persist_slo(
-                slo_dir=slo_dir,
+            result = persist_annotations(
+                annotations_dir=annotations_dir,
                 image_name=_current_image['filename'],
                 calibration=_current_image.get('calibration', {}),
                 version=2,
@@ -668,12 +668,12 @@ def save_slo():
             )
 
             # Skip overwrite warning if we've already saved this session
-            if _current_image.get('slo_saved') and result.get('existing_files'):
+            if _current_image.get('annotations_saved') and result.get('existing_files'):
                 result['existing_files'] = []
 
             if result['success']:
                 # Mark that we've saved this session
-                _current_image['slo_saved'] = True
+                _current_image['annotations_saved'] = True
 
                 # Update server-side cache with active set data
                 active_set = None
@@ -691,7 +691,7 @@ def save_slo():
                 _extraction_data['parameters'] = parameters
                 _extraction_data['dirty'] = False
 
-                log_event('slo_saved', {
+                log_event('annotations_saved', {
                     'filename': _current_image['filename'],
                     'version': 2,
                     'n_sets': len(sets),
@@ -702,7 +702,7 @@ def save_slo():
             return jsonify(result)
 
         except Exception as e:
-            log_event('slo_save_failed', {'error': str(e)})
+            log_event('annotations_save_failed', {'error': str(e)})
             return jsonify({'error': f'Save failed: {str(e)}'}), 500
 
     # V1 format (legacy)
@@ -714,11 +714,11 @@ def save_slo():
     if not tubercles:
         return jsonify({'error': 'No data to save'}), 400
 
-    slo_dir = current_app.config['APP_ROOT'] / 'slo'
+    annotations_dir = current_app.config['APP_ROOT'] / 'annotations'
 
     try:
-        result = persist_slo(
-            slo_dir=slo_dir,
+        result = persist_annotations(
+            annotations_dir=annotations_dir,
             image_name=_current_image['filename'],
             calibration=_current_image.get('calibration', {}),
             tubercles=tubercles,
@@ -728,12 +728,12 @@ def save_slo():
         )
 
         # Skip overwrite warning if we've already saved this session
-        if _current_image.get('slo_saved') and result.get('existing_files'):
+        if _current_image.get('annotations_saved') and result.get('existing_files'):
             result['existing_files'] = []
 
         if result['success']:
             # Mark that we've saved this session
-            _current_image['slo_saved'] = True
+            _current_image['annotations_saved'] = True
 
             # Update server-side cache
             _extraction_data['tubercles'] = tubercles
@@ -742,7 +742,7 @@ def save_slo():
             _extraction_data['parameters'] = parameters
             _extraction_data['dirty'] = False
 
-            log_event('slo_saved', {
+            log_event('annotations_saved', {
                 'filename': _current_image['filename'],
                 'n_tubercles': len(tubercles),
                 'n_edges': len(edges),
@@ -751,52 +751,55 @@ def save_slo():
         return jsonify(result)
 
     except Exception as e:
-        log_event('slo_save_failed', {'error': str(e)})
+        log_event('annotations_save_failed', {'error': str(e)})
         return jsonify({'error': f'Save failed: {str(e)}'}), 500
 
 
-@api_bp.route('/load-slo', methods=['POST'])
-def load_slo():
-    """Load SLO data from a file."""
+@api_bp.route('/load-annotations', methods=['POST'])
+def load_annotations():
+    """Load annotation data from a file."""
     from fish_scale_ui.services.logging import log_event
-    from fish_scale_ui.services.persistence import load_slo as load_slo_file
+    from fish_scale_ui.services.persistence import load_annotations as load_annotations_file
 
     data = request.get_json() or {}
-    slo_path = data.get('path')
+    annotations_path = data.get('path')
 
-    if not slo_path:
-        # Try to find SLO for current image
+    if not annotations_path:
+        # Try to find annotations for current image
         if not _current_image['filename']:
             return jsonify({'error': 'No image loaded and no path provided'}), 400
 
-        slo_dir = current_app.config['APP_ROOT'] / 'slo'
+        annotations_dir = current_app.config['APP_ROOT'] / 'annotations'
         base_name = Path(_current_image['filename']).stem
-        slo_path = slo_dir / f"{base_name}_slo.json"
+        # Try new naming first, fall back to legacy
+        annotations_path = annotations_dir / f"{base_name}_annotations.json"
+        if not annotations_path.exists():
+            annotations_path = annotations_dir / f"{base_name}_slo.json"
 
     try:
-        result = load_slo_file(slo_path)
+        result = load_annotations_file(annotations_path)
 
         if result['success']:
-            slo_data = result['data']
+            annotations_data = result['data']
 
             # Check image name match
             name_match = True
             if _current_image['filename']:
-                loaded_name = slo_data.get('image_name', '')
+                loaded_name = annotations_data.get('image_name', '')
                 if loaded_name and loaded_name != _current_image['filename']:
                     name_match = False
 
             # Update extraction data - handle both v1 and v2 formats
-            if slo_data.get('version') == 2 and slo_data.get('sets'):
+            if annotations_data.get('version') == 2 and annotations_data.get('sets'):
                 # V2 format: get data from active set
-                active_set_id = slo_data.get('activeSetId')
+                active_set_id = annotations_data.get('activeSetId')
                 active_set = None
-                for s in slo_data['sets']:
+                for s in annotations_data['sets']:
                     if s.get('id') == active_set_id:
                         active_set = s
                         break
-                if not active_set and slo_data['sets']:
-                    active_set = slo_data['sets'][0]
+                if not active_set and annotations_data['sets']:
+                    active_set = annotations_data['sets'][0]
 
                 if active_set:
                     _extraction_data['tubercles'] = active_set.get('tubercles', [])
@@ -806,48 +809,48 @@ def load_slo():
                     _extraction_data['edges'] = []
             else:
                 # V1 format: get data from root level
-                _extraction_data['tubercles'] = slo_data.get('tubercles', [])
-                _extraction_data['edges'] = slo_data.get('edges', [])
+                _extraction_data['tubercles'] = annotations_data.get('tubercles', [])
+                _extraction_data['edges'] = annotations_data.get('edges', [])
 
-            _extraction_data['statistics'] = slo_data.get('statistics', {})
-            _extraction_data['parameters'] = slo_data.get('parameters', {})
+            _extraction_data['statistics'] = annotations_data.get('statistics', {})
+            _extraction_data['parameters'] = annotations_data.get('parameters', {})
             _extraction_data['dirty'] = False
 
             # Update calibration if present
-            if slo_data.get('calibration'):
-                _current_image['calibration'] = slo_data['calibration']
+            if annotations_data.get('calibration'):
+                _current_image['calibration'] = annotations_data['calibration']
 
             # Mark as saved since we loaded existing files
-            _current_image['slo_saved'] = True
+            _current_image['annotations_saved'] = True
 
-            log_event('slo_loaded', {
-                'filename': slo_data.get('image_name', 'unknown'),
+            log_event('annotations_loaded', {
+                'filename': annotations_data.get('image_name', 'unknown'),
                 'n_tubercles': len(_extraction_data['tubercles']),
                 'n_edges': len(_extraction_data['edges']),
             })
 
             return jsonify({
                 'success': True,
-                'data': slo_data,
+                'data': annotations_data,
                 'name_match': name_match,
             })
 
         return jsonify(result)
 
     except Exception as e:
-        log_event('slo_load_failed', {'error': str(e)})
+        log_event('annotations_load_failed', {'error': str(e)})
         return jsonify({'error': f'Load failed: {str(e)}'}), 500
 
 
-@api_bp.route('/list-slo', methods=['GET'])
-def list_slo():
-    """List available SLO files."""
-    from fish_scale_ui.services.persistence import list_slo_files
+@api_bp.route('/list-annotations', methods=['GET'])
+def list_annotations():
+    """List available annotation files."""
+    from fish_scale_ui.services.persistence import list_annotation_files
 
-    slo_dir = current_app.config['APP_ROOT'] / 'slo'
+    annotations_dir = current_app.config['APP_ROOT'] / 'annotations'
     image_name = request.args.get('image')
 
-    files = list_slo_files(slo_dir, image_name)
+    files = list_annotation_files(annotations_dir, image_name)
     return jsonify({'files': files})
 
 

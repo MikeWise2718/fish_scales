@@ -1,10 +1,10 @@
-# SLO Persistence - Annotation Data Storage
+# Annotation Data Storage
 
 This document describes how annotation data (tubercles and connections) are saved and loaded.
 
 ## Storage Location
 
-All annotation files are saved in the **`slo/`** directory at the project root. This directory is gitignored.
+All annotation files are saved in the **`annotations/`** directory at the project root. This directory is gitignored.
 
 ## Files Created Per Image
 
@@ -12,21 +12,22 @@ For each image, three files are created using the image's base name:
 
 | File | Format | Content |
 |------|--------|---------|
-| `<image_name>_slo.json` | JSON | Complete annotation data (all sets) |
+| `<image_name>_annotations.json` | JSON | Complete annotation data (all sets) |
 | `<image_name>_tub.csv` | CSV | Tubercle data from the active set |
 | `<image_name>_itc.csv` | CSV | Connection data from the active set |
 
 **Example:** For `P1_Fig4_Atractosteus_simplex_7.07um.tif`:
-- `slo/P1_Fig4_Atractosteus_simplex_7.07um_slo.json`
-- `slo/P1_Fig4_Atractosteus_simplex_7.07um_tub.csv`
-- `slo/P1_Fig4_Atractosteus_simplex_7.07um_itc.csv`
+- `annotations/P1_Fig4_Atractosteus_simplex_7.07um_annotations.json`
+- `annotations/P1_Fig4_Atractosteus_simplex_7.07um_tub.csv`
+- `annotations/P1_Fig4_Atractosteus_simplex_7.07um_itc.csv`
 
-## SLO JSON Format
+## Annotations JSON Format
 
 ### Version 2 (Current - Multiple Sets)
 
 ```json
 {
+  "format": "annotations-v2",
   "version": 2,
   "created": "2025-01-15T10:30:00",
   "image_name": "example.tif",
@@ -88,6 +89,7 @@ For each image, three files are created using the image's base name:
 
 ```json
 {
+  "format": "annotations-v1",
   "version": "1.0",
   "created": "2025-01-15T10:30:00",
   "image_name": "example.tif",
@@ -100,6 +102,12 @@ For each image, three files are created using the image's base name:
 ```
 
 V1 files are automatically supported when loading - the system treats them as a single set.
+
+## Backwards Compatibility
+
+The system supports loading legacy `*_slo.json` files:
+- Both `*_annotations.json` and `*_slo.json` file names are searched when loading
+- New saves always use the `*_annotations.json` naming
 
 ## CSV Export Format
 
@@ -129,6 +137,6 @@ V1 files are automatically supported when loading - the system treats them as a 
 ## Implementation
 
 The persistence logic is in `src/fish_scale_ui/services/persistence.py`:
-- `save_slo()` - Save annotation data to files
-- `load_slo()` - Load SLO JSON file
-- `list_slo_files()` - List available SLO files for an image
+- `save_annotations()` - Save annotation data to files
+- `load_annotations()` - Load annotations JSON file
+- `list_annotation_files()` - List available annotation files for an image

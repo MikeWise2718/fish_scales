@@ -559,8 +559,8 @@ window.configure = (function() {
             });
         }
 
-        // Help icons
-        const helpIcons = document.querySelectorAll('.help-icon');
+        // Help icons for parameters (only those with data-param attribute)
+        const helpIcons = document.querySelectorAll('.help-icon[data-param]');
         helpIcons.forEach(icon => {
             icon.addEventListener('click', (e) => {
                 e.preventDefault();

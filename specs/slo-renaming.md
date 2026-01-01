@@ -1,5 +1,8 @@
 # SLO to Annotations Renaming Plan
 
+> **Status: IMPLEMENTED** (2026-01-01)
+> This renaming plan has been fully implemented. All code, documentation, and APIs now use "annotations" terminology. The legacy `*_slo.json` file format is still supported for backwards compatibility when loading.
+
 ## Overview
 
 This document outlines the plan to rename "SLO" (Scale Landmark Overlay) to "Annotations" throughout the codebase. The term "Annotations" is standard terminology in computer vision and image analysis, making the codebase more intuitive and self-documenting.

@@ -10,12 +10,12 @@ window.calibration = (function() {
     let currentCalibration = null;
 
     // DOM elements
-    let valueDisplay, warningBadge, scaleUmInput, scalePxInput;
+    let valueDisplay, methodBadge, scaleUmInput, scalePxInput;
     let umPerPxInput, measureBtn, measureStatus;
 
     function init() {
         valueDisplay = document.getElementById('calibrationValue');
-        warningBadge = document.getElementById('calibrationWarning');
+        methodBadge = document.getElementById('calibrationMethod');
         scaleUmInput = document.getElementById('scaleUm');
         scalePxInput = document.getElementById('scalePx');
         umPerPxInput = document.getElementById('umPerPx');
@@ -105,8 +105,11 @@ window.calibration = (function() {
     function updateDisplay() {
         if (currentCalibration) {
             const umPerPx = currentCalibration.um_per_px;
+            const method = currentCalibration.method || 'unknown';
             valueDisplay.textContent = `${umPerPx.toFixed(4)} µm/pixel`;
-            warningBadge.style.display = 'none';
+
+            // Show method badge with appropriate styling
+            updateMethodBadge(method);
 
             // Also update input fields
             if (umPerPxInput) {
@@ -120,11 +123,50 @@ window.calibration = (function() {
         }
     }
 
+    function updateMethodBadge(method) {
+        if (!methodBadge) return;
+
+        // Remove all method classes
+        methodBadge.classList.remove('method-estimate', 'method-manual', 'method-not-set');
+        methodBadge.style.display = 'inline-block';
+
+        switch (method) {
+            case 'estimate':
+                methodBadge.textContent = 'Estimated';
+                methodBadge.classList.add('method-estimate');
+                methodBadge.title = 'Using default 0.14 µm/pixel estimate - may be inaccurate';
+                break;
+            case 'scale_bar':
+            case 'direct':
+                methodBadge.textContent = 'Manual';
+                methodBadge.classList.add('method-manual');
+                methodBadge.title = 'Calibration set manually';
+                break;
+            case 'measure':
+                methodBadge.textContent = 'Measured';
+                methodBadge.classList.add('method-manual');
+                methodBadge.title = 'Calibration measured from scale bar in image';
+                break;
+            case 'loaded':
+                methodBadge.textContent = 'Loaded';
+                methodBadge.classList.add('method-manual');
+                methodBadge.title = 'Calibration loaded from saved annotations';
+                break;
+            default:
+                methodBadge.style.display = 'none';
+        }
+    }
+
     function displayAutoEstimate() {
-        // Auto-estimation based on 700x magnification
-        // Typical SEM at 700x: ~0.14 µm/pixel (varies by detector)
-        valueDisplay.textContent = '~0.14 µm/pixel (estimated)';
-        warningBadge.style.display = 'inline';
+        // No calibration set - show default estimate with warning
+        valueDisplay.textContent = '~0.14 µm/pixel';
+        if (methodBadge) {
+            methodBadge.textContent = 'Not Set';
+            methodBadge.classList.remove('method-estimate', 'method-manual');
+            methodBadge.classList.add('method-not-set');
+            methodBadge.style.display = 'inline-block';
+            methodBadge.title = 'No calibration set - using default estimate. Click ? for help.';
+        }
     }
 
     function startMeasuring() {
@@ -253,9 +295,13 @@ window.calibration = (function() {
     }
 
     function setCalibration(calibrationData) {
-        // Set calibration from loaded SLO data
+        // Set calibration from loaded annotations data
         if (calibrationData && calibrationData.um_per_px) {
-            currentCalibration = calibrationData;
+            currentCalibration = { ...calibrationData };
+            // If no method specified, mark as loaded from file
+            if (!currentCalibration.method) {
+                currentCalibration.method = 'loaded';
+            }
             updateDisplay();
         }
     }

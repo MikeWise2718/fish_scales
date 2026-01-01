@@ -615,14 +615,14 @@ def handle_calibration():
 
 
 @mcp_bp.route('/save', methods=['POST'])
-def save_slo():
-    """Save current state to SLO file.
+def save_annotations():
+    """Save current state to annotations file.
 
     Returns:
-        {"success": true, "files": {"slo": str, "tub_csv": str, "itc_csv": str}}
+        {"success": true, "files": {"annotations_json": str, "tub_csv": str, "itc_csv": str}}
     """
     from fish_scale_ui.services.logging import log_event
-    from fish_scale_ui.services.persistence import save_slo as persist_slo
+    from fish_scale_ui.services.persistence import save_annotations as persist_annotations
 
     _current_image, _extraction_data = get_state_refs()
 
@@ -635,11 +635,11 @@ def save_slo():
     if not tubercles:
         return jsonify({'error': 'No data to save'}), 400
 
-    slo_dir = current_app.config['APP_ROOT'] / 'slo'
+    annotations_dir = current_app.config['APP_ROOT'] / 'annotations'
 
     try:
-        result = persist_slo(
-            slo_dir=slo_dir,
+        result = persist_annotations(
+            annotations_dir=annotations_dir,
             image_name=_current_image['filename'],
             calibration=_current_image.get('calibration', {}),
             tubercles=tubercles,
@@ -649,10 +649,10 @@ def save_slo():
         )
 
         if result['success']:
-            _current_image['slo_saved'] = True
+            _current_image['annotations_saved'] = True
             _extraction_data['dirty'] = False
 
-            log_event('mcp_slo_saved', {
+            log_event('mcp_annotations_saved', {
                 'filename': _current_image['filename'],
                 'n_tubercles': len(tubercles),
                 'n_edges': len(edges),

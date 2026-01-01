@@ -228,14 +228,14 @@ window.extraction = (function() {
         }
     }
 
-    // Save SLO (v2 format with multiple sets)
-    async function saveSlo(force = false) {
+    // Save annotations (v2 format with multiple sets)
+    async function saveAnnotations(force = false) {
         try {
             // Get all sets data for v2 format
             const setsData = window.sets.exportForSave();
             const statistics = window.data?.getStatistics() || {};
 
-            const response = await fetch('/api/save-slo', {
+            const response = await fetch('/api/save-annotations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -257,7 +257,7 @@ window.extraction = (function() {
             if (result.existing_files && result.existing_files.length > 0 && !force) {
                 const confirmed = await showOverwriteDialog(result.existing_files);
                 if (confirmed) {
-                    return saveSlo(true);
+                    return saveAnnotations(true);
                 }
                 return false;
             }
@@ -265,7 +265,7 @@ window.extraction = (function() {
             // Mark all sets as clean
             window.sets.markAllClean();
             updateDirtyIndicator();
-            window.app.showToast('SLO saved successfully', 'success');
+            window.app.showToast('Annotations saved successfully', 'success');
             window.app.loadLog();
             return true;
 
@@ -276,10 +276,10 @@ window.extraction = (function() {
         }
     }
 
-    // Load SLO (supports both v1 and v2 formats)
-    async function loadSlo(path = null) {
+    // Load annotations (supports both v1 and v2 formats)
+    async function loadAnnotations(path = null) {
         try {
-            const response = await fetch('/api/load-slo', {
+            const response = await fetch('/api/load-annotations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path }),
@@ -289,7 +289,7 @@ window.extraction = (function() {
 
             if (result.error) {
                 if (result.error.includes('not found')) {
-                    // No existing SLO - that's OK, initialize with default set
+                    // No existing annotations - that's OK, initialize with default set
                     window.sets.init();
                     return false;
                 }
@@ -299,7 +299,7 @@ window.extraction = (function() {
 
             // Check name match warning
             if (!result.name_match) {
-                window.app.showToast('Warning: SLO was saved for a different image', 'warning');
+                window.app.showToast('Warning: Annotations were saved for a different image', 'warning');
             }
 
             // Check for v2 format (has sets array)
@@ -340,7 +340,7 @@ window.extraction = (function() {
             }
 
             updateDirtyIndicator();
-            window.app.showToast('SLO loaded successfully', 'success');
+            window.app.showToast('Annotations loaded successfully', 'success');
             window.app.loadLog();
             return true;
 
@@ -537,8 +537,8 @@ window.extraction = (function() {
             indicatorImage.style.display = isDirty ? 'inline-block' : 'none';
         }
 
-        // Update Save SLO button
-        const saveBtn = document.getElementById('saveSloBtn');
+        // Update Save Annotations button
+        const saveBtn = document.getElementById('saveAnnotationsBtn');
         if (saveBtn) {
             saveBtn.classList.toggle('has-changes', isDirty);
         }
@@ -575,23 +575,17 @@ window.extraction = (function() {
             extractConnectionsBtn.addEventListener('click', runConnectionExtraction);
         }
 
-        // Save SLO button (in toolbar)
-        const saveSloBtn = document.getElementById('saveSloBtn');
-        if (saveSloBtn) {
-            saveSloBtn.addEventListener('click', () => saveSlo());
-        }
-
-        // Load SLO button
-        const loadSloBtn = document.getElementById('loadSloBtn');
-        if (loadSloBtn) {
-            loadSloBtn.addEventListener('click', () => loadSlo());
+        // Save Annotations button (in toolbar)
+        const saveAnnotationsBtn = document.getElementById('saveAnnotationsBtn');
+        if (saveAnnotationsBtn) {
+            saveAnnotationsBtn.addEventListener('click', () => saveAnnotations());
         }
 
         // Keyboard shortcut: Ctrl+S
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 's') {
                 e.preventDefault();
-                saveSlo();
+                saveAnnotations();
             }
         });
 
@@ -609,11 +603,11 @@ window.extraction = (function() {
             markDirty();
         });
 
-        // Check for existing SLO on image load
+        // Check for existing annotations on image load
         document.addEventListener('imageLoaded', () => {
-            loadSlo().then(loaded => {
+            loadAnnotations().then(loaded => {
                 if (!loaded) {
-                    // Clear previous data if no SLO found
+                    // Clear previous data if no annotations found
                     if (window.overlay) window.overlay.clear();
                     if (window.data) window.data.clear();
                     if (window.editor) window.editor.setData([], []);
@@ -628,8 +622,11 @@ window.extraction = (function() {
     return {
         runExtraction,
         runConnectionExtraction,
-        saveSlo,
-        loadSlo,
+        saveAnnotations,
+        loadAnnotations,
+        // Backwards compatibility aliases
+        saveSlo: saveAnnotations,
+        loadSlo: loadAnnotations,
         checkDirty,
         markDirty,
         confirmUnsavedChanges,

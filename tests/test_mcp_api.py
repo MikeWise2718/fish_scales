@@ -14,7 +14,7 @@ def reset_api_state():
         'filename': None,
         'rotation': 0,
         'calibration': None,
-        'slo_saved': False,
+        'annotations_saved': False,
     })
     api._extraction_data.update({
         'tubercles': [],
@@ -499,7 +499,7 @@ class TestSaveEndpoint:
         assert response.status_code == 400
 
     def test_save_success(self, client, synthetic_test_image, sample_tubercles, tmp_path):
-        """Save SLO file successfully."""
+        """Save annotations file successfully."""
         from fish_scale_ui.routes import api
 
         # Load image

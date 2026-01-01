@@ -52,7 +52,7 @@ def create_app(config=None):
     # Ensure directories exist
     app.config['UPLOAD_FOLDER'].mkdir(parents=True, exist_ok=True)
     (app.config['APP_ROOT'] / 'log').mkdir(parents=True, exist_ok=True)
-    (app.config['APP_ROOT'] / 'slo').mkdir(parents=True, exist_ok=True)
+    (app.config['APP_ROOT'] / 'annotations').mkdir(parents=True, exist_ok=True)
 
     # Register blueprints
     from fish_scale_ui.routes.main import main_bp

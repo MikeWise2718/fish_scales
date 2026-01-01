@@ -613,8 +613,8 @@ window.sets = (function() {
     }
 
     /**
-     * Export all sets data for saving to SLO
-     * @returns {Object} Data structure for v2 SLO format
+     * Export all sets data for saving to annotations
+     * @returns {Object} Data structure for v2 annotations format
      */
     function exportForSave() {
         // Consolidate pending edits for all sets before exporting
@@ -635,8 +635,8 @@ window.sets = (function() {
     }
 
     /**
-     * Import sets data from loaded SLO (v2 format)
-     * @param {Object} data - Data from SLO file
+     * Import sets data from loaded annotations (v2 format)
+     * @param {Object} data - Data from annotations file
      */
     function importFromLoad(data) {
         clear();
@@ -688,7 +688,7 @@ window.sets = (function() {
     }
 
     /**
-     * Import from v1 SLO format (single set)
+     * Import from v1 annotations format (single set)
      * @param {Array} tubercles - Tubercle data
      * @param {Array} edges - Edge data
      */

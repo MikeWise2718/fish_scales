@@ -72,7 +72,7 @@ Features:
 - Interactive tubercle detection with parameter tuning
 - Manual add/delete/move tubercles
 - Multiple annotation sets per image
-- Export to CSV and SLO formats
+- Export to CSV and annotation formats
 
 ### CLI: Process a Single Image
 
@@ -240,7 +240,7 @@ fish-scale-mcp
 | `add_connection` / `delete_connection` | Connection CRUD operations |
 | `auto_connect` | Generate connections (delaunay/gabriel/rng) |
 | `get_statistics` | Get measurement statistics |
-| `save_slo` | Save annotations to file |
+| `save_annotations` | Save annotations to file |
 
 ## Project Structure
 

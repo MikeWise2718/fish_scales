@@ -211,8 +211,8 @@ TOOLS = [
         parameters={"type": "object", "properties": {}},
     ),
     ToolDefinition(
-        name="save_slo",
-        description="Save current annotations to SLO file.",
+        name="save_annotations",
+        description="Save current annotations to file.",
         parameters={"type": "object", "properties": {}},
     ),
     ToolDefinition(
@@ -485,7 +485,7 @@ class TubercleDetectionAgent:
                 resp.raise_for_status()
                 return resp.json()
 
-            elif name == "save_slo":
+            elif name == "save_annotations":
                 resp = self._client.post(self._api_url("/save"))
                 resp.raise_for_status()
                 data = resp.json()

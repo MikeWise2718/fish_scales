@@ -695,8 +695,19 @@ def load_image():
     try:
         # Check if this image is already loaded (by original filename)
         # Skip re-copying if same image is already in memory
+        # Handle GUID-prefixed paths from uploads folder: "abc123_originalname.tif"
+        current_filename = _current_image.get('filename', '')
+        incoming_name = image_path.name
+
+        # Check for exact match OR if incoming name ends with the original filename
+        # (handles GUID prefix: "abc123_image.tif" matches "image.tif")
+        filename_matches = (
+            current_filename == incoming_name or
+            (current_filename and incoming_name.endswith('_' + current_filename))
+        )
+
         already_loaded = (
-            _current_image.get('filename') == image_path.name and
+            filename_matches and
             _current_image.get('web_path') and
             Path(_current_image['web_path']).exists()
         )

@@ -49,6 +49,22 @@ window.agentExtraction = (function() {
     };
 
     /**
+     * Get theme colors from CSS custom properties.
+     * Falls back to default dark theme colors if variables are not set.
+     */
+    function getThemeColors() {
+        const styles = getComputedStyle(document.documentElement);
+        return {
+            background: styles.getPropertyValue('--panel-dark-bg-alt').trim() || '#1a1a2e',
+            backgroundLight: styles.getPropertyValue('--panel-dark-bg').trim() || '#1e293b',
+            grid: styles.getPropertyValue('--panel-dark-grid').trim() || '#333344',
+            text: styles.getPropertyValue('--panel-dark-text-muted').trim() || '#888888',
+            textDim: styles.getPropertyValue('--panel-dark-text-dim').trim() || '#64748b',
+            border: styles.getPropertyValue('--panel-dark-border').trim() || '#334155',
+        };
+    }
+
+    /**
      * Initialize providers from API
      */
     async function loadProviders() {
@@ -130,7 +146,9 @@ window.agentExtraction = (function() {
         // Validate inputs
         const provider = document.getElementById('agentProvider')?.value;
         const model = document.getElementById('agentModel')?.value;
-        const profile = document.getElementById('agentProfile')?.value;
+        const profile = document.getElementById('agentProfile')?.value || 'default';
+        const useCurrentParams = document.getElementById('agentUseCurrentParams')?.checked ?? true;
+        const targetScore = parseFloat(document.getElementById('agentTargetScore')?.value) || 0.70;
         const maxIterations = parseInt(document.getElementById('agentMaxIterations')?.value, 10) || 30;
 
         // Check if provider is configured
@@ -194,6 +212,9 @@ window.agentExtraction = (function() {
                     provider: provider,
                     model: model || undefined,
                     max_iterations: maxIterations,
+                    target_score: targetScore,
+                    profile: useCurrentParams ? null : profile,
+                    use_current_params: useCurrentParams,
                     verbose: true,
                     image_path: currentImage?.path || currentImage?.web_path,
                     calibration: calibration.um_per_px,
@@ -583,9 +604,10 @@ window.agentExtraction = (function() {
             const ctx = canvas.getContext('2d');
             const width = canvas.width;
             const height = canvas.height;
-            ctx.fillStyle = '#f8fafc';
+            const colors = getThemeColors();
+            ctx.fillStyle = colors.backgroundLight;
             ctx.fillRect(0, 0, width, height);
-            ctx.fillStyle = '#64748b';
+            ctx.fillStyle = colors.textDim;
             ctx.font = '14px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('Progress chart will appear during extraction', width / 2, height / 2);
@@ -601,9 +623,10 @@ window.agentExtraction = (function() {
         const ctx = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
+        const colors = getThemeColors();
 
         // Clear canvas
-        ctx.fillStyle = '#1a1a2e';
+        ctx.fillStyle = colors.background;
         ctx.fillRect(0, 0, width, height);
 
         // Draw chart
@@ -617,7 +640,7 @@ window.agentExtraction = (function() {
         const minScore = 0;
 
         // Draw grid lines
-        ctx.strokeStyle = '#333344';
+        ctx.strokeStyle = colors.grid;
         ctx.lineWidth = 1;
         for (let i = 0; i <= 4; i++) {
             const y = padding.top + (chartHeight * i / 4);
@@ -628,7 +651,7 @@ window.agentExtraction = (function() {
         }
 
         // Draw y-axis labels
-        ctx.fillStyle = '#888';
+        ctx.fillStyle = colors.text;
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'right';
         for (let i = 0; i <= 4; i++) {
@@ -690,7 +713,7 @@ window.agentExtraction = (function() {
         const latest = state.history[state.history.length - 1];
         const latestScore = (latest?.score || latest?.hexagonalness || 0).toFixed(3);
 
-        ctx.fillStyle = '#888';
+        ctx.fillStyle = colors.text;
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`Iterations: ${state.history.length}  Latest: ${latestScore}`, width - padding.right, height - 5);
@@ -857,7 +880,7 @@ window.agentExtraction = (function() {
                 const paramsResponse = await fetch('/api/tools/params');
                 if (paramsResponse.ok) {
                     const paramsData = await paramsResponse.json();
-                    currentParams = paramsData.params || paramsData;
+                    currentParams = paramsData.parameters || paramsData.params || paramsData;
                 }
             } catch (e) {
                 // Ignore params fetch errors
@@ -913,10 +936,13 @@ window.agentExtraction = (function() {
     function parseLogLines(logLines) {
         // Look for iteration, phase, and score information in log output
         for (const line of logLines.slice(-20)) {  // Check last 20 lines
-            // Parse iteration numbers
-            const iterMatch = line.match(/Iteration\s+(\d+)/i);
+            // Parse iteration numbers - matches both "Iteration N" and "Extraction [N/M]"
+            const iterMatch = line.match(/Iteration\s+(\d+)|Extraction\s*\[(\d+)/i);
             if (iterMatch) {
-                state.currentIteration = parseInt(iterMatch[1], 10);
+                const iterNum = parseInt(iterMatch[1] || iterMatch[2], 10);
+                if (iterNum > state.currentIteration) {
+                    state.currentIteration = iterNum;
+                }
             }
 
             // Parse phase information
@@ -1249,6 +1275,15 @@ window.agentExtraction = (function() {
             providerSelect.addEventListener('change', populateModelSelect);
         }
 
+        // Use current params checkbox - toggle profile select
+        const useCurrentParamsCheckbox = document.getElementById('agentUseCurrentParams');
+        const profileSelect = document.getElementById('agentProfile');
+        if (useCurrentParamsCheckbox && profileSelect) {
+            useCurrentParamsCheckbox.addEventListener('change', () => {
+                profileSelect.disabled = useCurrentParamsCheckbox.checked;
+            });
+        }
+
         // Read max iterations from input if available
         const maxIterInput = document.getElementById('agentMaxIterations');
         if (maxIterInput) {
@@ -1330,6 +1365,11 @@ window.agentExtraction = (function() {
 
     // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', init);
+
+    // Redraw chart when theme colors change
+    window.addEventListener('themeColorsChanged', () => {
+        updateChart();
+    });
 
     // Export public API
     return {

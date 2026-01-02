@@ -27,6 +27,38 @@ window.settings = (function() {
         hexEdgeRatioWeight: 0.15,
         // Panel width
         tabsPanelWidth: 400,
+        // Theme settings
+        panelTheme: 'dark', // 'dark', 'light', or 'custom'
+        // Custom theme colors (used when panelTheme === 'custom')
+        customPanelBg: '#1e293b',
+        customPanelBgAlt: '#1a1a2e',
+        customPanelText: '#e2e8f0',
+        customPanelTextMuted: '#94a3b8',
+        customPanelTextDim: '#64748b',
+        customPanelBorder: '#334155',
+        customPanelGrid: '#333344',
+    };
+
+    // Predefined theme color palettes
+    const THEMES = {
+        dark: {
+            panelBg: '#1e293b',
+            panelBgAlt: '#1a1a2e',
+            panelText: '#e2e8f0',
+            panelTextMuted: '#94a3b8',
+            panelTextDim: '#64748b',
+            panelBorder: '#334155',
+            panelGrid: '#333344',
+        },
+        light: {
+            panelBg: '#f1f5f9',
+            panelBgAlt: '#e2e8f0',
+            panelText: '#1e293b',
+            panelTextMuted: '#475569',
+            panelTextDim: '#64748b',
+            panelBorder: '#cbd5e1',
+            panelGrid: '#94a3b8',
+        },
     };
 
     // Current settings
@@ -39,8 +71,14 @@ window.settings = (function() {
         // Bind UI elements
         bindUI();
 
+        // Bind theme color UI
+        bindThemeColorUI();
+
         // Apply settings to UI
         applyToUI();
+
+        // Apply theme colors to CSS variables
+        applyThemeColors();
 
         // Init collapsible groups
         initCollapsibleGroups();
@@ -119,7 +157,192 @@ window.settings = (function() {
         if (window.app && window.app.showToast) {
             window.app.showToast('Settings reset to defaults', 'success');
         }
+
+        // Also reset and apply theme colors
+        applyThemeColorsToUI();
+        applyThemeColors();
     }
+
+    // ============================================
+    // Theme Color Functions
+    // ============================================
+
+    /**
+     * Apply theme colors to CSS custom properties.
+     * This updates the CSS variables that control the dark panel appearance.
+     */
+    function applyThemeColors() {
+        const root = document.documentElement;
+        let colors;
+
+        if (current.panelTheme === 'custom') {
+            colors = {
+                panelBg: current.customPanelBg,
+                panelBgAlt: current.customPanelBgAlt,
+                panelText: current.customPanelText,
+                panelTextMuted: current.customPanelTextMuted,
+                panelTextDim: current.customPanelTextDim,
+                panelBorder: current.customPanelBorder,
+                panelGrid: current.customPanelGrid,
+            };
+        } else {
+            colors = THEMES[current.panelTheme] || THEMES.dark;
+        }
+
+        root.style.setProperty('--panel-dark-bg', colors.panelBg);
+        root.style.setProperty('--panel-dark-bg-alt', colors.panelBgAlt);
+        root.style.setProperty('--panel-dark-text', colors.panelText);
+        root.style.setProperty('--panel-dark-text-muted', colors.panelTextMuted);
+        root.style.setProperty('--panel-dark-text-dim', colors.panelTextDim);
+        root.style.setProperty('--panel-dark-border', colors.panelBorder);
+        root.style.setProperty('--panel-dark-grid', colors.panelGrid);
+
+        // Dispatch event so canvas-based components can redraw
+        window.dispatchEvent(new CustomEvent('themeColorsChanged'));
+    }
+
+    /**
+     * Bind theme color UI elements (radio buttons and color pickers).
+     */
+    function bindThemeColorUI() {
+        // Theme mode radio buttons
+        const themeRadios = document.querySelectorAll('input[name="panelTheme"]');
+        themeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                set('panelTheme', this.value);
+                toggleCustomColorsVisibility(this.value === 'custom');
+                applyThemeColors();
+            });
+        });
+
+        // Custom color pickers
+        const colorSettings = [
+            { picker: 'panelBgColorPicker', text: 'panelBgColorText', key: 'customPanelBg' },
+            { picker: 'panelBgAltColorPicker', text: 'panelBgAltColorText', key: 'customPanelBgAlt' },
+            { picker: 'panelTextColorPicker', text: 'panelTextColorText', key: 'customPanelText' },
+            { picker: 'panelTextMutedColorPicker', text: 'panelTextMutedColorText', key: 'customPanelTextMuted' },
+            { picker: 'panelTextDimColorPicker', text: 'panelTextDimColorText', key: 'customPanelTextDim' },
+            { picker: 'panelBorderColorPicker', text: 'panelBorderColorText', key: 'customPanelBorder' },
+            { picker: 'panelGridColorPicker', text: 'panelGridColorText', key: 'customPanelGrid' },
+        ];
+
+        colorSettings.forEach(({ picker, text, key }) => {
+            bindThemeColorPicker(picker, text, key);
+        });
+
+        // Reset theme colors button
+        const resetBtn = document.getElementById('resetThemeColorsBtn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', resetThemeColors);
+        }
+    }
+
+    /**
+     * Bind a color picker and text input pair for theme colors.
+     */
+    function bindThemeColorPicker(pickerId, textId, settingKey) {
+        const picker = document.getElementById(pickerId);
+        const textInput = document.getElementById(textId);
+
+        if (picker) {
+            picker.addEventListener('input', function() {
+                if (textInput) {
+                    textInput.value = this.value;
+                }
+                set(settingKey, this.value);
+                applyThemeColors();
+            });
+        }
+
+        if (textInput) {
+            textInput.addEventListener('change', function() {
+                const color = this.value;
+                if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                    if (picker) {
+                        picker.value = color;
+                    }
+                    set(settingKey, color);
+                    applyThemeColors();
+                }
+            });
+        }
+    }
+
+    /**
+     * Toggle visibility of custom color options.
+     */
+    function toggleCustomColorsVisibility(show) {
+        const customSection = document.getElementById('customThemeColors');
+        if (customSection) {
+            customSection.style.display = show ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Reset theme colors to defaults.
+     */
+    function resetThemeColors() {
+        set('panelTheme', defaults.panelTheme);
+        set('customPanelBg', defaults.customPanelBg);
+        set('customPanelBgAlt', defaults.customPanelBgAlt);
+        set('customPanelText', defaults.customPanelText);
+        set('customPanelTextMuted', defaults.customPanelTextMuted);
+        set('customPanelTextDim', defaults.customPanelTextDim);
+        set('customPanelBorder', defaults.customPanelBorder);
+        set('customPanelGrid', defaults.customPanelGrid);
+
+        applyThemeColorsToUI();
+        applyThemeColors();
+
+        if (window.app && window.app.showToast) {
+            window.app.showToast('Theme colors reset to defaults', 'success');
+        }
+    }
+
+    /**
+     * Apply theme color settings to UI elements.
+     */
+    function applyThemeColorsToUI() {
+        // Set radio button based on current theme
+        const themeValue = current.panelTheme || 'dark';
+        const themeRadio = document.getElementById('panelTheme' + capitalize(themeValue));
+        if (themeRadio) {
+            themeRadio.checked = true;
+        }
+
+        // Toggle custom colors visibility
+        toggleCustomColorsVisibility(themeValue === 'custom');
+
+        // Set custom color pickers
+        setColorPickerValue('panelBgColorPicker', 'panelBgColorText', current.customPanelBg);
+        setColorPickerValue('panelBgAltColorPicker', 'panelBgAltColorText', current.customPanelBgAlt);
+        setColorPickerValue('panelTextColorPicker', 'panelTextColorText', current.customPanelText);
+        setColorPickerValue('panelTextMutedColorPicker', 'panelTextMutedColorText', current.customPanelTextMuted);
+        setColorPickerValue('panelTextDimColorPicker', 'panelTextDimColorText', current.customPanelTextDim);
+        setColorPickerValue('panelBorderColorPicker', 'panelBorderColorText', current.customPanelBorder);
+        setColorPickerValue('panelGridColorPicker', 'panelGridColorText', current.customPanelGrid);
+    }
+
+    /**
+     * Set color picker and text input values.
+     */
+    function setColorPickerValue(pickerId, textId, value) {
+        const picker = document.getElementById(pickerId);
+        const text = document.getElementById(textId);
+        if (picker) picker.value = value;
+        if (text) text.value = value;
+    }
+
+    /**
+     * Capitalize first letter of a string.
+     */
+    function capitalize(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    // ============================================
+    // End Theme Color Functions
+    // ============================================
 
     function bindUI() {
         // Scroll wheel zoom checkbox
@@ -556,6 +779,9 @@ window.settings = (function() {
 
         // Hexagonalness weights
         applyHexWeightsToUI();
+
+        // Theme colors
+        applyThemeColorsToUI();
     }
 
     function initCollapsibleGroups() {

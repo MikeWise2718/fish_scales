@@ -1073,6 +1073,7 @@ class ExtractionOptimizer:
         image_path: str,
         calibration: float,
         starting_profile: str = "default",
+        use_current_params: bool = False,
         target_hexagonalness: float = 0.7,
         max_iterations: int = 10,
         on_iteration: Callable[[OptimizationState], None] | None = None,
@@ -1082,7 +1083,8 @@ class ExtractionOptimizer:
         Args:
             image_path: Path to the image file
             calibration: Calibration value (micrometers per pixel)
-            starting_profile: Initial parameter profile to load
+            starting_profile: Initial parameter profile to load (ignored if use_current_params=True)
+            use_current_params: If True, skip profile loading and use current UI parameters
             target_hexagonalness: Target hexagonalness score (0-1)
             max_iterations: Maximum optimization iterations
             on_iteration: Callback after each extraction iteration
@@ -1104,11 +1106,14 @@ class ExtractionOptimizer:
         self.load_image(image_path)
         self.set_calibration(calibration)
 
-        # Load starting profile
-        try:
-            self._load_profile(starting_profile)
-        except Exception as e:
-            self._log(f"Warning: Could not load profile {starting_profile}: {e}")
+        # Load starting profile (unless using current params)
+        if use_current_params:
+            self._log("Using current UI parameters as starting point")
+        else:
+            try:
+                self._load_profile(starting_profile)
+            except Exception as e:
+                self._log(f"Warning: Could not load profile {starting_profile}: {e}")
 
         # Get initial params
         initial_params = self._get_params()
@@ -1125,11 +1130,12 @@ class ExtractionOptimizer:
         )
 
         # Build initial user message
+        starting_from = "current UI parameters" if use_current_params else f"'{starting_profile}' profile"
         user_message = f"""Optimize extraction parameters for this fish scale image.
 
 Target hexagonalness: {target_hexagonalness}
 Maximum iterations: {max_iterations}
-Starting profile: {starting_profile}
+Starting from: {starting_from}
 Calibration: {calibration} um/px
 
 Start by running extraction with the current parameters to establish a baseline, then analyze the results and iteratively improve.
@@ -1280,6 +1286,7 @@ When you achieve hexagonalness >= {target_hexagonalness} or believe no further i
         image_path: str,
         calibration: float,
         starting_profile: str = "default",
+        use_current_params: bool = False,
         target_hexagonalness: float = 0.7,
         max_iterations: int = 10,
         on_iteration: Callable[[OptimizationState], None] | None = None,
@@ -1289,7 +1296,8 @@ When you achieve hexagonalness >= {target_hexagonalness} or believe no further i
         Args:
             image_path: Path to the image file
             calibration: Calibration value (micrometers per pixel)
-            starting_profile: Initial parameter profile to load
+            starting_profile: Initial parameter profile to load (ignored if use_current_params=True)
+            use_current_params: If True, skip profile loading and use current UI parameters
             target_hexagonalness: Target hexagonalness score (0-1)
             max_iterations: Maximum optimization iterations
             on_iteration: Callback after each extraction iteration
@@ -1304,6 +1312,7 @@ When you achieve hexagonalness >= {target_hexagonalness} or believe no further i
                 image_path=image_path,
                 calibration=calibration,
                 starting_profile=starting_profile,
+                use_current_params=use_current_params,
                 target_hexagonalness=target_hexagonalness,
                 max_iterations=max_iterations,
                 on_iteration=on_iteration,

@@ -1097,6 +1097,113 @@
                         </div>
                     </div>
 
+                    <!-- Theme Colors Settings -->
+                    <div class="settings-group collapsed" id="settingsThemeColors">
+                        <div class="settings-group-header">
+                            <h3>Theme Colors</h3>
+                            <span class="settings-group-toggle">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="settings-group-content">
+                            <p class="setting-hint">Customize the image panel and container colors.</p>
+
+                            <!-- Theme Mode Selector -->
+                            <div class="setting-item">
+                                <label class="setting-label-text">Panel Theme</label>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="panelTheme" id="panelThemeDark" value="dark" checked>
+                                        <span>Dark</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="panelTheme" id="panelThemeLight" value="light">
+                                        <span>Light</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="panelTheme" id="panelThemeCustom" value="custom">
+                                        <span>Custom</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Custom Colors (shown only when Custom is selected) -->
+                            <div id="customThemeColors" style="display: none;">
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Panel Background</label>
+                                    <p class="setting-hint">Image panel, stats bar, code blocks</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelBgColorPicker" value="#1e293b">
+                                        <input type="text" id="panelBgColorText" value="#1e293b" class="color-text-input">
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Chart Background</label>
+                                    <p class="setting-hint">Optimization progress chart</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelBgAltColorPicker" value="#1a1a2e">
+                                        <input type="text" id="panelBgAltColorText" value="#1a1a2e" class="color-text-input">
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Primary Text</label>
+                                    <p class="setting-hint">Main text on panel backgrounds</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelTextColorPicker" value="#e2e8f0">
+                                        <input type="text" id="panelTextColorText" value="#e2e8f0" class="color-text-input">
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Muted Text</label>
+                                    <p class="setting-hint">Labels, hints on panel backgrounds</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelTextMutedColorPicker" value="#94a3b8">
+                                        <input type="text" id="panelTextMutedColorText" value="#94a3b8" class="color-text-input">
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Dim Text</label>
+                                    <p class="setting-hint">Secondary labels, axis text</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelTextDimColorPicker" value="#64748b">
+                                        <input type="text" id="panelTextDimColorText" value="#64748b" class="color-text-input">
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Borders</label>
+                                    <p class="setting-hint">Borders, scrollbar tracks</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelBorderColorPicker" value="#334155">
+                                        <input type="text" id="panelBorderColorText" value="#334155" class="color-text-input">
+                                    </div>
+                                </div>
+
+                                <div class="setting-item">
+                                    <label class="setting-label-text">Grid Lines</label>
+                                    <p class="setting-hint">Chart grid lines</p>
+                                    <div class="color-input-group">
+                                        <input type="color" id="panelGridColorPicker" value="#333344">
+                                        <input type="text" id="panelGridColorText" value="#333344" class="color-text-input">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reset Button -->
+                            <div class="setting-item">
+                                <button id="resetThemeColorsBtn" class="btn btn-secondary btn-sm">
+                                    Reset Theme Colors
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Hexagonalness Calculation -->
                     <div class="settings-group collapsed" id="settingsHexagonalness">
                         <div class="settings-group-header">
@@ -1248,8 +1355,16 @@
                         </div>
 
                         <div class="param-row agent-config-row">
+                            <label class="agent-checkbox-label">
+                                <input type="checkbox" id="agentUseCurrentParams" checked>
+                                <span>Use current parameters</span>
+                            </label>
+                            <span class="param-hint">Start from existing extraction settings instead of a profile</span>
+                        </div>
+
+                        <div class="param-row agent-config-row" id="agentProfileRow">
                             <label for="agentProfile">Detection Profile</label>
-                            <select id="agentProfile" class="param-input param-select">
+                            <select id="agentProfile" class="param-input param-select" disabled>
                                 <option value="default">Default</option>
                                 <option value="conservative">Conservative (fewer false positives)</option>
                                 <option value="aggressive">Aggressive (fewer false negatives)</option>

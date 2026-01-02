@@ -15,6 +15,15 @@
     --text-muted: #64748b;
     --cyan: #00ffff;
     --yellow: #ffff00;
+
+    /* Theme: Dark panel colors (defaults, can be overridden by JS) */
+    --panel-dark-bg: #1e293b;
+    --panel-dark-bg-alt: #1a1a2e;
+    --panel-dark-text: #e2e8f0;
+    --panel-dark-text-muted: #94a3b8;
+    --panel-dark-text-dim: #64748b;
+    --panel-dark-border: #334155;
+    --panel-dark-grid: #333344;
 }
 
 * {
@@ -245,7 +254,7 @@ body {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    background-color: #1e293b;
+    background-color: var(--panel-dark-bg);
 }
 
 .image-container {
@@ -1694,10 +1703,10 @@ body {
     align-items: center;
     gap: 1.5rem;
     padding: 0.4rem 1rem;
-    background-color: #1e293b;
-    border-top: 1px solid var(--border-color);
+    background-color: var(--panel-dark-bg);
+    border-top: 1px solid var(--panel-dark-border);
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: var(--panel-dark-text-muted);
 }
 
 .stats-bar-item {
@@ -1707,24 +1716,24 @@ body {
 }
 
 .stats-bar-label {
-    color: #64748b;
+    color: var(--panel-dark-text-dim);
 }
 
 .stats-bar-value {
-    color: #e2e8f0;
+    color: var(--panel-dark-text);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
 }
 
 .stats-bar-unit {
-    color: #64748b;
+    color: var(--panel-dark-text-dim);
     font-size: 0.75rem;
 }
 
 .stats-bar-hex {
     margin-left: auto;
     padding-left: 1rem;
-    border-left: 1px solid #475569;
+    border-left: 1px solid var(--panel-dark-border);
 }
 
 .stats-bar-hex-value {
@@ -2909,8 +2918,8 @@ body {
 .agent-collapsible-content pre {
     margin: 0;
     padding: 0.5rem;
-    background-color: #1e293b;
-    color: #e2e8f0;
+    background-color: var(--panel-dark-bg);
+    color: var(--panel-dark-text);
     border-radius: 0.25rem;
     font-size: 0.75rem;
     white-space: pre-wrap;
@@ -2927,17 +2936,17 @@ body {
 }
 
 .agent-collapsible-content pre::-webkit-scrollbar-track {
-    background: #334155;
+    background: var(--panel-dark-border);
     border-radius: 4px;
 }
 
 .agent-collapsible-content pre::-webkit-scrollbar-thumb {
-    background: #64748b;
+    background: var(--panel-dark-text-dim);
     border-radius: 4px;
 }
 
 .agent-collapsible-content pre::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: var(--panel-dark-text-muted);
 }
 
 /* Agent Costs Panel */

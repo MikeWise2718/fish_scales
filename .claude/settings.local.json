@@ -31,7 +31,8 @@
       "Bash(node --version:*)",
       "Bash(node --check:*)",
       "Bash(node:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(tasklist:*)"
     ]
   }
 }

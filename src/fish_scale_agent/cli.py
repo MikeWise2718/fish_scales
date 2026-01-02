@@ -108,6 +108,11 @@ def create_parser() -> argparse.ArgumentParser:
         help="Starting parameter profile (default: default)",
     )
     optimize_parser.add_argument(
+        "--use-current-params",
+        action="store_true",
+        help="Use current UI parameters instead of loading a profile (default: false)",
+    )
+    optimize_parser.add_argument(
         "--target-score",
         type=float,
         default=0.7,
@@ -330,7 +335,10 @@ def cmd_optimize(args):
     console.print("=" * 34)
     console.print(f"Image: [cyan]{image_path.name}[/cyan]")
     console.print(f"Provider: [cyan]{args.provider}[/cyan] ({provider.model_name})")
-    console.print(f"Starting profile: [cyan]{args.profile}[/cyan]")
+    if args.use_current_params:
+        console.print("Starting from: [cyan]current parameters[/cyan]")
+    else:
+        console.print(f"Starting profile: [cyan]{args.profile}[/cyan]")
     console.print(f"Target hexagonalness: [cyan]{args.target_score:.2f}[/cyan]")
     console.print()
 
@@ -374,6 +382,7 @@ def cmd_optimize(args):
             image_path=str(image_path.resolve()),
             calibration=args.calibration,
             starting_profile=args.profile,
+            use_current_params=args.use_current_params,
             target_hexagonalness=args.target_score,
             max_iterations=args.max_iterations,
             on_iteration=on_iteration,

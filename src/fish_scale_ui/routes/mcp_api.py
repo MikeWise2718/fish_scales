@@ -750,9 +750,15 @@ def load_image():
         _extraction_data['parameters'] = {}
         _extraction_data['dirty'] = False
 
-        # Add to recent images
+        # Add to recent images - but NOT files from uploads directory
+        upload_folder = current_app.config['UPLOAD_FOLDER'].resolve()
         init_recent_images(current_app.config['APP_ROOT'])
-        add_recent_image(str(image_path), image_path.name)
+        try:
+            image_path.resolve().relative_to(upload_folder)
+            # File is in uploads directory - don't add to recent images
+        except ValueError:
+            # File is NOT in uploads - safe to add
+            add_recent_image(str(image_path), image_path.name)
 
         log_event('mcp_image_loaded', {
             'filename': image_path.name,

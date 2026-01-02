@@ -44,14 +44,23 @@ def _write_status(status_file: Path, status: dict):
 
 
 def _read_status(status_file: Path) -> dict:
-    """Read status from file."""
+    """Read status from file with retry for transient Windows file locks."""
     if not status_file.exists():
         return {'state': 'unknown', 'error': 'Status file not found'}
-    try:
-        with open(status_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        return {'state': 'error', 'error': f'Failed to read status: {e}'}
+
+    # Retry a few times for transient file locks (common on Windows)
+    max_retries = 3
+    retry_delay = 0.1  # 100ms
+
+    for attempt in range(max_retries):
+        try:
+            with open(status_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            return {'state': 'error', 'error': f'Failed to read status after {max_retries} attempts: {e}'}
 
 
 def _monitor_agent_process(session_id: str, process: subprocess.Popen,
@@ -144,6 +153,9 @@ def start_agent():
     provider = data.get('provider', 'claude')
     model = data.get('model')
     max_iterations = data.get('max_iterations', 20)
+    target_score = data.get('target_score', 0.70)
+    profile = data.get('profile', 'default')
+    use_current_params = data.get('use_current_params', True)
     verbose = data.get('verbose', False)
     image_path = data.get('image_path')
     calibration = data.get('calibration')
@@ -222,6 +234,13 @@ def start_agent():
         return jsonify({'error': 'Calibration not set. Set calibration first.'}), 400
 
     cmd.extend(['--calibration', str(calibration)])
+
+    cmd.extend(['--target-score', str(target_score)])
+
+    if use_current_params:
+        cmd.append('--use-current-params')
+    elif profile:
+        cmd.extend(['--profile', profile])
 
     if verbose:
         cmd.append('-v')

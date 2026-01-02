@@ -322,6 +322,8 @@ def browse_images():
 
     Returns directory listing with files and subdirectories.
     """
+    from fish_scale_ui.services.logging import log_event
+
     image_dir = Path(current_app.config['IMAGE_DIR'])
 
     # Support both absolute path and relative subdir
@@ -369,6 +371,7 @@ def browse_images():
                         'modified': entry.stat().st_mtime
                     })
     except PermissionError:
+        log_event('browse_permission_denied', {'directory': str(target_dir)})
         return jsonify({'error': 'Permission denied'}), 403
 
     # Determine parent directory (None if at filesystem root)

@@ -36,7 +36,7 @@ def create_app(config=None):
                 template_folder='templates')
 
     # Default configuration
-    app_root = Path(__file__).parent.parent.parent.parent  # Project root
+    app_root = Path(__file__).parent.parent.parent  # Project root (fish_scales/)
     app.config.update(
         SECRET_KEY=os.environ.get('SECRET_KEY', 'dev-key-change-in-production'),
         MAX_CONTENT_LENGTH=100 * 1024 * 1024,  # 100MB max upload

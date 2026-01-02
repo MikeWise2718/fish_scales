@@ -36,6 +36,20 @@ window.app = (function() {
             toast.style.opacity = '0';
             setTimeout(() => toast.remove(), 200);
         }, 3000);
+
+        // Log toast messages to server (for Log tab)
+        // Map toast types to event types
+        const eventType = type === 'error' ? 'toast_error' :
+                         type === 'warning' ? 'toast_warning' :
+                         type === 'success' ? 'toast_success' : 'toast_info';
+        fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event_type: eventType,
+                details: { message: message }
+            })
+        }).catch(() => {}); // Silently ignore logging errors
     }
 
     // Modal dialogs

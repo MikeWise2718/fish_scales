@@ -28,6 +28,21 @@
                 </div>
             </div>
             <button type="button" class="btn btn-xs btn-secondary stats-bar-new-set" id="statsBarNewSetBtn" title="Create new set">+ New</button>
+            <button type="button" class="btn btn-xs btn-secondary" id="saveSetBtn" title="Save all sets (Ctrl+S)" disabled>Save</button>
+            <div class="stats-bar-gear-container">
+                <button type="button" class="btn btn-xs btn-icon" id="setMenuBtn" title="Set management">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </button>
+                <div class="stats-bar-gear-menu" id="setMenuDropdown" style="display: none;">
+                    <button class="stats-bar-gear-item" id="renameSetBtn">Rename Set...</button>
+                    <button class="stats-bar-gear-item" id="duplicateSetBtn">Duplicate Set...</button>
+                    <hr class="stats-bar-gear-divider">
+                    <button class="stats-bar-gear-item stats-bar-gear-danger" id="deleteSetBtn">Delete Set</button>
+                </div>
+            </div>
             <div class="stats-bar-item">
                 <span class="stats-bar-label">TUB:</span>
                 <span id="statsBarTubercles" class="stats-bar-value">-</span>
@@ -79,6 +94,13 @@
                 </svg>
             </button>
             <span class="zoom-level" id="zoomLevel">100%</span>
+            <div class="toolbar-separator"></div>
+            <button type="button" class="btn btn-icon" id="shortcutsHelpBtn" title="Keyboard shortcuts">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h8"/>
+                </svg>
+            </button>
         </div>
 
         <!-- Overlay toggle controls -->
@@ -109,43 +131,6 @@
             </label>
         </div>
 
-        <!-- Set selector bar -->
-        <div class="set-selector-bar" id="setSelector">
-            <div class="set-buttons" id="setButtons">
-                <!-- Set buttons will be populated by JavaScript -->
-            </div>
-            <div class="set-actions">
-                <button type="button" class="btn btn-icon btn-sm" id="addSetBtn" title="Create new set (Ctrl+N)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                </button>
-                <button type="button" class="btn btn-sm" id="saveSetBtn" title="Save all sets (Ctrl+S)" disabled>
-                    Save
-                </button>
-                <button type="button" class="btn btn-icon btn-sm" id="shortcutsHelpBtn" title="Keyboard shortcuts">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="4" width="20" height="16" rx="2"/>
-                        <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h8"/>
-                    </svg>
-                </button>
-                <div class="set-menu-container">
-                    <button type="button" class="btn btn-icon btn-sm" id="setMenuBtn" title="Set management">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
-                    </button>
-                    <div class="set-menu-dropdown" id="setMenuDropdown" style="display: none;">
-                        <button class="set-menu-item" id="renameSetBtn">Rename Set...</button>
-                        <button class="set-menu-item" id="duplicateSetBtn">Duplicate Set...</button>
-                        <hr class="set-menu-divider">
-                        <button class="set-menu-item set-menu-danger" id="deleteSetBtn">Delete Set</button>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Panel Resizer -->
@@ -485,6 +470,113 @@
                     <span id="paramsChangedIndicator" class="params-changed-indicator" style="display: none;">
                         Parameters changed
                     </span>
+                </div>
+
+                <!-- Optimization Section -->
+                <div class="config-section optimization-section">
+                    <h3>Optimize Parameters</h3>
+                    <p class="hint">Automatically tune parameters to maximize hexagonalness score using gradient ascent.</p>
+
+                    <!-- Parameter Selection -->
+                    <div class="optimize-params-select">
+                        <h4>Parameters to Optimize</h4>
+                        <div class="optimize-param-checkboxes">
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="threshold">
+                                <span>Threshold</span>
+                            </label>
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="min_diameter_um">
+                                <span>Min Diameter</span>
+                            </label>
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="max_diameter_um">
+                                <span>Max Diameter</span>
+                            </label>
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="min_circularity">
+                                <span>Circularity</span>
+                            </label>
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="clahe_clip">
+                                <span>CLAHE Clip</span>
+                            </label>
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="clahe_kernel">
+                                <span>CLAHE Kernel</span>
+                            </label>
+                            <label class="optimize-param-label">
+                                <input type="checkbox" class="optimize-param-checkbox" data-param="blur_sigma">
+                                <span>Blur Sigma</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Optimization Settings -->
+                    <div class="optimize-settings">
+                        <div class="param-row">
+                            <label for="optimizeDeltaThreshold">Convergence Delta</label>
+                            <input type="number" id="optimizeDeltaThreshold" class="param-input param-number"
+                                   min="0.0001" max="0.01" step="0.0001" value="0.001">
+                        </div>
+                        <div class="param-row">
+                            <label for="optimizeMaxIterations">Max Iterations</label>
+                            <input type="number" id="optimizeMaxIterations" class="param-input param-number"
+                                   min="1" max="50" step="1" value="20">
+                        </div>
+                        <div class="param-row">
+                            <label for="optimizeTargetScore">Target Score</label>
+                            <input type="number" id="optimizeTargetScore" class="param-input param-number"
+                                   min="0.5" max="1.0" step="0.05" value="0.85">
+                        </div>
+                    </div>
+
+                    <!-- Status Display -->
+                    <div class="optimize-status-panel">
+                        <div class="optimize-status-row">
+                            <span class="optimize-status-label">Status:</span>
+                            <span id="optimizeStatus" class="optimize-status-value">Ready</span>
+                        </div>
+                        <div class="optimize-status-row">
+                            <span class="optimize-status-label">Iteration:</span>
+                            <span id="optimizeIteration" class="optimize-status-value">-</span>
+                            <span>/</span>
+                            <span id="optimizeMaxIter">20</span>
+                        </div>
+                        <div class="optimize-status-row">
+                            <span class="optimize-status-label">Hexagonalness:</span>
+                            <span id="optimizeHexScore" class="optimize-status-value">-</span>
+                            <span id="optimizeHexDelta" class="optimize-delta"></span>
+                        </div>
+                        <div class="optimize-status-row">
+                            <span class="optimize-status-label">Best Score:</span>
+                            <span id="optimizeBestScore" class="optimize-status-value">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Control Buttons -->
+                    <div class="optimize-controls">
+                        <button type="button" class="btn btn-secondary" id="optimizeStepBtn" title="Run one gradient step">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Step
+                        </button>
+                        <button type="button" class="btn btn-primary" id="optimizeAutoBtn" title="Run until convergence">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                                <line x1="19" y1="5" x2="19" y2="19"/>
+                            </svg>
+                            Auto
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="optimizeStopBtn" title="Stop optimization" disabled>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="6" y="6" width="12" height="12"/>
+                            </svg>
+                            Stop
+                        </button>
+                        <span class="spinner" id="optimizeSpinner" style="display: none;"></span>
+                    </div>
                 </div>
 
             </div>
@@ -1425,13 +1517,14 @@
 <script src="{{ url_for('static', filename='js/undo.js') }}"></script>
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/extraction.js') }}"></script>
+<script src="{{ url_for('static', filename='js/optimize.js') }}"></script>
 <script src="{{ url_for('static', filename='js/setUI.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="{{ url_for('static', filename='js/agent_extraction.js') }}"></script>
 <script>
-    // MCP state polling for auto-refresh
-    let mcpPollingEnabled = true;
+    // MCP state polling for auto-refresh (disabled - MCP endpoints removed)
+    let mcpPollingEnabled = false;
     let lastStateHash = null;
     let currentImageUrl = null;
 
@@ -1537,7 +1630,7 @@
             const hexScore = stats.hexagonalness_score;
             const reliability = stats.reliability;
             if (hexScore !== undefined && reliability !== 'none') {
-                statsBarHex.textContent = hexScore.toFixed(2);
+                statsBarHex.textContent = hexScore.toFixed(3);
                 statsBarHex.classList.toggle('hex-low', reliability === 'low');
             } else {
                 statsBarHex.textContent = '-';
@@ -1588,8 +1681,8 @@
         const params = new URLSearchParams(window.location.search);
         let imgUrl = params.get('img');
 
-        // If no URL param, check if MCP API has loaded an image
-        if (!imgUrl) {
+        // If no URL param and MCP is enabled, check if MCP API has loaded an image
+        if (!imgUrl && mcpPollingEnabled) {
             try {
                 const response = await fetch('/api/mcp/state');
                 const state = await response.json();
@@ -1641,8 +1734,10 @@
         // Load initial log
         window.app.loadLog();
 
-        // Start polling for MCP changes (even if loaded via URL param)
-        setTimeout(pollMCPState, 2000);
+        // Start polling for MCP changes only if enabled
+        if (mcpPollingEnabled) {
+            setTimeout(pollMCPState, 2000);
+        }
     });
 </script>
 {% endblock %}

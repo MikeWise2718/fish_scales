@@ -231,7 +231,7 @@ window.data = (function() {
             const hexScore = stats.hexagonalness_score;
             const reliability = stats.reliability;
             if (hexScore !== undefined && reliability !== 'none') {
-                statsBarHex.textContent = hexScore.toFixed(2);
+                statsBarHex.textContent = hexScore.toFixed(3);
                 statsBarHex.classList.toggle('hex-low', reliability === 'low');
             } else {
                 statsBarHex.textContent = '-';

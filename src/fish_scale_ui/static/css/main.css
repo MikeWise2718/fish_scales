@@ -2235,6 +2235,57 @@ body {
     margin-left: -0.5rem;
 }
 
+/* Gear menu in stats bar */
+.stats-bar-gear-container {
+    position: relative;
+    display: inline-flex;
+}
+
+.stats-bar-gear-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.25rem;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    min-width: 140px;
+    overflow: hidden;
+}
+
+.stats-bar-gear-item {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    color: var(--text-color);
+}
+
+.stats-bar-gear-item:hover {
+    background-color: var(--bg-color);
+}
+
+.stats-bar-gear-divider {
+    margin: 0.25rem 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+.stats-bar-gear-danger {
+    color: var(--error-color);
+}
+
+.stats-bar-gear-danger:hover {
+    background-color: rgba(220, 38, 38, 0.1);
+}
+
 .btn-xs {
     padding: 0.125rem 0.375rem;
     font-size: 0.7rem;
@@ -3087,4 +3138,155 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 0.375rem;
     padding: 0.75rem;
+}
+
+/* ========================================
+   Gradient Optimizer Section
+   ======================================== */
+
+.optimization-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--border-color);
+}
+
+.optimization-section h3 {
+    margin-bottom: 0.5rem;
+}
+
+.optimization-section .hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+/* Parameter Selection */
+.optimize-params-select h4 {
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.optimize-param-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.optimize-param-label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.optimize-param-label:hover {
+    background: var(--hover-bg);
+    border-color: var(--primary-color);
+}
+
+.optimize-param-label input[type="checkbox"] {
+    margin: 0;
+}
+
+.optimize-param-label input[type="checkbox"]:checked + span {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.optimize-param-label input:disabled + span {
+    color: var(--text-muted);
+}
+
+/* Optimization Settings */
+.optimize-settings {
+    margin-bottom: 1rem;
+}
+
+.optimize-settings .param-row {
+    margin-bottom: 0.5rem;
+}
+
+.optimize-settings .param-input {
+    width: 100px;
+}
+
+/* Status Panel */
+.optimize-status-panel {
+    background: var(--bg-color);
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.optimize-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.optimize-status-row:last-child {
+    margin-bottom: 0;
+}
+
+.optimize-status-label {
+    color: var(--text-muted);
+    min-width: 100px;
+}
+
+.optimize-status-value {
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.optimize-status-value.status-running {
+    color: var(--warning-color);
+}
+
+.optimize-status-value.status-success {
+    color: var(--success-color);
+}
+
+.optimize-status-value.status-error {
+    color: var(--error-color);
+}
+
+.optimize-delta {
+    font-size: 0.75rem;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.optimize-delta.positive {
+    color: var(--success-color);
+}
+
+.optimize-delta.negative {
+    color: var(--error-color);
+}
+
+/* Control Buttons */
+.optimize-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.optimize-controls .btn svg {
+    margin-right: 0.25rem;
+}
+
+.optimize-controls .spinner {
+    margin-left: 0.5rem;
 }

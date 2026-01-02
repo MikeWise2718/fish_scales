@@ -451,6 +451,325 @@ def extract():
         return jsonify({'error': f'Extraction failed: {str(e)}'}), 500
 
 
+# Module-level state for optimization
+_optimizer_state = {
+    'running': False,
+    'stop_requested': False,
+    'current_iteration': 0,
+    'best_score': 0,
+    'best_params': None,
+}
+
+
+@api_bp.route('/optimize-step', methods=['POST'])
+def optimize_step():
+    """Perform one gradient ascent optimization step.
+
+    POST body:
+        {
+            "params": {
+                "threshold": 0.05,
+                "min_diameter_um": 2.0,
+                "max_diameter_um": 10.0,
+                "min_circularity": 0.5,
+                "clahe_clip": 0.03,
+                "clahe_kernel": 8,
+                "blur_sigma": 1.0,
+                ...
+            },
+            "enabled_params": ["threshold", "min_circularity", "blur_sigma"],
+            "iteration": 1,
+            "max_iterations": 20,
+            "delta_threshold": 0.001,
+            "target_score": 0.85
+        }
+
+    Returns:
+        {
+            "success": true,
+            "new_params": {...},
+            "gradient": {...},
+            "hexagonalness": 0.723,
+            "prev_hexagonalness": 0.711,
+            "delta": 0.012,
+            "tubercles": [...],
+            "edges": [...],
+            "statistics": {...},
+            "extractions_performed": 15,
+            "should_stop": false,
+            "stop_reason": ""
+        }
+    """
+    from fish_scale_ui.services.logging import log_event
+    from fish_scale_ui.services.optimizer import run_optimize_step, GradientOptimizer
+
+    if not _current_image['path']:
+        return jsonify({'error': 'No image loaded'}), 400
+
+    if not _current_image.get('calibration'):
+        return jsonify({'error': 'Calibration not set'}), 400
+
+    if _optimizer_state['running']:
+        return jsonify({'error': 'Optimization already running'}), 400
+
+    data = request.get_json() or {}
+    params = data.get('params', {})
+    enabled_params = data.get('enabled_params')
+
+    # Convergence parameters (for frontend-driven auto mode)
+    iteration = data.get('iteration', 1)
+    max_iterations = data.get('max_iterations', 20)
+    delta_threshold = data.get('delta_threshold', 0.001)
+    target_score = data.get('target_score', 0.85)
+
+    # Get calibration
+    calibration = _current_image['calibration']
+    um_per_px = calibration.get('um_per_px', 0.33)
+
+    # Use web_path for extraction consistency
+    image_path = _current_image.get('web_path') or _current_image['path']
+
+    try:
+        _optimizer_state['running'] = True
+
+        result = run_optimize_step(
+            image_path=image_path,
+            um_per_px=um_per_px,
+            params=params,
+            enabled_params=enabled_params,
+        )
+
+        # Check convergence
+        should_stop, stop_reason = GradientOptimizer.check_convergence(
+            prev_score=result['prev_hexagonalness'],
+            new_score=result['hexagonalness'],
+            iteration=iteration,
+            delta_threshold=delta_threshold,
+            max_iterations=max_iterations,
+            target_score=target_score,
+        )
+        result['should_stop'] = should_stop
+        result['stop_reason'] = stop_reason
+        result['iteration'] = iteration
+
+        # Update extraction data with the new results
+        _extraction_data['tubercles'] = result['tubercles']
+        _extraction_data['edges'] = result['edges']
+        _extraction_data['statistics'] = result['statistics']
+        _extraction_data['parameters'] = result['new_params']
+        _extraction_data['dirty'] = True
+
+        # Log the optimization step
+        log_event('optimize_step', {
+            'iteration': iteration,
+            'prev_hexagonalness': result['prev_hexagonalness'],
+            'hexagonalness': result['hexagonalness'],
+            'delta': result['delta'],
+            'enabled_params': enabled_params,
+            'extractions_performed': result['extractions_performed'],
+            'should_stop': should_stop,
+            'stop_reason': stop_reason,
+        })
+
+        return jsonify(result)
+
+    except Exception as e:
+        log_event('optimize_step_failed', {'error': str(e)})
+        return jsonify({'error': f'Optimization step failed: {str(e)}'}), 500
+
+    finally:
+        _optimizer_state['running'] = False
+
+
+@api_bp.route('/optimize-auto', methods=['POST'])
+def optimize_auto():
+    """Run automatic optimization until convergence.
+
+    POST body:
+        {
+            "params": {...},
+            "enabled_params": ["threshold", "min_circularity", "blur_sigma"],
+            "max_iterations": 20,
+            "delta_threshold": 0.001,
+            "target_score": 0.85
+        }
+
+    Returns:
+        {
+            "success": true,
+            "final_params": {...},
+            "final_score": 0.78,
+            "iterations": 8,
+            "reason": "converged",
+            "history": [{"iteration": 1, "hexagonalness": 0.65, "delta": 0.03}, ...],
+            "tubercles": [...],
+            "edges": [...],
+            "statistics": {...}
+        }
+    """
+    from fish_scale_ui.services.logging import log_event
+    from fish_scale_ui.services.optimizer import GradientOptimizer
+
+    if not _current_image['path']:
+        return jsonify({'error': 'No image loaded'}), 400
+
+    if not _current_image.get('calibration'):
+        return jsonify({'error': 'Calibration not set'}), 400
+
+    if _optimizer_state['running']:
+        return jsonify({'error': 'Optimization already running'}), 400
+
+    data = request.get_json() or {}
+    params = data.get('params', {})
+    enabled_params = data.get('enabled_params')
+    max_iterations = int(data.get('max_iterations', 20))
+    delta_threshold = float(data.get('delta_threshold', 0.001))
+    target_score = float(data.get('target_score', 0.85))
+
+    # Get calibration
+    calibration = _current_image['calibration']
+    um_per_px = calibration.get('um_per_px', 0.33)
+
+    # Use web_path for extraction consistency
+    image_path = _current_image.get('web_path') or _current_image['path']
+
+    try:
+        _optimizer_state['running'] = True
+        _optimizer_state['stop_requested'] = False
+        _optimizer_state['current_iteration'] = 0
+        _optimizer_state['best_score'] = 0
+        _optimizer_state['best_params'] = None
+
+        optimizer = GradientOptimizer(
+            image_path=image_path,
+            um_per_px=um_per_px,
+            enabled_params=enabled_params,
+        )
+
+        current_params = params.copy()
+        history = []
+        prev_score = 0
+        final_result = None
+        reason = 'max_iterations'
+
+        for iteration in range(1, max_iterations + 1):
+            if _optimizer_state['stop_requested']:
+                reason = 'stopped'
+                break
+
+            _optimizer_state['current_iteration'] = iteration
+
+            # Run one step
+            result = optimizer.step(current_params)
+            current_params = result['new_params']
+            new_score = result['hexagonalness']
+            final_result = result
+
+            # Track history
+            history.append({
+                'iteration': iteration,
+                'hexagonalness': new_score,
+                'delta': result['delta'],
+            })
+
+            # Track best
+            if new_score > _optimizer_state['best_score']:
+                _optimizer_state['best_score'] = new_score
+                _optimizer_state['best_params'] = current_params.copy()
+
+            # Check convergence
+            should_stop, stop_reason = GradientOptimizer.check_convergence(
+                prev_score=prev_score,
+                new_score=new_score,
+                iteration=iteration,
+                delta_threshold=delta_threshold,
+                max_iterations=max_iterations,
+                target_score=target_score,
+            )
+
+            if should_stop:
+                reason = stop_reason
+                break
+
+            prev_score = new_score
+
+        # Update extraction data with final results
+        if final_result:
+            _extraction_data['tubercles'] = final_result['tubercles']
+            _extraction_data['edges'] = final_result['edges']
+            _extraction_data['statistics'] = final_result['statistics']
+            _extraction_data['parameters'] = final_result['new_params']
+            _extraction_data['dirty'] = True
+
+        # Log the optimization
+        log_event('optimize_auto_complete', {
+            'iterations': len(history),
+            'final_score': final_result['hexagonalness'] if final_result else 0,
+            'reason': reason,
+            'enabled_params': enabled_params,
+        })
+
+        return jsonify({
+            'success': True,
+            'final_params': current_params,
+            'final_score': final_result['hexagonalness'] if final_result else 0,
+            'iterations': len(history),
+            'reason': reason,
+            'history': history,
+            'tubercles': final_result['tubercles'] if final_result else [],
+            'edges': final_result['edges'] if final_result else [],
+            'statistics': final_result['statistics'] if final_result else {},
+        })
+
+    except Exception as e:
+        log_event('optimize_auto_failed', {'error': str(e)})
+        return jsonify({'error': f'Optimization failed: {str(e)}'}), 500
+
+    finally:
+        _optimizer_state['running'] = False
+
+
+@api_bp.route('/optimize-stop', methods=['POST'])
+def optimize_stop():
+    """Stop running optimization.
+
+    Returns:
+        {
+            "success": true,
+            "stopped_at_iteration": 5,
+            "current_score": 0.72
+        }
+    """
+    if not _optimizer_state['running']:
+        return jsonify({'error': 'No optimization running'}), 400
+
+    _optimizer_state['stop_requested'] = True
+
+    return jsonify({
+        'success': True,
+        'stopped_at_iteration': _optimizer_state['current_iteration'],
+        'best_score': _optimizer_state['best_score'],
+    })
+
+
+@api_bp.route('/optimize-status', methods=['GET'])
+def optimize_status():
+    """Get current optimization status.
+
+    Returns:
+        {
+            "running": true,
+            "current_iteration": 5,
+            "best_score": 0.72
+        }
+    """
+    return jsonify({
+        'running': _optimizer_state['running'],
+        'current_iteration': _optimizer_state['current_iteration'],
+        'best_score': _optimizer_state['best_score'],
+    })
+
+
 @api_bp.route('/extraction-data', methods=['GET'])
 def get_extraction_data():
     """Get current extraction data."""

@@ -280,7 +280,7 @@ window.app = (function() {
             // Ctrl+N - New set
             if (e.ctrlKey && e.key === 'n') {
                 e.preventDefault();
-                document.getElementById('addSetBtn')?.click();
+                document.getElementById('statsBarNewSetBtn')?.click();
                 return;
             }
 

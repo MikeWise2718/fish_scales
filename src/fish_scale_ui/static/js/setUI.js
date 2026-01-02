@@ -59,8 +59,8 @@ window.setUI = (function() {
             container.appendChild(btn);
         });
 
-        // Update add button state
-        const addBtn = document.getElementById('addSetBtn');
+        // Update add button state (in stats bar)
+        const addBtn = document.getElementById('statsBarNewSetBtn');
         if (addBtn) {
             addBtn.disabled = !window.sets.canCreateMore();
         }
@@ -672,8 +672,8 @@ window.setUI = (function() {
      * Bind button handlers
      */
     function bindHandlers() {
-        // Add set button
-        const addBtn = document.getElementById('addSetBtn');
+        // Add set button (stats bar)
+        const addBtn = document.getElementById('statsBarNewSetBtn');
         if (addBtn) {
             addBtn.addEventListener('click', handleAddSet);
         }
@@ -726,7 +726,7 @@ window.setUI = (function() {
         // Close menu on click outside
         document.addEventListener('click', (e) => {
             if (menuOpen) {
-                const container = document.querySelector('.set-menu-container');
+                const container = document.querySelector('.stats-bar-gear-container');
                 if (container && !container.contains(e.target)) {
                     closeMenu();
                 }

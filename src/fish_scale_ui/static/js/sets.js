@@ -83,6 +83,7 @@ window.sets = (function() {
      * @param {Object} options - Options for initial content
      * @param {Array} options.tubercles - Initial tubercles
      * @param {Array} options.edges - Initial edges
+     * @param {Object} options.parameters - Extraction parameters used to create this set
      * @returns {Object} The created set or null if max sets reached
      */
     function createSet(name, options = {}) {
@@ -100,6 +101,7 @@ window.sets = (function() {
             name: uniqueName,
             tubercles: options.tubercles ? JSON.parse(JSON.stringify(options.tubercles)) : [],
             edges: options.edges ? JSON.parse(JSON.stringify(options.edges)) : [],
+            parameters: options.parameters ? JSON.parse(JSON.stringify(options.parameters)) : null,
             isDirty: false,
             undoStack: [],
             redoStack: [],
@@ -286,6 +288,7 @@ window.sets = (function() {
         const newSet = createSet(name, {
             tubercles: source.tubercles,
             edges: source.edges,
+            parameters: source.parameters,  // Copy extraction parameters
             // Start with empty history for the clone
             history: [],
         });
@@ -335,6 +338,32 @@ window.sets = (function() {
             tubercles: set.tubercles,
             edges: set.edges,
         };
+    }
+
+    /**
+     * Get parameters for the current set
+     * @returns {Object|null} Parameters object or null if not set
+     */
+    function getCurrentParameters() {
+        const set = getCurrentSet();
+        return set ? set.parameters : null;
+    }
+
+    /**
+     * Set parameters for the current set
+     * @param {Object} params - Extraction parameters
+     */
+    function setCurrentParameters(params) {
+        const set = getCurrentSet();
+        if (!set) return;
+
+        set.parameters = params ? JSON.parse(JSON.stringify(params)) : null;
+        set.modifiedAt = new Date().toISOString();
+
+        // Dispatch event
+        document.dispatchEvent(new CustomEvent('setParametersChanged', {
+            detail: { setId: set.id, parameters: set.parameters }
+        }));
     }
 
     /**
@@ -629,6 +658,7 @@ window.sets = (function() {
                 modifiedAt: sets[id].modifiedAt,
                 tubercles: sets[id].tubercles,
                 edges: sets[id].edges,
+                parameters: sets[id].parameters,  // Include extraction parameters
                 history: sets[id].history,
             })),
         };
@@ -656,6 +686,7 @@ window.sets = (function() {
                 name: setData.name || 'Unnamed',
                 tubercles: setData.tubercles || [],
                 edges: setData.edges || [],
+                parameters: setData.parameters || null,  // Load extraction parameters
                 isDirty: false,
                 undoStack: [],
                 redoStack: [],
@@ -737,6 +768,8 @@ window.sets = (function() {
         // Data operations
         setCurrentData,
         getCurrentData,
+        getCurrentParameters,
+        setCurrentParameters,
 
         // Dirty state
         markDirty,

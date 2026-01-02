@@ -154,6 +154,9 @@ window.extraction = (function() {
             // Store data in sets module
             window.sets.setCurrentData(result.tubercles, result.edges);
 
+            // Store extraction parameters in the set
+            window.sets.setCurrentParameters(result.parameters || params);
+
             // Update overlay
             if (window.overlay) {
                 window.overlay.setData(result.tubercles, result.edges);

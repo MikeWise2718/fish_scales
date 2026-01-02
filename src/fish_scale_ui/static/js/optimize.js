@@ -217,6 +217,7 @@ window.optimize = (function() {
         // Update sets module
         if (window.sets) {
             window.sets.setCurrentData(result.tubercles, result.edges);
+            window.sets.setCurrentParameters(result.new_params);
         }
 
         // Update data tables

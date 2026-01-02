@@ -1157,6 +1157,10 @@ window.agentExtraction = (function() {
                 // Update sets module
                 if (window.sets) {
                     window.sets.setCurrentData(mcpState.tubercles, mcpState.edges || []);
+                    // Store the extraction parameters used
+                    if (mcpState.parameters) {
+                        window.sets.setCurrentParameters(mcpState.parameters);
+                    }
                 }
             }
         } catch (err) {

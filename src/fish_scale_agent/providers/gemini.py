@@ -9,6 +9,7 @@ from google.genai import types
 
 from .base import (
     AgentLLMProvider,
+    StopAgentLoop,
     ToolDefinition,
     ToolCall,
     AgentMessage,
@@ -176,6 +177,9 @@ class GeminiAgentProvider(AgentLLMProvider):
                             )
                         )
                     )
+                except StopAgentLoop:
+                    # Re-raise control flow exceptions
+                    raise
                 except Exception as e:
                     function_response_parts.append(
                         types.Part(

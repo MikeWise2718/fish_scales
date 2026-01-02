@@ -5,6 +5,19 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
+class StopAgentLoop(Exception):
+    """Exception raised to signal that the agent loop should stop.
+
+    This is a control flow exception used to terminate the agent loop
+    from within a tool executor. Providers should re-raise this exception
+    rather than catching it as a tool error.
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
 @dataclass
 class ToolDefinition:
     """Tool definition for LLM function calling."""

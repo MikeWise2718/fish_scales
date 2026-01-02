@@ -12,7 +12,7 @@ from typing import Any, Callable
 import httpx
 
 from .agent_run_logger import AgentRunLogger
-from .providers.base import AgentLLMProvider, ToolDefinition
+from .providers.base import AgentLLMProvider, StopAgentLoop, ToolDefinition
 
 
 @dataclass
@@ -671,12 +671,14 @@ accept_result("Target hexagonalness (0.70) achieved with score of 0.72. Pattern 
 ```"""
 
 
-class StopOptimization(Exception):
-    """Exception raised to signal that optimization should stop."""
+class StopOptimization(StopAgentLoop):
+    """Exception raised to signal that optimization should stop.
 
-    def __init__(self, reason: str):
-        self.reason = reason
-        super().__init__(reason)
+    Inherits from StopAgentLoop so that providers properly re-raise it
+    instead of converting it to a tool error message.
+    """
+
+    pass  # Inherits reason and __init__ from StopAgentLoop
 
 
 class ExtractionOptimizer:

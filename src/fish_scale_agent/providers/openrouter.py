@@ -8,6 +8,7 @@ import httpx
 
 from .base import (
     AgentLLMProvider,
+    StopAgentLoop,
     ToolDefinition,
     ToolCall,
     AgentMessage,
@@ -347,6 +348,9 @@ class OpenRouterAgentProvider(AgentLLMProvider):
                             "tool_call_id": tc.id,
                             "content": result_str,
                         })
+                except StopAgentLoop:
+                    # Re-raise control flow exceptions
+                    raise
                 except Exception as e:
                     messages.append({
                         "role": "tool",

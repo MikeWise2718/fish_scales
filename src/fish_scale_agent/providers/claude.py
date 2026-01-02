@@ -8,6 +8,7 @@ import anthropic
 
 from .base import (
     AgentLLMProvider,
+    StopAgentLoop,
     ToolDefinition,
     ToolCall,
     AgentMessage,
@@ -302,6 +303,9 @@ class ClaudeAgentProvider(AgentLLMProvider):
                             "tool_use_id": tc.id,
                             "content": result_str,
                         })
+                except StopAgentLoop:
+                    # Re-raise control flow exceptions
+                    raise
                 except Exception as e:
                     tool_results.append({
                         "type": "tool_result",

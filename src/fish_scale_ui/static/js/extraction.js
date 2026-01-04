@@ -80,7 +80,8 @@ window.extraction = (function() {
                 window.editor.setData(updatedTubercles, result.edges);
             }
 
-            // Record history event for auto_connect
+            // Record history event for auto_connect (v3.0: includes calibration)
+            const calibration = window.calibration?.getCurrentCalibration();
             window.sets?.addHistoryEvent('auto_connect', {
                 graph_type: graphType,
                 n_tubercles: updatedTubercles.length,
@@ -88,6 +89,7 @@ window.extraction = (function() {
                 hexagonalness: stats.hexagonalness_score,
                 cull_long_edges: cullLongEdges,
                 cull_factor: cullFactor,
+                calibration_um_per_pixel: calibration?.um_per_px,  // v3.0: record calibration
             });
 
             // Mark set as dirty
@@ -180,12 +182,13 @@ window.extraction = (function() {
                 window.configure.markExtracted(result.parameters);
             }
 
-            // Record history event for extraction
+            // Record history event for extraction (v3.0: includes calibration)
             window.sets?.addHistoryEvent('extraction', {
                 method: params.method || 'log',
                 n_tubercles: result.statistics.n_tubercles,
                 n_edges: result.statistics.n_edges,
                 parameters: { ...params },
+                calibration_um_per_pixel: calibration.um_per_px,  // v3.0: record calibration
             });
 
             // Mark set as dirty
@@ -594,7 +597,7 @@ window.extraction = (function() {
 
         // Warn on page unload
         window.addEventListener('beforeunload', (e) => {
-            if (isDirty) {
+            if (checkDirty()) {
                 e.preventDefault();
                 e.returnValue = 'You have unsaved changes.';
                 return e.returnValue;

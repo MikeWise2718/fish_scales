@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Optional
 
 
+# Current format version - always save as v3.0
+CURRENT_VERSION = "3.0"
+
+
 def save_annotations(
     annotations_dir: Path,
     image_name: str,
@@ -15,20 +19,21 @@ def save_annotations(
     edges: list = None,
     statistics: dict = None,
     parameters: dict = None,
-    version: int = 1,
+    version: int = 3,
     sets: list = None,
     activeSetId: str = None,
 ) -> dict:
     """
     Save annotation data to files.
 
-    Supports two formats:
+    Supports three formats:
     - v1 (legacy): Single set with tubercles and edges at root level
-    - v2 (new): Multiple sets with data in sets array
+    - v2 (legacy): Multiple sets with data in sets array
+    - v3 (current): Multiple sets with per-set calibration snapshots and enhanced metadata
 
     Creates:
-    - <image_name>_tub.csv - Tubercle data (from active set in v2)
-    - <image_name>_itc.csv - Intertubercular connection data (from active set in v2)
+    - <image_name>_tub.csv - Tubercle data (from active set)
+    - <image_name>_itc.csv - Intertubercular connection data (from active set)
     - <image_name>_annotations.json - Full annotation data
 
     Args:
@@ -39,9 +44,9 @@ def save_annotations(
         edges: List of edge dicts (v1 format)
         statistics: Statistics dict
         parameters: Extraction parameters dict
-        version: Annotation format version (1 or 2)
-        sets: List of set dicts (v2 format)
-        activeSetId: ID of the active set (v2 format)
+        version: Annotation format version (1, 2, or 3)
+        sets: List of set dicts (v2/v3 format)
+        activeSetId: ID of the active set (v2/v3 format)
 
     Returns:
         Dict with success status and file paths
@@ -102,25 +107,38 @@ def save_annotations(
             writer.writerows(csv_edges)
 
     # Build annotation JSON data
-    if version == 2:
-        # V2 format with multiple sets
+    # Check if we're loading an existing file to preserve created timestamp
+    existing_created = None
+    if annotations_path.exists():
+        try:
+            with open(annotations_path, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+                existing_created = existing_data.get('created')
+        except Exception:
+            pass
+
+    now = datetime.now().isoformat()
+
+    if version >= 2:
+        # V3 format (current) - always save as v3.0 for v2+ requests
         annotations_data = {
-            'format': 'annotations-v2',
-            'version': 2,
-            'created': datetime.now().isoformat(),
+            'format': 'fish-scale-annotations',
+            'version': CURRENT_VERSION,
+            'purpose': 'Tubercle and intertubercular space annotations for SEM fish scale classification',
             'image_name': image_name,
+            'created': existing_created or now,
+            'modified': now,
             'calibration': calibration,
             'parameters': parameters or {},
-            'statistics': statistics or {},
             'activeSetId': activeSetId,
             'sets': sets or [],
         }
     else:
-        # V1 format (legacy)
+        # V1 format (legacy) - for backward compatibility only
         annotations_data = {
             'format': 'annotations-v1',
             'version': '1.0',
-            'created': datetime.now().isoformat(),
+            'created': existing_created or now,
             'image_name': image_name,
             'calibration': calibration,
             'parameters': parameters or {},
@@ -143,9 +161,48 @@ def save_annotations(
     }
 
 
+def detect_annotation_version(data: dict) -> str:
+    """
+    Detect the annotation file version from its structure.
+
+    Args:
+        data: Parsed annotation JSON data
+
+    Returns:
+        Version string: '1.0', '2.0', or '3.0'
+    """
+    # Check for explicit version field
+    version = data.get('version')
+
+    if version == CURRENT_VERSION or version == '3.0':
+        return '3.0'
+    elif version == 2 or version == '2.0':
+        return '2.0'
+    elif version == '1.0' or version == 1:
+        return '1.0'
+
+    # Infer from structure
+    if data.get('format') == 'fish-scale-annotations':
+        return '3.0'
+    elif 'sets' in data:
+        # Has sets array - v2 or v3
+        if data.get('format') == 'annotations-v2':
+            return '2.0'
+        # Check for v3 indicators (per-set calibration)
+        sets = data.get('sets', [])
+        if sets and 'calibration_um_per_pixel' in sets[0]:
+            return '3.0'
+        return '2.0'
+    else:
+        # No sets array - v1
+        return '1.0'
+
+
 def load_annotations(annotations_path: Path) -> dict:
     """
     Load annotation data from a JSON file.
+
+    Supports v1, v2, and v3 formats with automatic version detection.
 
     Args:
         annotations_path: Path to the annotations JSON file
@@ -162,9 +219,22 @@ def load_annotations(annotations_path: Path) -> dict:
         with open(annotations_path, 'r', encoding='utf-8') as f:
             annotations_data = json.load(f)
 
+        # Detect and normalize version
+        detected_version = detect_annotation_version(annotations_data)
+        annotations_data['_detected_version'] = detected_version
+
+        # Normalize version field for downstream compatibility
+        if detected_version == '3.0':
+            annotations_data['version'] = 3
+        elif detected_version == '2.0':
+            annotations_data['version'] = 2
+        else:
+            annotations_data['version'] = 1
+
         return {
             'success': True,
             'data': annotations_data,
+            'detected_version': detected_version,
         }
     except json.JSONDecodeError as e:
         return {'success': False, 'error': f'Invalid JSON: {str(e)}'}

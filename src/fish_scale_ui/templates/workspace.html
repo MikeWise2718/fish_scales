@@ -16,6 +16,11 @@
         <!-- Statistics bar (always visible, first row under image) -->
         <div class="stats-bar" id="statsBar">
             <span class="stats-bar-set-label">Set:</span>
+            <button type="button" class="btn btn-xs btn-icon stats-bar-set-nav" id="prevSetBtn" title="Previous set">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
             <div class="stats-bar-set-dropdown" id="statsBarSetDropdown">
                 <button type="button" class="stats-bar-set-btn" id="statsBarSetBtn">
                     <span id="statsBarSetName">Base</span>
@@ -27,6 +32,11 @@
                     <!-- Set list populated by JavaScript -->
                 </div>
             </div>
+            <button type="button" class="btn btn-xs btn-icon stats-bar-set-nav" id="nextSetBtn" title="Next set">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
             <button type="button" class="btn btn-xs btn-secondary stats-bar-new-set" id="statsBarNewSetBtn" title="Create new set">+ New</button>
             <button type="button" class="btn btn-xs btn-secondary" id="saveSetBtn" title="Save all sets (Ctrl+S)" disabled>Save</button>
             <div class="stats-bar-gear-container">
@@ -782,143 +792,215 @@
             <div class="tab-pane" data-tab="data">
                 <h2>Data</h2>
 
-                <!-- Current Set Header -->
-                <div class="tab-set-header" id="dataTabSetHeader">
-                    <span class="tab-set-label">Current Set:</span>
-                    <div class="tab-set-dropdown" id="dataTabSetDropdown">
-                        <button type="button" class="tab-set-btn" id="dataTabSetBtn">
-                            <span id="dataTabSetName">Base</span>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"></polyline>
+                <!-- Panel 1: Image-Level Data (solid border, not collapsible) -->
+                <div class="data-panel data-panel-stored" id="imageLevelPanel">
+                    <h3 class="data-panel-header">
+                        <span>Image-Level Data</span>
+                        <span class="data-panel-badge stored-badge">Stored</span>
+                    </h3>
+                    <div class="data-panel-content">
+                        <div class="data-row">
+                            <span class="data-label">Current Calibration:</span>
+                            <span id="dataCurrentCalibration" class="data-value">-</span>
+                            <span class="data-unit">µm/px</span>
+                        </div>
+                        <div class="data-row data-row-secondary">
+                            <span class="data-label">Source:</span>
+                            <span id="dataCalibrationSource" class="data-value-secondary">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Set Data (solid border) -->
+                <div class="data-panel data-panel-stored" id="setDataPanel">
+                    <h3 class="data-panel-header">
+                        <span>Set Data</span>
+                        <span class="data-panel-badge stored-badge">Stored</span>
+                        <div class="tab-set-dropdown" id="dataTabSetDropdown">
+                            <button type="button" class="tab-set-btn" id="dataTabSetBtn">
+                                <span id="dataTabSetName">Base</span>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div class="tab-set-menu" id="dataTabSetMenu" style="display: none;">
+                                <!-- Set list populated by JavaScript -->
+                            </div>
+                        </div>
+                    </h3>
+                    <div class="data-panel-content">
+                        <!-- Calibration Snapshot -->
+                        <div class="data-row">
+                            <span class="data-label">Set Calibration:</span>
+                            <span id="dataSetCalibration" class="data-value">-</span>
+                            <span class="data-unit">µm/px</span>
+                        </div>
+                        <div id="calibrationMismatchWarning" class="calibration-mismatch-warning" style="display: none;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
                             </svg>
-                        </button>
-                        <div class="tab-set-menu" id="dataTabSetMenu" style="display: none;">
-                            <!-- Set list populated by JavaScript -->
+                            <span>Calibration mismatch! Set uses <span id="mismatchSetCal">-</span>, current is <span id="mismatchCurrentCal">-</span></span>
+                            <button type="button" class="btn btn-sm" id="recalculateBtn">Recalculate</button>
+                        </div>
+
+                        <!-- Extraction Parameters (collapsible, default collapsed) -->
+                        <div class="data-subsection collapsible-section">
+                            <h4 class="collapsible-header collapsed" id="paramsHeader">
+                                <span class="collapse-icon">▼</span>
+                                <span>Extraction Parameters</span>
+                            </h4>
+                            <div class="collapsible-content" id="paramsContent" style="display: none;">
+                                <div id="setParamsDisplay" class="set-params-display">
+                                    <span class="empty-state">No parameters recorded</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TUB Table (collapsible) -->
+                        <div class="data-subsection collapsible-section">
+                            <h4 class="collapsible-header" id="tubHeader">
+                                <span class="collapse-icon">▼</span>
+                                <span>Tubercles (TUB)</span>
+                                <span id="tubCount" class="item-count">0</span>
+                                <div class="column-toggles" id="tubColumnToggles">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </h4>
+                            <div class="collapsible-content" id="tubContent">
+                                <div class="data-table-container">
+                                    <table class="data-table" id="tubTable">
+                                        <thead>
+                                            <tr>
+                                                <th data-col="id">ID</th>
+                                                <th data-col="x">X</th>
+                                                <th data-col="y">Y</th>
+                                                <th data-col="diam">Diam (µm)</th>
+                                                <th data-col="circ">Circ</th>
+                                                <th data-col="bdry">Bdry</th>
+                                                <th data-col="source" class="col-optional">Source</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tubTableBody">
+                                            <tr><td colspan="7" class="empty-table">No tubercles detected</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ITC Table (collapsible) -->
+                        <div class="data-subsection collapsible-section">
+                            <h4 class="collapsible-header" id="itcHeader">
+                                <span class="collapse-icon">▼</span>
+                                <span>Intertubercular Connections (ITC)</span>
+                                <span id="itcCount" class="item-count">0</span>
+                            </h4>
+                            <div class="collapsible-content" id="itcContent">
+                                <div class="data-table-container">
+                                    <table class="data-table" id="itcTable">
+                                        <thead>
+                                            <tr>
+                                                <th>ID1</th>
+                                                <th>ID2</th>
+                                                <th>Center (µm)</th>
+                                                <th>Edge (µm)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="itcTableBody">
+                                            <tr><td colspan="4" class="empty-table">No connections detected</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="data-section">
-                    <h3>Statistics</h3>
-                    <div id="statisticsPanel" class="statistics-panel">
-                        <div class="stat-row">
-                            <span class="stat-label">Tubercles:</span>
-                            <span id="statNTubercles" class="stat-value">-</span>
-                            <span class="stat-detail" id="statBoundaryDetail"></span>
+                <!-- Panel 3: Computed Statistics (dashed border) -->
+                <div class="data-panel data-panel-computed" id="computedStatsPanel">
+                    <h3 class="data-panel-header">
+                        <span>Computed Statistics</span>
+                        <span class="data-panel-badge computed-badge">Computed</span>
+                    </h3>
+                    <div class="data-panel-content">
+                        <div id="statisticsPanel" class="statistics-panel">
+                            <div class="stat-row">
+                                <span class="stat-label">Tubercles:</span>
+                                <span id="statNTubercles" class="stat-value">-</span>
+                                <span class="stat-detail" id="statBoundaryDetail"></span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Mean Diameter:</span>
+                                <span id="statMeanDiameter" class="stat-value">-</span>
+                                <span class="stat-unit">µm</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Connections:</span>
+                                <span id="statNEdges" class="stat-value">-</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Mean Space:</span>
+                                <span id="statMeanSpace" class="stat-value">-</span>
+                                <span class="stat-unit">µm</span>
+                            </div>
+                            <div class="stat-row classification">
+                                <span class="stat-label">Classification:</span>
+                                <span id="statGenus" class="stat-value">-</span>
+                                <span id="statConfidence" class="stat-confidence">-</span>
+                            </div>
+                            <hr class="stat-divider">
+                            <div class="stat-row hexagonalness">
+                                <span class="stat-label">Hexagonalness:</span>
+                                <span id="statHexScore" class="stat-value stat-score">-</span>
+                                <span class="stat-unit">/ 1.0</span>
+                                <a href="#" class="help-icon" data-help="hexagonalness" title="Help">?</a>
+                                <span id="statHexReliability" class="stat-reliability"></span>
+                            </div>
+                            <div class="stat-row stat-indent">
+                                <span class="stat-label">Spacing Uniformity:</span>
+                                <span id="statSpacingUniformity" class="stat-value">-</span>
+                                <span class="stat-unit" id="statSpacingWeight">(40%)</span>
+                                <a href="#" class="help-icon" data-help="spacing-uniformity" title="Help">?</a>
+                            </div>
+                            <div class="stat-row stat-indent">
+                                <span class="stat-label">Degree Score:</span>
+                                <span id="statDegreeScore" class="stat-value">-</span>
+                                <span class="stat-unit" id="statDegreeWeight">(45%)</span>
+                                <a href="#" class="help-icon" data-help="degree-score" title="Help">?</a>
+                            </div>
+                            <div class="stat-row stat-indent">
+                                <span class="stat-label">Edge Ratio Score:</span>
+                                <span id="statEdgeRatioScore" class="stat-value">-</span>
+                                <span class="stat-unit" id="statEdgeRatioWeight">(15%)</span>
+                                <a href="#" class="help-icon" data-help="edge-ratio-score" title="Help">?</a>
+                            </div>
+                            <div class="stat-row stat-secondary">
+                                <span class="stat-label">Spacing CV:</span>
+                                <span id="statSpacingCV" class="stat-value">-</span>
+                                <a href="#" class="help-icon" data-help="spacing-cv" title="Help">?</a>
+                            </div>
+                            <div class="stat-row stat-secondary">
+                                <span class="stat-label">Mean Degree:</span>
+                                <span id="statMeanDegree" class="stat-value">-</span>
+                                <span class="stat-unit">neighbors</span>
+                                <a href="#" class="help-icon" data-help="mean-degree" title="Help">?</a>
+                            </div>
                         </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Mean Diameter:</span>
-                            <span id="statMeanDiameter" class="stat-value">-</span>
-                            <span class="stat-unit">um</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Connections:</span>
-                            <span id="statNEdges" class="stat-value">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Mean Space:</span>
-                            <span id="statMeanSpace" class="stat-value">-</span>
-                            <span class="stat-unit">um</span>
-                        </div>
-                        <div class="stat-row classification">
-                            <span class="stat-label">Classification:</span>
-                            <span id="statGenus" class="stat-value">-</span>
-                            <span id="statConfidence" class="stat-confidence">-</span>
-                        </div>
-                        <hr class="stat-divider">
-                        <div class="stat-row hexagonalness">
-                            <span class="stat-label">Hexagonalness:</span>
-                            <span id="statHexScore" class="stat-value stat-score">-</span>
-                            <span class="stat-unit">/ 1.0</span>
-                            <a href="#" class="help-icon" data-help="hexagonalness" title="Help">?</a>
-                            <span id="statHexReliability" class="stat-reliability"></span>
-                        </div>
-                        <div class="stat-row stat-indent">
-                            <span class="stat-label">Spacing Uniformity:</span>
-                            <span id="statSpacingUniformity" class="stat-value">-</span>
-                            <span class="stat-unit" id="statSpacingWeight">(40%)</span>
-                            <a href="#" class="help-icon" data-help="spacing-uniformity" title="Help">?</a>
-                        </div>
-                        <div class="stat-row stat-indent">
-                            <span class="stat-label">Degree Score:</span>
-                            <span id="statDegreeScore" class="stat-value">-</span>
-                            <span class="stat-unit" id="statDegreeWeight">(45%)</span>
-                            <a href="#" class="help-icon" data-help="degree-score" title="Help">?</a>
-                        </div>
-                        <div class="stat-row stat-indent">
-                            <span class="stat-label">Edge Ratio Score:</span>
-                            <span id="statEdgeRatioScore" class="stat-value">-</span>
-                            <span class="stat-unit" id="statEdgeRatioWeight">(15%)</span>
-                            <a href="#" class="help-icon" data-help="edge-ratio-score" title="Help">?</a>
-                        </div>
-                        <div class="stat-row stat-secondary">
-                            <span class="stat-label">Spacing CV:</span>
-                            <span id="statSpacingCV" class="stat-value">-</span>
-                            <a href="#" class="help-icon" data-help="spacing-cv" title="Help">?</a>
-                        </div>
-                        <div class="stat-row stat-secondary">
-                            <span class="stat-label">Mean Degree:</span>
-                            <span id="statMeanDegree" class="stat-value">-</span>
-                            <span class="stat-unit">neighbors</span>
-                            <a href="#" class="help-icon" data-help="mean-degree" title="Help">?</a>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="data-section">
-                    <h3>Tubercles (TUB)</h3>
-                    <div class="data-table-container">
-                        <table class="data-table" id="tubTable">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>X</th>
-                                    <th>Y</th>
-                                    <th>Diam (um)</th>
-                                    <th>Circ</th>
-                                    <th>Bdry</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tubTableBody">
-                                <tr><td colspan="6" class="empty-table">No tubercles detected</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="data-section">
-                    <h3>Intertubercular Connections (ITC)</h3>
-                    <div class="data-table-container">
-                        <table class="data-table" id="itcTable">
-                            <thead>
-                                <tr>
-                                    <th>ID1</th>
-                                    <th>ID2</th>
-                                    <th>Center (um)</th>
-                                    <th>Edge (um)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="itcTableBody">
-                                <tr><td colspan="4" class="empty-table">No connections detected</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Dataset History Section -->
-                <div class="data-section history-section">
-                    <div class="history-header" id="historyHeader">
-                        <h3>Dataset History</h3>
-                        <span class="history-toggle" id="historyToggle">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </span>
-                    </div>
-                    <div class="history-content" id="historyContent">
-                        <div class="history-empty" id="historyEmpty">No history events recorded</div>
-                        <div class="history-timeline" id="historyTimeline">
-                            <!-- History events populated by JavaScript -->
+                        <!-- Dataset History Section (collapsible, default collapsed) -->
+                        <div class="data-subsection history-section collapsible-section">
+                            <h4 class="collapsible-header collapsed" id="historyHeader">
+                                <span class="collapse-icon">▼</span>
+                                <span>Dataset History</span>
+                            </h4>
+                            <div class="collapsible-content" id="historyContent" style="display: none;">
+                                <div class="history-empty" id="historyEmpty">No history events recorded</div>
+                                <div class="history-timeline" id="historyTimeline">
+                                    <!-- History events populated by JavaScript -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1416,8 +1498,12 @@
                             <span id="agentLastAction" class="agent-status-value">-</span>
                         </div>
                         <div class="agent-status-row">
-                            <span class="agent-status-label">Elapsed:</span>
+                            <span class="agent-status-label">Total Time:</span>
                             <span id="agentElapsed" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Step Time:</span>
+                            <span id="agentStepTime" class="agent-status-value">-</span>
                         </div>
                     </div>
                 </div>

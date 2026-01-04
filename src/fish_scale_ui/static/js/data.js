@@ -1,5 +1,5 @@
 /**
- * Fish Scale Measurement UI - Data Tab
+ * Fish Scale Measurement UI - Data Tab (v3.0)
  */
 
 window.data = (function() {
@@ -7,12 +7,41 @@ window.data = (function() {
     let edges = [];
     let statistics = {};
 
+    // Column visibility state (persisted in localStorage)
+    const COLUMN_STORAGE_KEY = 'fishScale_dataColumnVisibility';
+    let columnVisibility = {
+        source: false,  // Source column hidden by default
+    };
+
+    // Load column visibility from localStorage
+    function loadColumnVisibility() {
+        try {
+            const saved = localStorage.getItem(COLUMN_STORAGE_KEY);
+            if (saved) {
+                columnVisibility = { ...columnVisibility, ...JSON.parse(saved) };
+            }
+        } catch (e) {
+            console.warn('Failed to load column visibility:', e);
+        }
+    }
+
+    // Save column visibility to localStorage
+    function saveColumnVisibility() {
+        try {
+            localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(columnVisibility));
+        } catch (e) {
+            console.warn('Failed to save column visibility:', e);
+        }
+    }
+
     // Update data and render tables
     function setData(newTubercles, newEdges, newStatistics) {
         tubercles = newTubercles || [];
         edges = newEdges || [];
         statistics = newStatistics || {};
 
+        renderImageLevelData();
+        renderSetData();
         renderTubercleTable();
         renderEdgeTable();
         renderStatistics();
@@ -23,9 +52,144 @@ window.data = (function() {
         tubercles = [];
         edges = [];
         statistics = {};
+        renderImageLevelData();
+        renderSetData();
         renderTubercleTable();
         renderEdgeTable();
         renderStatistics();
+    }
+
+    // ===== Panel 1: Image-Level Data =====
+
+    /**
+     * Render the image-level data panel (current calibration)
+     */
+    function renderImageLevelData() {
+        const calibration = window.calibration?.getCurrentCalibration();
+        const calValueEl = document.getElementById('dataCurrentCalibration');
+        const calSourceEl = document.getElementById('dataCalibrationSource');
+
+        if (calValueEl) {
+            if (calibration?.um_per_px) {
+                calValueEl.textContent = calibration.um_per_px.toFixed(4);
+            } else {
+                calValueEl.textContent = 'Not set';
+            }
+        }
+
+        if (calSourceEl) {
+            if (calibration?.source) {
+                calSourceEl.textContent = calibration.source;
+            } else {
+                calSourceEl.textContent = '-';
+            }
+        }
+    }
+
+    // ===== Panel 2: Set Data =====
+
+    /**
+     * Render the set data panel (calibration snapshot, parameters)
+     */
+    function renderSetData() {
+        renderSetCalibration();
+        renderSetParameters();
+        updateItemCounts();
+    }
+
+    /**
+     * Render set calibration and mismatch warning
+     */
+    function renderSetCalibration() {
+        const setCalEl = document.getElementById('dataSetCalibration');
+        const warningEl = document.getElementById('calibrationMismatchWarning');
+        const mismatchSetEl = document.getElementById('mismatchSetCal');
+        const mismatchCurrentEl = document.getElementById('mismatchCurrentCal');
+
+        const match = window.sets?.checkCalibrationMatch() || { matches: true };
+        const setCal = window.sets?.getSetCalibration();
+
+        if (setCalEl) {
+            if (setCal !== null && setCal !== undefined) {
+                setCalEl.textContent = setCal.toFixed(4);
+            } else {
+                setCalEl.textContent = 'Legacy (not recorded)';
+            }
+        }
+
+        if (warningEl) {
+            if (!match.matches && !match.legacy) {
+                warningEl.style.display = 'flex';
+                if (mismatchSetEl) mismatchSetEl.textContent = match.setCal?.toFixed(4) || '-';
+                if (mismatchCurrentEl) mismatchCurrentEl.textContent = match.currentCal?.toFixed(4) || '-';
+            } else {
+                warningEl.style.display = 'none';
+            }
+        }
+    }
+
+    /**
+     * Render extraction parameters for current set
+     */
+    function renderSetParameters() {
+        const container = document.getElementById('setParamsDisplay');
+        if (!container) return;
+
+        const params = window.sets?.getCurrentParameters();
+
+        if (!params || Object.keys(params).length === 0) {
+            container.innerHTML = '<span class="empty-state">No parameters recorded</span>';
+            return;
+        }
+
+        // Display key parameters in a compact format
+        const displayParams = [
+            { key: 'method', label: 'Method' },
+            { key: 'threshold', label: 'Threshold', format: v => v?.toFixed(3) },
+            { key: 'min_diameter_um', label: 'Min Diam', format: v => `${v?.toFixed(1)} µm` },
+            { key: 'max_diameter_um', label: 'Max Diam', format: v => `${v?.toFixed(1)} µm` },
+            { key: 'min_circularity', label: 'Min Circ', format: v => v?.toFixed(2) },
+            { key: 'graph_type', label: 'Graph' },
+        ];
+
+        const rows = displayParams
+            .filter(p => params[p.key] !== undefined)
+            .map(p => {
+                const value = p.format ? p.format(params[p.key]) : params[p.key];
+                return `<div class="param-row"><span class="param-name">${p.label}:</span><span class="param-value">${value}</span></div>`;
+            })
+            .join('');
+
+        container.innerHTML = rows || '<span class="empty-state">No parameters recorded</span>';
+    }
+
+    /**
+     * Update item counts in collapsible headers
+     */
+    function updateItemCounts() {
+        const tubCountEl = document.getElementById('tubCount');
+        const itcCountEl = document.getElementById('itcCount');
+
+        if (tubCountEl) {
+            tubCountEl.textContent = tubercles.length;
+        }
+        if (itcCountEl) {
+            itcCountEl.textContent = edges.length;
+        }
+    }
+
+    /**
+     * Handle recalculate button click
+     */
+    function handleRecalculate() {
+        // Update set calibration to current
+        const currentCal = window.calibration?.getCurrentCalibration()?.um_per_px;
+        if (currentCal) {
+            window.sets?.setSetCalibration(currentCal);
+            window.sets?.markDirty();
+            renderSetData();
+            window.app?.showToast('Set calibration updated to current value', 'success');
+        }
     }
 
     // Render tubercle table
@@ -35,9 +199,14 @@ window.data = (function() {
 
         tbody.innerHTML = '';
 
+        // Update column visibility in header
+        updateColumnVisibility();
+
+        const colCount = 6 + (columnVisibility.source ? 1 : 0);
+
         if (tubercles.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="6" class="empty-table">No tubercles detected</td>';
+            row.innerHTML = `<td colspan="${colCount}" class="empty-table">No tubercles detected</td>`;
             tbody.appendChild(row);
             return;
         }
@@ -46,6 +215,9 @@ window.data = (function() {
             const row = document.createElement('tr');
             row.dataset.tubId = tub.id;
             const boundaryStr = tub.is_boundary ? 'Y' : 'N';
+            const sourceStr = tub.source || 'extracted';
+            const sourceClass = columnVisibility.source ? '' : 'col-optional';
+            const sourceVisible = columnVisibility.source ? 'visible' : '';
             row.innerHTML = `
                 <td>${tub.id}</td>
                 <td>${tub.centroid_x.toFixed(1)}</td>
@@ -53,6 +225,7 @@ window.data = (function() {
                 <td>${tub.diameter_um.toFixed(2)}</td>
                 <td>${(tub.circularity * 100).toFixed(1)}%</td>
                 <td>${boundaryStr}</td>
+                <td class="${sourceClass} ${sourceVisible}">${sourceStr}</td>
             `;
             row.addEventListener('click', () => {
                 highlightTubercleRow(tub.id);
@@ -61,6 +234,55 @@ window.data = (function() {
                 }
             });
             tbody.appendChild(row);
+        });
+    }
+
+    /**
+     * Update column visibility in header and toggle buttons
+     */
+    function updateColumnVisibility() {
+        // Update header column visibility
+        const sourceHeader = document.querySelector('#tubTable th[data-col="source"]');
+        if (sourceHeader) {
+            sourceHeader.classList.toggle('visible', columnVisibility.source);
+        }
+
+        // Update toggle button state
+        const sourceToggle = document.querySelector('.column-toggle[data-col="source"]');
+        if (sourceToggle) {
+            sourceToggle.classList.toggle('active', columnVisibility.source);
+        }
+    }
+
+    /**
+     * Toggle a column's visibility
+     */
+    function toggleColumn(colName) {
+        columnVisibility[colName] = !columnVisibility[colName];
+        saveColumnVisibility();
+        renderTubercleTable();
+    }
+
+    /**
+     * Initialize column toggle buttons
+     */
+    function initColumnToggles() {
+        const container = document.getElementById('tubColumnToggles');
+        if (!container) return;
+
+        // Create toggle for Source column
+        container.innerHTML = `
+            <button type="button" class="column-toggle ${columnVisibility.source ? 'active' : ''}"
+                    data-col="source" title="Toggle Source column">Src</button>
+        `;
+
+        // Add click handler
+        container.addEventListener('click', (e) => {
+            const toggle = e.target.closest('.column-toggle');
+            if (toggle) {
+                const col = toggle.dataset.col;
+                toggleColumn(col);
+            }
         });
     }
 
@@ -290,6 +512,21 @@ window.data = (function() {
 
     // Initialize
     function init() {
+        // Load saved column visibility
+        loadColumnVisibility();
+
+        // Initialize column toggles
+        initColumnToggles();
+
+        // Initialize collapsible sections
+        initCollapsibleSections();
+
+        // Recalculate button handler
+        const recalculateBtn = document.getElementById('recalculateBtn');
+        if (recalculateBtn) {
+            recalculateBtn.addEventListener('click', handleRecalculate);
+        }
+
         // Listen for overlay selection events
         document.addEventListener('tubercleSelected', (e) => {
             highlightTubercleRow(e.detail.id);
@@ -301,6 +538,17 @@ window.data = (function() {
 
         document.addEventListener('overlayDeselected', () => {
             clearHighlights();
+        });
+
+        // Listen for calibration changes to update panels
+        document.addEventListener('calibrationChanged', () => {
+            renderImageLevelData();
+            renderSetCalibration();
+        });
+
+        // Listen for set changes to update panels
+        document.addEventListener('setChanged', () => {
+            renderSetData();
         });
 
         // Help icons for hexagonalness metrics
@@ -316,6 +564,24 @@ window.data = (function() {
         // Update weight displays when settings change or on init
         updateWeightDisplays();
         window.addEventListener('hexWeightsChanged', updateWeightDisplays);
+    }
+
+    /**
+     * Initialize collapsible section handlers
+     */
+    function initCollapsibleSections() {
+        // Get all collapsible headers in the Data tab
+        const headers = document.querySelectorAll('[data-tab="data"] .collapsible-header');
+
+        headers.forEach(header => {
+            header.addEventListener('click', () => {
+                const isCollapsed = header.classList.toggle('collapsed');
+                const content = header.nextElementSibling;
+                if (content && content.classList.contains('collapsible-content')) {
+                    content.style.display = isCollapsed ? 'none' : 'block';
+                }
+            });
+        });
     }
 
     // Update the weight percentage displays in the Data tab
@@ -436,11 +702,21 @@ window.data = (function() {
      * Format event details for display
      */
     function formatEventDetails(event) {
+        let details = '';
         switch (event.type) {
             case 'extraction':
-                return `${event.n_tubercles} tubercles, ${event.n_edges} connections (${event.method || 'auto'})`;
+                details = `${event.n_tubercles} tubercles, ${event.n_edges} connections (${event.method || 'auto'})`;
+                // v3.0: show calibration if recorded
+                if (event.calibration_um_per_pixel) {
+                    details += ` @ ${event.calibration_um_per_pixel.toFixed(4)} µm/px`;
+                }
+                return details;
             case 'auto_connect':
-                return `${event.n_edges} connections (${event.graph_type || 'auto'})`;
+                details = `${event.n_edges} connections (${event.graph_type || 'auto'})`;
+                if (event.calibration_um_per_pixel) {
+                    details += ` @ ${event.calibration_um_per_pixel.toFixed(4)} µm/px`;
+                }
+                return details;
             case 'manual_edit':
                 return event.summary || '';
             case 'agent_phase':
@@ -463,12 +739,8 @@ window.data = (function() {
             return;
         }
 
-        window.configure.setParams(params);
-        window.app?.showToast('Parameters restored', 'success');
-
-        // Switch to Configure tab
-        const configBtn = document.querySelector('[data-tab="configure"]');
-        if (configBtn) configBtn.click();
+        // Use the new applyParameters method which handles switching tab and showing toast
+        window.configure.applyParameters(params);
     }
 
     /**
@@ -517,5 +789,10 @@ window.data = (function() {
         clearHighlights,
         getStatistics,
         renderHistory,
+        // v3.0 additions
+        renderImageLevelData,
+        renderSetData,
+        renderSetCalibration,
+        renderSetParameters,
     };
 })();

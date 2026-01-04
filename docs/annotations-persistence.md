@@ -23,34 +23,46 @@ For each image, three files are created using the image's base name:
 
 ## Annotations JSON Format
 
-### Version 2 (Current - Multiple Sets)
+### Version 3.0 (Current - Multiple Sets with Per-Set Calibration)
+
+Version 3.0 introduces per-set calibration snapshots for provenance tracking and enhanced metadata.
 
 ```json
 {
-  "format": "annotations-v2",
-  "version": 2,
-  "created": "2025-01-15T10:30:00",
+  "format": "fish-scale-annotations",
+  "version": "3.0",
+  "purpose": "Tubercle and intertubercular space annotations for SEM fish scale classification",
   "image_name": "example.tif",
+  "created": "2025-01-15T10:30:00",
+  "modified": "2025-01-15T14:45:00",
   "calibration": {
     "um_per_pixel": 0.1,
-    "method": "manual"
+    "method": "manual",
+    "source": "manual entry"
   },
   "parameters": {
     "method": "log",
-    "min_sigma": 5.0,
-    "max_sigma": 15.0,
-    ...
+    "threshold": 0.05,
+    "min_diameter_um": 2.0,
+    "max_diameter_um": 10.0,
+    "min_circularity": 0.5
   },
-  "statistics": {
-    "tubercle_diameter_mean": 7.2,
-    "intertubercular_space_mean": 12.5,
-    ...
-  },
-  "activeSetId": "set-1",
+  "activeSetId": "set-abc123",
   "sets": [
     {
-      "id": "set-1",
+      "id": "set-abc123",
       "name": "Initial Extraction",
+      "createdAt": "2025-01-15T10:30:00",
+      "modifiedAt": "2025-01-15T10:35:00",
+      "calibration_um_per_pixel": 0.1,
+      "parameters": {
+        "method": "log",
+        "threshold": 0.05,
+        "min_diameter_um": 2.0,
+        "max_diameter_um": 10.0,
+        "min_circularity": 0.5,
+        "graph_type": "gabriel"
+      },
       "tubercles": [
         {
           "id": 1,
@@ -59,7 +71,9 @@ For each image, three files are created using the image's base name:
           "diameter_px": 45.2,
           "diameter_um": 4.52,
           "radius_px": 22.6,
-          "circularity": 0.95
+          "circularity": 0.95,
+          "is_boundary": false,
+          "source": "extracted"
         }
       ],
       "edges": [
@@ -73,17 +87,63 @@ For each image, three files are created using the image's base name:
           "center_distance_um": 3.2,
           "edge_distance_um": 1.5
         }
+      ],
+      "history": [
+        {
+          "type": "extraction",
+          "timestamp": "2025-01-15T10:30:00",
+          "user": "researcher",
+          "method": "log",
+          "n_tubercles": 45,
+          "n_edges": 89,
+          "parameters": {...},
+          "calibration_um_per_pixel": 0.1
+        }
       ]
-    },
+    }
+  ]
+}
+```
+
+#### Key Changes in v3.0
+
+| Field | Description |
+|-------|-------------|
+| `format` | Changed to `"fish-scale-annotations"` |
+| `version` | String `"3.0"` instead of integer |
+| `purpose` | New field describing file purpose |
+| `modified` | Timestamp of last modification |
+| `sets[].calibration_um_per_pixel` | **New**: Per-set calibration snapshot |
+| `sets[].tubercles[].source` | **New**: `"extracted"` or `"manual"` |
+| `sets[].history[].calibration_um_per_pixel` | **New**: Calibration recorded in history events |
+
+### Version 2 (Legacy - Multiple Sets)
+
+```json
+{
+  "format": "annotations-v2",
+  "version": 2,
+  "created": "2025-01-15T10:30:00",
+  "image_name": "example.tif",
+  "calibration": {
+    "um_per_pixel": 0.1,
+    "method": "manual"
+  },
+  "parameters": {...},
+  "statistics": {...},
+  "activeSetId": "set-1",
+  "sets": [
     {
-      "id": "set-2",
-      "name": "After Manual Edit",
+      "id": "set-1",
+      "name": "Initial Extraction",
       "tubercles": [...],
       "edges": [...]
     }
   ]
 }
 ```
+
+V2 files are automatically upgraded to v3.0 format when saved.
 
 ### Version 1 (Legacy - Single Set)
 
@@ -101,13 +161,43 @@ For each image, three files are created using the image's base name:
 }
 ```
 
-V1 files are automatically supported when loading - the system treats them as a single set.
+V1 files are automatically converted to v3.0 multi-set format when saved.
+
+## Calibration Provenance Tracking
+
+### Per-Set Calibration Snapshots
+
+Each set now stores the calibration value that was active when the set was created or extracted. This enables:
+
+1. **Provenance tracking**: Know exactly what calibration was used for each extraction
+2. **Mismatch detection**: UI warns if current calibration differs from set's stored calibration
+3. **Recalculation**: Option to update measurements with new calibration
+
+### Calibration Mismatch Warning
+
+When the Data tab displays a set whose `calibration_um_per_pixel` differs from the current image calibration:
+
+- A yellow warning banner appears
+- Shows both calibration values
+- Provides a "Recalculate" button to update the set's calibration
+
+### History Event Calibration
+
+Extraction and auto-connect history events now include `calibration_um_per_pixel` to record what calibration was active at that point in time.
 
 ## Backwards Compatibility
 
-The system supports loading legacy `*_slo.json` files:
-- Both `*_annotations.json` and `*_slo.json` file names are searched when loading
-- New saves always use the `*_annotations.json` naming
+The system maintains full backwards compatibility:
+
+| Loading | Behavior |
+|---------|----------|
+| V1 files | Converted to v3.0 with single set, calibration captured from current |
+| V2 files | Sets receive `calibration_um_per_pixel` from current calibration |
+| V3 files | Loaded as-is |
+
+All saves are written in v3.0 format regardless of input version.
+
+Legacy `*_slo.json` files are also supported when loading.
 
 ## CSV Export Format
 
@@ -137,6 +227,11 @@ The system supports loading legacy `*_slo.json` files:
 ## Implementation
 
 The persistence logic is in `src/fish_scale_ui/services/persistence.py`:
-- `save_annotations()` - Save annotation data to files
-- `load_annotations()` - Load annotations JSON file
+- `save_annotations()` - Save annotation data to files (always writes v3.0)
+- `load_annotations()` - Load annotations JSON file (auto-detects version)
+- `detect_annotation_version()` - Detect file version from structure
 - `list_annotation_files()` - List available annotation files for an image
+
+JavaScript implementation:
+- `sets.js` - Manages set data including `calibration_um_per_pixel`
+- `data.js` - Renders Data tab panels including calibration mismatch warnings

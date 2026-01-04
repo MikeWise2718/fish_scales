@@ -430,6 +430,96 @@ window.configure = (function() {
         checkParamsChanged();
     }
 
+    /**
+     * Set parameters programmatically from an external source.
+     * Used by agent_extraction.js and data.js to sync parameters.
+     * @param {Object} params - Parameter object with keys matching form input IDs
+     */
+    function setParams(params) {
+        if (!params || typeof params !== 'object') return;
+
+        pushUndo();
+
+        // Merge with defaults to ensure all params have values
+        const mergedParams = { ...defaults, ...params };
+
+        // Apply to form controls
+        applyParamsToForm(mergedParams);
+
+        // Update internal state
+        currentParams = { ...mergedParams };
+        saveToStorage();
+        checkParamsChanged();
+    }
+
+    /**
+     * Apply parameters from history restoration.
+     * Sets parameters, switches to Configure tab, and shows confirmation.
+     * @param {Object} params - Parameter object to apply
+     */
+    function applyParameters(params) {
+        if (!params || typeof params !== 'object') {
+            window.app?.showToast('Invalid parameters', 'error');
+            return;
+        }
+
+        // Set the parameters
+        setParams(params);
+
+        // Switch to Configure tab
+        const configBtn = document.querySelector('[data-tab="configure"]');
+        if (configBtn) {
+            configBtn.click();
+        }
+
+        // Show confirmation toast
+        window.app?.showToast('Parameters restored from history', 'success');
+    }
+
+    /**
+     * Enable or disable all Configure tab controls.
+     * Used during agent optimization to prevent manual interference.
+     * @param {boolean} enabled - Whether controls should be enabled
+     */
+    function setEnabled(enabled) {
+        // Parameter inputs (sliders, selects, checkboxes)
+        const paramInputs = document.querySelectorAll('.param-input');
+        paramInputs.forEach(input => {
+            input.disabled = !enabled;
+        });
+
+        // Editable value inputs (number inputs next to sliders)
+        const editableValues = document.querySelectorAll('.param-value-editable');
+        editableValues.forEach(input => {
+            input.disabled = !enabled;
+        });
+
+        // Profile select
+        const profileSelect = document.getElementById('profileSelect');
+        if (profileSelect) {
+            profileSelect.disabled = !enabled;
+        }
+
+        // Buttons
+        const buttons = [
+            'resetParamsBtn',
+            'undoParamsBtn',
+            'saveProfileBtn',
+        ];
+        buttons.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.disabled = !enabled;
+            }
+        });
+
+        // Add/remove visual indicator class on the configure tab content
+        const configureTab = document.getElementById('tab-configure');
+        if (configureTab) {
+            configureTab.classList.toggle('controls-disabled', !enabled);
+        }
+    }
+
     // Show/hide cull factor row based on checkbox
     function updateCullFactorVisibility() {
         const checkbox = document.getElementById('cull_long_edges');
@@ -575,6 +665,9 @@ window.configure = (function() {
 
     return {
         getParams,
+        setParams,
+        applyParameters,  // v3.0: for history restoration
+        setEnabled,
         markExtracted,
         checkParamsChanged,
         applyProfile,

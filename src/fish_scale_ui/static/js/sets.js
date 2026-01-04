@@ -78,12 +78,22 @@ window.sets = (function() {
     }
 
     /**
+     * Get current calibration um_per_pixel value
+     * @returns {number|null} Calibration value or null if not set
+     */
+    function getCurrentCalibrationValue() {
+        const calibration = window.calibration?.getCurrentCalibration();
+        return calibration?.um_per_px || null;
+    }
+
+    /**
      * Create a new set
      * @param {string} name - Set name
      * @param {Object} options - Options for initial content
      * @param {Array} options.tubercles - Initial tubercles
      * @param {Array} options.edges - Initial edges
      * @param {Object} options.parameters - Extraction parameters used to create this set
+     * @param {number} options.calibration_um_per_pixel - Calibration snapshot (auto-captured if not provided)
      * @returns {Object} The created set or null if max sets reached
      */
     function createSet(name, options = {}) {
@@ -96,13 +106,23 @@ window.sets = (function() {
         const uniqueName = makeNameUnique(name);
         const now = new Date().toISOString();
 
+        // Mark as dirty if created with data (needs saving to disk)
+        const hasData = (options.tubercles && options.tubercles.length > 0) ||
+                        (options.edges && options.edges.length > 0);
+
+        // Capture calibration snapshot - use provided value or current calibration
+        const calibrationSnapshot = options.calibration_um_per_pixel !== undefined
+            ? options.calibration_um_per_pixel
+            : getCurrentCalibrationValue();
+
         const newSet = {
             id: id,
             name: uniqueName,
             tubercles: options.tubercles ? JSON.parse(JSON.stringify(options.tubercles)) : [],
             edges: options.edges ? JSON.parse(JSON.stringify(options.edges)) : [],
             parameters: options.parameters ? JSON.parse(JSON.stringify(options.parameters)) : null,
-            isDirty: false,
+            calibration_um_per_pixel: calibrationSnapshot,  // v3.0: per-set calibration snapshot
+            isDirty: hasData,
             undoStack: [],
             redoStack: [],
             createdAt: now,
@@ -364,6 +384,59 @@ window.sets = (function() {
         document.dispatchEvent(new CustomEvent('setParametersChanged', {
             detail: { setId: set.id, parameters: set.parameters }
         }));
+    }
+
+    /**
+     * Get calibration for a set
+     * @param {string} setId - Set ID (defaults to current)
+     * @returns {number|null} Calibration um_per_pixel value or null
+     */
+    function getSetCalibration(setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        return set ? set.calibration_um_per_pixel : null;
+    }
+
+    /**
+     * Update calibration for a set (used when recalculating)
+     * @param {number} calibration - New calibration value
+     * @param {string} setId - Set ID (defaults to current)
+     */
+    function setSetCalibration(calibration, setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        if (!set) return;
+
+        set.calibration_um_per_pixel = calibration;
+        set.modifiedAt = new Date().toISOString();
+
+        // Dispatch event
+        document.dispatchEvent(new CustomEvent('setCalibrationChanged', {
+            detail: { setId: id, calibration: calibration }
+        }));
+    }
+
+    /**
+     * Check if set calibration matches current calibration
+     * @param {string} setId - Set ID (defaults to current)
+     * @returns {Object} { matches: boolean, setCal: number, currentCal: number }
+     */
+    function checkCalibrationMatch(setId = null) {
+        const id = setId || currentSetId;
+        const set = sets[id];
+        const currentCal = getCurrentCalibrationValue();
+        const setCal = set?.calibration_um_per_pixel;
+
+        // Handle cases where calibration isn't set
+        if (setCal === null || setCal === undefined || currentCal === null) {
+            return { matches: true, setCal, currentCal, legacy: setCal === null || setCal === undefined };
+        }
+
+        // Compare with small tolerance for floating point
+        const tolerance = 0.0001;
+        const matches = Math.abs(setCal - currentCal) < tolerance;
+
+        return { matches, setCal, currentCal, legacy: false };
     }
 
     /**
@@ -643,7 +716,7 @@ window.sets = (function() {
 
     /**
      * Export all sets data for saving to annotations
-     * @returns {Object} Data structure for v2 annotations format
+     * @returns {Object} Data structure for v3 annotations format
      */
     function exportForSave() {
         // Consolidate pending edits for all sets before exporting
@@ -656,6 +729,7 @@ window.sets = (function() {
                 name: sets[id].name,
                 createdAt: sets[id].createdAt,
                 modifiedAt: sets[id].modifiedAt,
+                calibration_um_per_pixel: sets[id].calibration_um_per_pixel,  // v3.0: per-set calibration
                 tubercles: sets[id].tubercles,
                 edges: sets[id].edges,
                 parameters: sets[id].parameters,  // Include extraction parameters
@@ -665,7 +739,7 @@ window.sets = (function() {
     }
 
     /**
-     * Import sets data from loaded annotations (v2 format)
+     * Import sets data from loaded annotations (v2/v3 format)
      * @param {Object} data - Data from annotations file
      */
     function importFromLoad(data) {
@@ -677,6 +751,9 @@ window.sets = (function() {
             return;
         }
 
+        // Get current calibration for fallback (legacy sets without calibration snapshot)
+        const currentCalibration = getCurrentCalibrationValue();
+
         data.sets.forEach(setData => {
             const id = setData.id || generateId();
             const now = new Date().toISOString();
@@ -687,6 +764,8 @@ window.sets = (function() {
                 tubercles: setData.tubercles || [],
                 edges: setData.edges || [],
                 parameters: setData.parameters || null,  // Load extraction parameters
+                // v3.0: per-set calibration snapshot (fallback to current for legacy)
+                calibration_um_per_pixel: setData.calibration_um_per_pixel ?? currentCalibration,
                 isDirty: false,
                 undoStack: [],
                 redoStack: [],
@@ -770,6 +849,11 @@ window.sets = (function() {
         getCurrentData,
         getCurrentParameters,
         setCurrentParameters,
+
+        // Calibration operations (v3.0)
+        getSetCalibration,
+        setSetCalibration,
+        checkCalibrationMatch,
 
         // Dirty state
         markDirty,

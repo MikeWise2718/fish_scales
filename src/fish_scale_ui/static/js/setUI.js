@@ -71,23 +71,60 @@ window.setUI = (function() {
 
     /**
      * Handle click on a set button
+     * Note: No warning dialog needed - all set data is preserved in memory.
+     * The dirty indicator (*) shows which sets need saving to disk.
      */
     function handleSetClick(setId) {
         const currentSetId = window.sets.getCurrentSetId();
         if (setId === currentSetId) return;
 
-        // Check for unsaved changes
-        if (window.sets.hasUnsavedChanges()) {
-            showUnsavedChangesDialog(() => {
-                // Save and switch
-                saveAndSwitch(setId);
-            }, () => {
-                // Switch without saving
-                switchToSet(setId);
-            });
-        } else {
-            switchToSet(setId);
-        }
+        switchToSet(setId);
+    }
+
+    /**
+     * Navigate to the previous set
+     */
+    function handlePrevSet() {
+        const setList = window.sets.getSetList();
+        if (setList.length <= 1) return;
+
+        const currentSetId = window.sets.getCurrentSetId();
+        const currentIndex = setList.findIndex(s => s.id === currentSetId);
+        if (currentIndex <= 0) return;
+
+        const prevSetId = setList[currentIndex - 1].id;
+        handleSetClick(prevSetId);
+    }
+
+    /**
+     * Navigate to the next set
+     */
+    function handleNextSet() {
+        const setList = window.sets.getSetList();
+        if (setList.length <= 1) return;
+
+        const currentSetId = window.sets.getCurrentSetId();
+        const currentIndex = setList.findIndex(s => s.id === currentSetId);
+        if (currentIndex >= setList.length - 1) return;
+
+        const nextSetId = setList[currentIndex + 1].id;
+        handleSetClick(nextSetId);
+    }
+
+    /**
+     * Update the prev/next navigation buttons' disabled state
+     */
+    function updateSetNavButtons() {
+        const prevBtn = document.getElementById('prevSetBtn');
+        const nextBtn = document.getElementById('nextSetBtn');
+        if (!prevBtn || !nextBtn) return;
+
+        const setList = window.sets.getSetList();
+        const currentSetId = window.sets.getCurrentSetId();
+        const currentIndex = setList.findIndex(s => s.id === currentSetId);
+
+        prevBtn.disabled = currentIndex <= 0 || setList.length <= 1;
+        nextBtn.disabled = currentIndex >= setList.length - 1 || setList.length <= 1;
     }
 
     /**
@@ -209,6 +246,7 @@ window.setUI = (function() {
                 options = {
                     tubercles: JSON.parse(JSON.stringify(sourceSet.tubercles)),
                     edges: JSON.parse(JSON.stringify(sourceSet.edges)),
+                    parameters: sourceSet.parameters ? { ...sourceSet.parameters } : undefined,
                 };
             }
         }
@@ -385,6 +423,7 @@ window.setUI = (function() {
         updateDataTabSetName();
         updateEditTabSetName();
         updateExtractionTabSetName();
+        updateSetNavButtons();
     }
 
     /**
@@ -678,6 +717,16 @@ window.setUI = (function() {
             addBtn.addEventListener('click', handleAddSet);
         }
 
+        // Prev/Next set navigation buttons
+        const prevBtn = document.getElementById('prevSetBtn');
+        if (prevBtn) {
+            prevBtn.addEventListener('click', handlePrevSet);
+        }
+        const nextBtn = document.getElementById('nextSetBtn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', handleNextSet);
+        }
+
         // Save button
         const saveBtn = document.getElementById('saveSetBtn');
         if (saveBtn) {
@@ -848,6 +897,11 @@ window.setUI = (function() {
                 // Recalculate and display statistics
                 const stats = calculateStatistics(set.tubercles, set.edges);
                 window.data?.setData(set.tubercles, set.edges, stats);
+
+                // Sync parameters to Configure tab if set has stored parameters
+                if (set.parameters && window.configure?.setParams) {
+                    window.configure.setParams(set.parameters);
+                }
             }
         });
 
@@ -871,6 +925,11 @@ window.setUI = (function() {
 
                 const stats = calculateStatistics(set.tubercles, set.edges);
                 window.data?.setData(set.tubercles, set.edges, stats);
+
+                // Sync parameters to Configure tab if set has stored parameters
+                if (set.parameters && window.configure?.setParams) {
+                    window.configure.setParams(set.parameters);
+                }
             }
         });
 

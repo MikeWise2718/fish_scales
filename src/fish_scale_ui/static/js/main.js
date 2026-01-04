@@ -342,6 +342,18 @@ window.app = (function() {
         });
     }
 
+    // Log an event to the server
+    function logEvent(eventType, details = {}) {
+        fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event_type: eventType,
+                details: details
+            })
+        }).catch(() => {}); // Silently ignore logging errors
+    }
+
     // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', () => {
         initTabs();
@@ -353,6 +365,7 @@ window.app = (function() {
         showToast,
         showModal,
         hideModal,
-        loadLog
+        loadLog,
+        logEvent
     };
 })();

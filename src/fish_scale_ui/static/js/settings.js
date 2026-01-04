@@ -49,6 +49,8 @@ window.settings = (function() {
             panelTextDim: '#64748b',
             panelBorder: '#334155',
             panelGrid: '#333344',
+            setNameColor: '#93c5fd',      // Light blue - good contrast on dark
+            hexValueColor: '#fbbf24',     // Amber - good contrast on dark
         },
         light: {
             panelBg: '#f1f5f9',
@@ -58,6 +60,8 @@ window.settings = (function() {
             panelTextDim: '#64748b',
             panelBorder: '#cbd5e1',
             panelGrid: '#94a3b8',
+            setNameColor: '#1d4ed8',      // Darker blue - good contrast on light
+            hexValueColor: '#b45309',     // Darker amber - good contrast on light
         },
     };
 
@@ -196,6 +200,8 @@ window.settings = (function() {
         root.style.setProperty('--panel-dark-text-dim', colors.panelTextDim);
         root.style.setProperty('--panel-dark-border', colors.panelBorder);
         root.style.setProperty('--panel-dark-grid', colors.panelGrid);
+        root.style.setProperty('--stats-bar-set-color', colors.setNameColor || '#93c5fd');
+        root.style.setProperty('--stats-bar-hex-color', colors.hexValueColor || '#fbbf24');
 
         // Dispatch event so canvas-based components can redraw
         window.dispatchEvent(new CustomEvent('themeColorsChanged'));

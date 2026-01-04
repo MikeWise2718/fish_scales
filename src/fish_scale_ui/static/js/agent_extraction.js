@@ -28,7 +28,9 @@ window.agentExtraction = (function() {
         pollingInterval: null,
         providers: [],  // Available providers from API
         chart: null,    // Chart.js instance or canvas context
-        startTime: null, // Timestamp when agent started
+        startTime: null,     // Timestamp when agent started
+        stepStartTime: null, // Timestamp when current step/iteration started
+        lastIteration: -1,   // Track iteration changes for step timing
         // Cost tracking
         costs: {
             provider: null,
@@ -190,6 +192,8 @@ window.agentExtraction = (function() {
         state.bestParams = null;
         state.bestSetName = null;
         state.startTime = Date.now();
+        state.stepStartTime = Date.now();
+        state.lastIteration = -1;
         // Initialize costs with selected provider/model
         state.costs = {
             provider: provider,
@@ -203,6 +207,9 @@ window.agentExtraction = (function() {
         updateStatus('Starting agent...');
         updateElapsed();
         updateCosts();
+
+        // Disable Configure tab controls during optimization
+        window.configure?.setEnabled?.(false);
 
         try {
             const response = await fetch('/api/agent/start', {
@@ -278,6 +285,9 @@ window.agentExtraction = (function() {
             updateStatus('Stopped by user');
             window.app?.showToast('Agent stopped', 'info');
 
+            // Re-enable Configure tab controls
+            window.configure?.setEnabled?.(true);
+
         } catch (err) {
             console.error('Failed to stop agent:', err);
             window.app?.showToast(`Failed to stop agent: ${err.message}`, 'error');
@@ -339,6 +349,8 @@ window.agentExtraction = (function() {
         state.bestSetName = null;
         state.history = [];
         state.startTime = null;
+        state.stepStartTime = null;
+        state.lastIteration = -1;
         // Reset costs
         state.costs = {
             provider: null,
@@ -355,6 +367,9 @@ window.agentExtraction = (function() {
         updateStatus('Ready');
         updateElapsed();
         updateCosts();
+
+        // Re-enable Configure tab controls
+        window.configure?.setEnabled?.(true);
     }
 
     /**
@@ -472,6 +487,32 @@ window.agentExtraction = (function() {
     }
 
     /**
+     * Update step time display
+     */
+    function updateStepTime() {
+        const stepTimeEl = document.getElementById('agentStepTime');
+        if (!stepTimeEl) return;
+
+        if (!state.stepStartTime || !state.isRunning) {
+            stepTimeEl.textContent = '-';
+            return;
+        }
+
+        const stepElapsed = Date.now() - state.stepStartTime;
+        stepTimeEl.textContent = formatElapsed(stepElapsed);
+    }
+
+    /**
+     * Check if iteration changed and reset step timer if so
+     */
+    function checkIterationChange(newIteration) {
+        if (newIteration !== state.lastIteration) {
+            state.lastIteration = newIteration;
+            state.stepStartTime = Date.now();
+        }
+    }
+
+    /**
      * Update the status display with data from API
      * @param {string|object} data - Status message string or status data object from API
      */
@@ -490,6 +531,7 @@ window.agentExtraction = (function() {
         if (data) {
             // Update state values from API response
             if (data.iteration !== undefined) {
+                checkIterationChange(data.iteration);
                 state.currentIteration = data.iteration;
             }
             if (data.phase !== undefined) {
@@ -575,6 +617,9 @@ window.agentExtraction = (function() {
 
         // Update elapsed time
         updateElapsed();
+
+        // Update step time
+        updateStepTime();
     }
 
     /**
@@ -743,13 +788,25 @@ window.agentExtraction = (function() {
             max_diameter_um: 'Max Diameter',
             min_circularity: 'Circularity',
             clahe_clip: 'CLAHE Clip',
+            clahe_kernel: 'CLAHE Kernel',
             blur_sigma: 'Blur Sigma',
             neighbor_graph: 'Graph Type',
+            graph_type: 'Graph Type',
+            cull_long_edges: 'Cull Long Edges',
+            cull_factor: 'Cull Factor',
         };
 
         for (const [key, value] of Object.entries(params)) {
             const displayName = displayNames[key] || key;
-            const displayValue = typeof value === 'number' ? value.toFixed(3) : value;
+            // Format value based on type
+            let displayValue;
+            if (typeof value === 'boolean') {
+                displayValue = value ? 'Yes' : 'No';
+            } else if (typeof value === 'number') {
+                displayValue = value.toFixed(3);
+            } else {
+                displayValue = value;
+            }
             paramItems.push(`
                 <div class="agent-param-row">
                     <span class="agent-param-label">${displayName}:</span>
@@ -893,6 +950,11 @@ window.agentExtraction = (function() {
             updateLLMDisplay(status);
             updateCosts(status);
 
+            // Sync parameters to Configure tab (if params changed)
+            if (currentParams && window.configure?.setParams) {
+                window.configure.setParams(currentParams);
+            }
+
             // Refresh overlay when iteration changes (new extraction completed)
             if (state.currentIteration !== prevIteration && state.currentIteration > 0) {
                 refreshFromMCP();
@@ -909,6 +971,9 @@ window.agentExtraction = (function() {
                 // Refresh data from MCP state
                 refreshFromMCP();
 
+                // Re-enable Configure tab controls
+                window.configure?.setEnabled?.(true);
+
             } else if (status.state === 'failed' || status.state === 'error') {
                 state.isRunning = false;
                 stopPolling();
@@ -916,11 +981,17 @@ window.agentExtraction = (function() {
                 updateUI();
                 window.app?.showToast(`Agent error: ${status.error || 'Unknown error'}`, 'error');
 
+                // Re-enable Configure tab controls
+                window.configure?.setEnabled?.(true);
+
             } else if (status.state === 'stopped') {
                 state.isRunning = false;
                 stopPolling();
                 updateStatus('Stopped');
                 updateUI();
+
+                // Re-enable Configure tab controls
+                window.configure?.setEnabled?.(true);
             }
 
         } catch (err) {

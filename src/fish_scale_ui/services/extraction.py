@@ -108,9 +108,23 @@ def run_extraction(
 
     # Measure statistics
     diameters, mean_diam, std_diam = measure_diameters(tubercles)
-    spaces, mean_space, std_space = measure_nearest_neighbor_spacing(
-        tubercles, calibration
-    )
+
+    # Cull long edges if enabled (do this BEFORE statistics calculation)
+    if cull_long_edges and edges:
+        center_distances = [e.center_distance_um for e in edges]
+        avg_center_distance = np.mean(center_distances)
+        max_allowed = avg_center_distance * cull_factor
+        edges = [e for e in edges if e.center_distance_um <= max_allowed]
+
+    # Calculate edge statistics (using potentially culled edges)
+    if edges:
+        edge_distances = [e.edge_distance_um for e in edges]
+        mean_space = np.mean(edge_distances)
+        std_space = np.std(edge_distances)
+    else:
+        spaces, mean_space, std_space = measure_nearest_neighbor_spacing(
+            tubercles, calibration
+        )
 
     # Classify genus
     genus = "Unknown"
@@ -118,7 +132,7 @@ def run_extraction(
     if tubercles:
         genus, confidence = classify_genus(mean_diam, mean_space)
 
-    # Calculate hexagonalness metrics
+    # Calculate hexagonalness metrics (using culled edges for consistency with JS)
     hex_metrics = calculate_hexagonalness(tubercles, edges)
 
     # Convert to serializable format
@@ -165,18 +179,6 @@ def run_extraction(
                 'center_distance_um': e.center_distance_um,
                 'edge_distance_um': e.edge_distance_um,
             })
-
-    # Cull long edges if enabled
-    if cull_long_edges and edges_data:
-        avg_center_distance = np.mean([e['center_distance_um'] for e in edges_data])
-        max_allowed = avg_center_distance * cull_factor
-        edges_data = [e for e in edges_data if e['center_distance_um'] <= max_allowed]
-
-    # Recalculate edge statistics after culling
-    if edges_data:
-        edge_distances = [e['edge_distance_um'] for e in edges_data]
-        mean_space = np.mean(edge_distances)
-        std_space = np.std(edge_distances)
 
     return {
         'success': True,

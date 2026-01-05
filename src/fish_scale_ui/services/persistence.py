@@ -22,6 +22,7 @@ def save_annotations(
     version: int = 3,
     sets: list = None,
     activeSetId: str = None,
+    custom_filename: str = None,
 ) -> dict:
     """
     Save annotation data to files.
@@ -47,6 +48,7 @@ def save_annotations(
         version: Annotation format version (1, 2, or 3)
         sets: List of set dicts (v2/v3 format)
         activeSetId: ID of the active set (v2/v3 format)
+        custom_filename: Optional custom base filename for Save As
 
     Returns:
         Dict with success status and file paths
@@ -55,7 +57,11 @@ def save_annotations(
     annotations_dir.mkdir(parents=True, exist_ok=True)
 
     # Clean up image name (remove extension)
-    base_name = Path(image_name).stem
+    # Use custom_filename if provided (Save As), otherwise derive from image
+    if custom_filename:
+        base_name = Path(custom_filename).stem
+    else:
+        base_name = Path(image_name).stem
 
     # File paths
     tub_path = annotations_dir / f"{base_name}_tub.csv"

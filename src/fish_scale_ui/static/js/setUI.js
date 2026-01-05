@@ -407,11 +407,19 @@ window.setUI = (function() {
 
     /**
      * Update the save button state
+     * Save is enabled when there's any data to save (not just unsaved changes)
      */
     function updateSaveButton() {
+        const hasData = window.sets.hasAnyData();
         const saveBtn = document.getElementById('saveSetBtn');
         if (saveBtn) {
-            saveBtn.disabled = !window.sets.anyUnsavedChanges();
+            // Enable save when there's data, not just when dirty
+            saveBtn.disabled = !hasData;
+        }
+        const saveAsBtn = document.getElementById('saveAsBtn');
+        if (saveAsBtn) {
+            // Enable Save As when there's data
+            saveAsBtn.disabled = !hasData;
         }
     }
 
@@ -739,6 +747,14 @@ window.setUI = (function() {
             });
         }
 
+        // Save As button
+        const saveAsBtn = document.getElementById('saveAsBtn');
+        if (saveAsBtn) {
+            saveAsBtn.addEventListener('click', () => {
+                window.extraction?.saveSloAs();
+            });
+        }
+
         // Shortcuts help button
         const shortcutsBtn = document.getElementById('shortcutsHelpBtn');
         if (shortcutsBtn) {
@@ -894,9 +910,10 @@ window.setUI = (function() {
                 window.overlay?.setData(set.tubercles, set.edges);
                 window.editor?.setData(set.tubercles, set.edges);
 
-                // Recalculate and display statistics
-                const stats = calculateStatistics(set.tubercles, set.edges);
-                window.data?.setData(set.tubercles, set.edges, stats);
+                // Recalculate and display statistics (async)
+                calculateStatistics(set.tubercles, set.edges).then(stats => {
+                    window.data?.setData(set.tubercles, set.edges, stats);
+                });
 
                 // Sync parameters to Configure tab if set has stored parameters
                 if (set.parameters && window.configure?.setParams) {
@@ -912,6 +929,11 @@ window.setUI = (function() {
             updateSaveButton();
         });
 
+        // Data changed (extraction completed, data edited, etc.)
+        document.addEventListener('setDataChanged', () => {
+            updateSaveButton();
+        });
+
         // Sets loaded from file
         document.addEventListener('setsLoaded', () => {
             renderSetButtons();
@@ -923,8 +945,10 @@ window.setUI = (function() {
                 window.overlay?.setData(set.tubercles, set.edges);
                 window.editor?.setData(set.tubercles, set.edges);
 
-                const stats = calculateStatistics(set.tubercles, set.edges);
-                window.data?.setData(set.tubercles, set.edges, stats);
+                // Async stats calculation
+                calculateStatistics(set.tubercles, set.edges).then(stats => {
+                    window.data?.setData(set.tubercles, set.edges, stats);
+                });
 
                 // Sync parameters to Configure tab if set has stored parameters
                 if (set.parameters && window.configure?.setParams) {
@@ -937,16 +961,17 @@ window.setUI = (function() {
         window.addEventListener('hexWeightsChanged', () => {
             const set = window.sets?.getCurrentSet();
             if (set) {
-                const stats = calculateStatistics(set.tubercles, set.edges);
-                window.data?.setData(set.tubercles, set.edges, stats);
+                calculateStatistics(set.tubercles, set.edges).then(stats => {
+                    window.data?.setData(set.tubercles, set.edges, stats);
+                });
             }
         });
     }
 
     /**
-     * Calculate statistics from data
+     * Calculate statistics from data (async - fetches hexagonalness from server)
      */
-    function calculateStatistics(tubercles, edges) {
+    async function calculateStatistics(tubercles, edges) {
         const n_tubercles = tubercles.length;
         const n_edges = edges.length;
 
@@ -975,8 +1000,8 @@ window.setUI = (function() {
             }
         }
 
-        // Calculate hexagonalness metrics
-        const hexMetrics = calculateHexagonalness(tubercles, edges);
+        // Fetch hexagonalness metrics from server
+        const hexMetrics = await fetchHexagonalness();
 
         // Count boundary vs interior nodes
         const n_boundary = tubercles.filter(t => t.is_boundary).length;
@@ -998,12 +1023,10 @@ window.setUI = (function() {
     }
 
     /**
-     * Calculate hexagonalness metrics
+     * Fetch hexagonalness metrics from server API
      */
-    function calculateHexagonalness(tubercles, edges) {
-        const MIN_NODES_FOR_RELIABLE = 15;
-
-        const result = {
+    async function fetchHexagonalness() {
+        const defaultResult = {
             hexagonalness_score: 0.0,
             spacing_uniformity: 0.0,
             degree_score: 0.0,
@@ -1015,76 +1038,29 @@ window.setUI = (function() {
             n_interior_nodes: 0,
         };
 
-        if (!tubercles || tubercles.length < 4) {
-            return result;
-        }
+        try {
+            // Get weights from settings
+            const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+            const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+            const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
 
-        const n_nodes = tubercles.length;
-        result.n_nodes = n_nodes;
-
-        // Separate interior and boundary nodes
-        const interiorTubercles = tubercles.filter(t => !t.is_boundary);
-        const interiorIds = new Set(interiorTubercles.map(t => t.id));
-        const n_interior = interiorIds.size;
-        result.n_interior_nodes = n_interior;
-
-        // Reliability based on interior node count
-        result.reliability = n_interior >= MIN_NODES_FOR_RELIABLE ? 'high' : (n_interior >= 4 ? 'low' : 'none');
-
-        // Spacing uniformity (filter out negative/zero distances from overlapping tubercles) - uses all edges
-        if (edges && edges.length > 0) {
-            const spacings = edges.map(e => e.edge_distance_um).filter(s => s > 0);
-            if (spacings.length > 0) {
-                const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
-                const variance = spacings.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spacings.length;
-                const cv = mean > 0 ? Math.sqrt(variance) / mean : 1.0;
-                result.spacing_cv = cv;
-                result.spacing_uniformity = Math.max(0, 1 - 2 * cv);
-            }
-        }
-
-        // Degree distribution - INTERIOR NODES ONLY
-        const degree = {};
-        tubercles.forEach(t => { degree[t.id] = 0; });
-
-        edges.forEach(e => {
-            const aId = e.tubercle_a_id ?? e.id1;
-            const bId = e.tubercle_b_id ?? e.id2;
-            if (degree[aId] !== undefined) degree[aId]++;
-            if (degree[bId] !== undefined) degree[bId]++;
-        });
-
-        // Filter to interior nodes only
-        const interiorDegrees = interiorTubercles.map(t => degree[t.id]);
-        if (interiorDegrees.length > 0) {
-            result.mean_degree = interiorDegrees.reduce((a, b) => a + b, 0) / interiorDegrees.length;
-            let weightedScore = 0;
-            interiorDegrees.forEach(d => {
-                if (d >= 5 && d <= 7) weightedScore += 1.0;
-                else if (d === 4 || d === 8) weightedScore += 0.7;
-                else if (d === 3 || d === 9) weightedScore += 0.3;
+            const params = new URLSearchParams({
+                spacing_weight: spacingWeight,
+                degree_weight: degreeWeight,
+                edge_ratio_weight: edgeRatioWeight,
             });
-            result.degree_score = weightedScore / interiorDegrees.length;
+
+            const response = await fetch(`/api/hexagonalness?${params}`);
+            if (!response.ok) {
+                console.error('Hexagonalness API error:', response.status);
+                return defaultResult;
+            }
+
+            return await response.json();
+        } catch (err) {
+            console.error('Hexagonalness calculation failed:', err);
+            return defaultResult;
         }
-
-        // Edge/node ratio - uses interior nodes
-        if (n_interior > 0) {
-            const ratio = edges.length / n_interior;
-            result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 3.0) / 2);
-        }
-
-        // Composite score (use configurable weights from settings)
-        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
-        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
-        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
-
-        result.hexagonalness_score = (
-            spacingWeight * result.spacing_uniformity +
-            degreeWeight * result.degree_score +
-            edgeRatioWeight * result.edge_ratio_score
-        );
-
-        return result;
     }
 
     // Initialize on DOM ready

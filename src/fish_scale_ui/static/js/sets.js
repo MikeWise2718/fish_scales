@@ -500,6 +500,16 @@ window.sets = (function() {
     }
 
     /**
+     * Check if ANY set has data (tubercles or edges)
+     */
+    function hasAnyData() {
+        return setOrder.some(id => {
+            const set = sets[id];
+            return set && (set.tubercles.length > 0 || set.edges.length > 0);
+        });
+    }
+
+    /**
      * Get the undo stack for the current set
      */
     function getUndoStack() {
@@ -644,7 +654,7 @@ window.sets = (function() {
      * Called before save to record all edits since last save
      * @param {string} setId - Set ID (defaults to current)
      */
-    function consolidateEdits(setId = null) {
+    async function consolidateEdits(setId = null) {
         const id = setId || currentSetId;
         const set = sets[id];
         if (!set) return;
@@ -664,10 +674,10 @@ window.sets = (function() {
         if (edits.added_connections > 0) summary.push(`+${edits.added_connections} connections`);
         if (edits.deleted_connections > 0) summary.push(`-${edits.deleted_connections} connections`);
 
-        // Calculate hexagonalness for result
+        // Calculate hexagonalness for result (uses current server state)
         const tubercles = set.tubercles;
         const edges = set.edges;
-        const hexStats = window.extraction?.calculateHexagonalness?.(tubercles, edges);
+        const hexStats = await window.extraction?.calculateHexagonalness?.();
 
         // Add history event
         addHistoryEvent('manual_edit', {
@@ -716,11 +726,13 @@ window.sets = (function() {
 
     /**
      * Export all sets data for saving to annotations
-     * @returns {Object} Data structure for v3 annotations format
+     * @returns {Promise<Object>} Data structure for v3 annotations format
      */
-    function exportForSave() {
+    async function exportForSave() {
         // Consolidate pending edits for all sets before exporting
-        setOrder.forEach(id => consolidateEdits(id));
+        for (const id of setOrder) {
+            await consolidateEdits(id);
+        }
 
         return {
             activeSetId: currentSetId,
@@ -861,6 +873,7 @@ window.sets = (function() {
         markAllClean,
         hasUnsavedChanges,
         anyUnsavedChanges,
+        hasAnyData,
 
         // Undo/redo
         getUndoStack,

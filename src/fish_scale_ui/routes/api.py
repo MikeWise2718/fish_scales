@@ -239,6 +239,14 @@ def rotate_image():
         return jsonify({'error': f'Failed to rotate image: {str(e)}'}), 400
 
 
+@api_bp.route('/current-image', methods=['GET'])
+def current_image():
+    """Get current image filename."""
+    return jsonify({
+        'filename': _current_image.get('filename'),
+    })
+
+
 @api_bp.route('/calibration', methods=['GET', 'POST'])
 def calibration():
     """Get or set calibration data."""
@@ -959,6 +967,7 @@ def save_annotations():
     data = request.get_json() or {}
     force = data.get('force', False)
     version = data.get('version', 1)
+    custom_filename = data.get('custom_filename')  # For Save As
 
     # Check for v2 format (multiple sets)
     if version == 2 and 'sets' in data:
@@ -987,6 +996,7 @@ def save_annotations():
                 activeSetId=activeSetId,
                 statistics=statistics,
                 parameters=parameters,
+                custom_filename=custom_filename,
             )
 
             # Skip overwrite warning if we've already saved this session
@@ -1454,7 +1464,7 @@ def calculate_hexagonalness():
 
     Returns component scores and weighted hexagonalness score.
     """
-    from collections import defaultdict
+    from fish_scale_ui.routes.mcp_api import _calculate_hexagonalness_from_dicts
 
     # Get weights from query params
     spacing_weight = float(request.args.get('spacing_weight', 0.40))
@@ -1464,68 +1474,16 @@ def calculate_hexagonalness():
     tubercles = _extraction_data.get('tubercles', [])
     edges = _extraction_data.get('edges', [])
 
-    result = {
-        'spacing_uniformity': 0.0,
-        'degree_score': 0.0,
-        'edge_ratio_score': 0.0,
-        'hexagonalness_score': 0.0,
-        'reliability': 'none',
-        'n_nodes': 0,
-    }
+    # Use the canonical implementation from mcp_api
+    result = _calculate_hexagonalness_from_dicts(tubercles, edges)
 
-    if not tubercles or len(tubercles) < 4:
-        return jsonify(result)
-
-    n_nodes = len(tubercles)
-    result['n_nodes'] = n_nodes
-    result['reliability'] = 'high' if n_nodes >= 15 else 'low'
-
-    # 1. Spacing uniformity
-    if edges:
-        spacings = [e.get('edge_distance_um', 0) for e in edges]
-        spacings = [s for s in spacings if s > 0]
-        if spacings:
-            mean_spacing = float(np.mean(spacings))
-            std_spacing = float(np.std(spacings))
-            cv = std_spacing / mean_spacing if mean_spacing > 0 else 1.0
-            result['spacing_uniformity'] = float(max(0, 1 - 2 * cv))
-
-    # 2. Degree distribution
-    degree = defaultdict(int)
-    for t in tubercles:
-        degree[t['id']] = 0
-    for e in edges:
-        a_id = e.get('tubercle_a_id') or e.get('id1')
-        b_id = e.get('tubercle_b_id') or e.get('id2')
-        if a_id in degree:
-            degree[a_id] += 1
-        if b_id in degree:
-            degree[b_id] += 1
-
-    degrees = list(degree.values())
-    if degrees:
-        weighted_score = 0
-        for d in degrees:
-            if 5 <= d <= 7:
-                weighted_score += 1.0
-            elif d == 4 or d == 8:
-                weighted_score += 0.7
-            elif d == 3 or d == 9:
-                weighted_score += 0.3
-        result['degree_score'] = float(weighted_score / len(degrees))
-
-    # 3. Edge/node ratio
-    if n_nodes > 0:
-        ratio = len(edges) / n_nodes
-        deviation = abs(ratio - 2.5)
-        result['edge_ratio_score'] = float(max(0, 1 - deviation / 2))
-
-    # 4. Composite score with custom weights
-    score = (
-        spacing_weight * result['spacing_uniformity'] +
-        degree_weight * result['degree_score'] +
-        edge_ratio_weight * result['edge_ratio_score']
-    )
-    result['hexagonalness_score'] = float(score)
+    # Recalculate composite score with custom weights (if different from defaults)
+    if spacing_weight != 0.40 or degree_weight != 0.45 or edge_ratio_weight != 0.15:
+        score = (
+            spacing_weight * result['spacing_uniformity'] +
+            degree_weight * result['degree_score'] +
+            edge_ratio_weight * result['edge_ratio_score']
+        )
+        result['hexagonalness_score'] = float(score)
 
     return jsonify(result)

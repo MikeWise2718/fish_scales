@@ -622,23 +622,14 @@ window.settings = (function() {
     }
 
     async function updateHexCalcDisplay() {
-        const jsEl = document.getElementById('hexCalcJS');
-        const pyEl = document.getElementById('hexCalcPython');
+        const hexEl = document.getElementById('hexCalcValue');
 
         // Get current weights
         const spacingWeight = current.hexSpacingWeight;
         const degreeWeight = current.hexDegreeWeight;
         const edgeRatioWeight = current.hexEdgeRatioWeight;
 
-        // Get JS-computed value from data module's current statistics
-        const stats = window.data?.getStatistics?.() || {};
-        if (stats.hexagonalness_score !== undefined) {
-            if (jsEl) jsEl.textContent = stats.hexagonalness_score.toFixed(6);
-        } else {
-            if (jsEl) jsEl.textContent = '-';
-        }
-
-        // Fetch Python-computed value
+        // Fetch hexagonalness from server (single source of truth)
         try {
             const params = new URLSearchParams({
                 spacing_weight: spacingWeight,
@@ -647,15 +638,15 @@ window.settings = (function() {
             });
             const response = await fetch(`/api/hexagonalness?${params}`);
             const result = await response.json();
-            if (pyEl) {
+            if (hexEl) {
                 if (result.hexagonalness_score !== undefined && result.reliability !== 'none') {
-                    pyEl.textContent = result.hexagonalness_score.toFixed(6);
+                    hexEl.textContent = result.hexagonalness_score.toFixed(6);
                 } else {
-                    pyEl.textContent = '-';
+                    hexEl.textContent = '-';
                 }
             }
         } catch (e) {
-            if (pyEl) pyEl.textContent = 'error';
+            if (hexEl) hexEl.textContent = 'error';
         }
     }
 

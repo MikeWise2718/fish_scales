@@ -408,12 +408,10 @@ Hexagonalness = 0.40 × Spacing Uniformity + 0.45 × Degree Score + 0.15 × Edge
 - `low`: 4-14 nodes (may be unreliable)
 - `none`: <4 nodes (insufficient data)
 
-**Implementation locations** (must stay in sync):
-- Python core: `fish_scale_analysis/core/measurement.py` → `calculate_hexagonalness()`
-- Python MCP API: `fish_scale_ui/routes/mcp_api.py` → `_calculate_hexagonalness_from_dicts()`
-- JavaScript: `extraction.js`, `setUI.js`, `editor.js` → `calculateHexagonalness()`
-
-Tests in `tests/test_hexagonalness_consistency.py` verify all implementations agree.
+**Implementation:**
+- Single source of truth: `fish_scale_ui/routes/mcp_api.py` → `_calculate_hexagonalness_from_dicts()`
+- API endpoint: `GET /api/hexagonalness` (supports custom weights via query params)
+- JavaScript modules call the API endpoint for all hexagonalness calculations
 
 ## Screenshots and Debugging
 

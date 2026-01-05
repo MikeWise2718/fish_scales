@@ -66,7 +66,7 @@ window.extraction = (function() {
 
             // Update data tables with new statistics
             if (window.data) {
-                const stats = calculateStatistics(updatedTubercles, result.edges);
+                const stats = await calculateStatistics(updatedTubercles, result.edges);
                 // Include boundary counts from API response
                 if (result.statistics) {
                     stats.n_boundary = result.statistics.n_boundary;
@@ -238,7 +238,7 @@ window.extraction = (function() {
     async function saveAnnotations(force = false) {
         try {
             // Get all sets data for v2 format
-            const setsData = window.sets.exportForSave();
+            const setsData = await window.sets.exportForSave();
             const statistics = window.data?.getStatistics() || {};
 
             const response = await fetch('/api/save-annotations', {
@@ -278,6 +278,73 @@ window.extraction = (function() {
         } catch (err) {
             console.error('Save failed:', err);
             window.app.showToast('Save failed: ' + err.message, 'error');
+            return false;
+        }
+    }
+
+    // Save As - prompt for custom filename
+    async function saveAnnotationsAs() {
+        // Get current image name as default from API
+        let defaultName = 'annotations';
+        try {
+            const resp = await fetch('/api/current-image');
+            const data = await resp.json();
+            if (data.filename) {
+                defaultName = data.filename.replace(/\.[^/.]+$/, '');
+            }
+        } catch (e) {
+            console.warn('Could not fetch current image name:', e);
+        }
+
+        // Prompt for filename
+        const customFilename = prompt(
+            'Enter filename for annotations (without extension):',
+            defaultName
+        );
+
+        if (!customFilename || !customFilename.trim()) {
+            return false; // User cancelled
+        }
+
+        // Sanitize filename
+        const sanitized = customFilename.trim().replace(/[\/\\:*?"<>|]/g, '');
+        if (!sanitized) {
+            window.app.showToast('Invalid filename', 'error');
+            return false;
+        }
+
+        try {
+            // Get all sets data for v2 format
+            const setsData = await window.sets.exportForSave();
+            const statistics = window.data?.getStatistics() || {};
+
+            const response = await fetch('/api/save-annotations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    force: true, // Always force for Save As (new filename)
+                    version: 2,
+                    ...setsData,
+                    statistics,
+                    custom_filename: sanitized,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                window.app.showToast(result.error, 'error');
+                return false;
+            }
+
+            // Note: Don't mark as clean since this is a copy
+            window.app.showToast(`Annotations saved as ${sanitized}`, 'success');
+            window.app.loadLog();
+            return true;
+
+        } catch (err) {
+            console.error('Save As failed:', err);
+            window.app.showToast('Save As failed: ' + err.message, 'error');
             return false;
         }
     }
@@ -331,7 +398,7 @@ window.extraction = (function() {
             // Update data tables
             if (window.data && currentSet) {
                 // Calculate statistics from current set
-                const stats = calculateStatistics(currentSet.tubercles, currentSet.edges);
+                const stats = await calculateStatistics(currentSet.tubercles, currentSet.edges);
                 window.data.setData(currentSet.tubercles, currentSet.edges, stats);
             }
 
@@ -356,8 +423,8 @@ window.extraction = (function() {
         }
     }
 
-    // Calculate statistics from data
-    function calculateStatistics(tubercles, edges) {
+    // Calculate statistics from data (async - fetches hexagonalness from server)
+    async function calculateStatistics(tubercles, edges) {
         const n_tubercles = tubercles.length;
         const n_edges = edges.length;
 
@@ -386,8 +453,8 @@ window.extraction = (function() {
             }
         }
 
-        // Calculate hexagonalness metrics
-        const hexMetrics = calculateHexagonalness(tubercles, edges);
+        // Fetch hexagonalness metrics from server
+        const hexMetrics = await calculateHexagonalness();
 
         // Count boundary vs interior nodes
         const n_boundary = tubercles.filter(t => t.is_boundary).length;
@@ -408,11 +475,9 @@ window.extraction = (function() {
         };
     }
 
-    // Calculate hexagonalness metrics
-    function calculateHexagonalness(tubercles, edges) {
-        const MIN_NODES_FOR_RELIABLE = 15;
-
-        const result = {
+    // Fetch hexagonalness metrics from server API
+    async function calculateHexagonalness() {
+        const defaultResult = {
             hexagonalness_score: 0.0,
             spacing_uniformity: 0.0,
             degree_score: 0.0,
@@ -424,75 +489,29 @@ window.extraction = (function() {
             n_interior_nodes: 0,
         };
 
-        if (!tubercles || tubercles.length < 4) {
-            return result;
-        }
+        try {
+            // Get weights from settings
+            const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+            const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+            const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
 
-        const n_nodes = tubercles.length;
-        result.n_nodes = n_nodes;
-
-        // Separate interior and boundary nodes
-        const interiorTubercles = tubercles.filter(t => !t.is_boundary);
-        const interiorIds = new Set(interiorTubercles.map(t => t.id));
-        const n_interior = interiorIds.size;
-        result.n_interior_nodes = n_interior;
-
-        // Reliability based on interior node count
-        result.reliability = n_interior >= MIN_NODES_FOR_RELIABLE ? 'high' : (n_interior >= 4 ? 'low' : 'none');
-
-        // Spacing uniformity - uses all edges
-        if (edges && edges.length > 0) {
-            const spacings = edges.map(e => e.edge_distance_um).filter(s => s > 0);
-            if (spacings.length > 0) {
-                const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
-                const variance = spacings.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spacings.length;
-                const cv = mean > 0 ? Math.sqrt(variance) / mean : 1.0;
-                result.spacing_cv = cv;
-                result.spacing_uniformity = Math.max(0, 1 - 2 * cv);
-            }
-        }
-
-        // Degree distribution - INTERIOR NODES ONLY
-        const degree = {};
-        tubercles.forEach(t => { degree[t.id] = 0; });
-        edges.forEach(e => {
-            const aId = e.tubercle_a_id ?? e.id1;
-            const bId = e.tubercle_b_id ?? e.id2;
-            if (degree[aId] !== undefined) degree[aId]++;
-            if (degree[bId] !== undefined) degree[bId]++;
-        });
-
-        // Filter to interior nodes only
-        const interiorDegrees = interiorTubercles.map(t => degree[t.id]);
-        if (interiorDegrees.length > 0) {
-            result.mean_degree = interiorDegrees.reduce((a, b) => a + b, 0) / interiorDegrees.length;
-            let weightedScore = 0;
-            interiorDegrees.forEach(d => {
-                if (d >= 5 && d <= 7) weightedScore += 1.0;
-                else if (d === 4 || d === 8) weightedScore += 0.7;
-                else if (d === 3 || d === 9) weightedScore += 0.3;
+            const params = new URLSearchParams({
+                spacing_weight: spacingWeight,
+                degree_weight: degreeWeight,
+                edge_ratio_weight: edgeRatioWeight,
             });
-            result.degree_score = weightedScore / interiorDegrees.length;
+
+            const response = await fetch(`/api/hexagonalness?${params}`);
+            if (!response.ok) {
+                console.error('Hexagonalness API error:', response.status);
+                return defaultResult;
+            }
+
+            return await response.json();
+        } catch (err) {
+            console.error('Hexagonalness calculation failed:', err);
+            return defaultResult;
         }
-
-        // Edge/node ratio - uses interior nodes
-        if (n_interior > 0) {
-            const ratio = edges.length / n_interior;
-            result.edge_ratio_score = Math.max(0, 1 - Math.abs(ratio - 3.0) / 2);
-        }
-
-        // Composite score (use configurable weights from settings)
-        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
-        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
-        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
-
-        result.hexagonalness_score = (
-            spacingWeight * result.spacing_uniformity +
-            degreeWeight * result.degree_score +
-            edgeRatioWeight * result.edge_ratio_score
-        );
-
-        return result;
     }
 
     // Show overwrite confirmation dialog
@@ -629,9 +648,11 @@ window.extraction = (function() {
         runExtraction,
         runConnectionExtraction,
         saveAnnotations,
+        saveAnnotationsAs,
         loadAnnotations,
         // Backwards compatibility aliases
         saveSlo: saveAnnotations,
+        saveSloAs: saveAnnotationsAs,
         loadSlo: loadAnnotations,
         checkDirty,
         markDirty,

@@ -1081,19 +1081,19 @@ window.editor = (function() {
     /**
      * Refresh all displays with current data
      */
-    function refreshDisplays() {
+    async function refreshDisplays() {
         // Update overlay
         window.overlay?.setData(tubercles, edges);
 
         // Update data tables
-        const stats = calculateStatistics();
+        const stats = await calculateStatistics();
         window.data?.setData(tubercles, edges, stats);
     }
 
     /**
-     * Calculate statistics from current data
+     * Calculate statistics from current data (async - fetches hexagonalness from server)
      */
-    function calculateStatistics() {
+    async function calculateStatistics() {
         const n_tubercles = tubercles.length;
         const n_edges = edges.length;
 
@@ -1120,8 +1120,8 @@ window.editor = (function() {
             }
         }
 
-        // Calculate hexagonalness metrics
-        const hexMetrics = calculateHexagonalness(tubercles, edges);
+        // Fetch hexagonalness metrics from server
+        const hexMetrics = await fetchHexagonalness();
 
         // Count boundary vs interior nodes
         const n_boundary = tubercles.filter(t => t.is_boundary).length;
@@ -1143,12 +1143,10 @@ window.editor = (function() {
     }
 
     /**
-     * Calculate hexagonalness metrics for the current data
+     * Fetch hexagonalness metrics from server API
      */
-    function calculateHexagonalness(tubercles, edges) {
-        const MIN_NODES_FOR_RELIABLE = 15;
-
-        const result = {
+    async function fetchHexagonalness() {
+        const defaultResult = {
             hexagonalness_score: 0.0,
             spacing_uniformity: 0.0,
             degree_score: 0.0,
@@ -1161,94 +1159,29 @@ window.editor = (function() {
             n_interior_nodes: 0,
         };
 
-        if (!tubercles || tubercles.length < 4) {
-            return result;
-        }
+        try {
+            // Get weights from settings
+            const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
+            const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
+            const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
 
-        const n_nodes = tubercles.length;
-        result.n_nodes = n_nodes;
+            const params = new URLSearchParams({
+                spacing_weight: spacingWeight,
+                degree_weight: degreeWeight,
+                edge_ratio_weight: edgeRatioWeight,
+            });
 
-        // Separate interior and boundary nodes
-        const interiorTubercles = tubercles.filter(t => !t.is_boundary);
-        const interiorIds = new Set(interiorTubercles.map(t => t.id));
-        const n_interior = interiorIds.size;
-        result.n_interior_nodes = n_interior;
-
-        // Reliability based on interior node count
-        result.reliability = n_interior >= MIN_NODES_FOR_RELIABLE ? 'high' : (n_interior >= 4 ? 'low' : 'none');
-
-        // 1. Spacing uniformity (coefficient of variation) - uses all edges
-        if (edges && edges.length > 0) {
-            const spacings = edges
-                .map(e => e.edge_distance_um)
-                .filter(s => s > 0);
-
-            if (spacings.length > 0) {
-                const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
-                const variance = spacings.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spacings.length;
-                const std = Math.sqrt(variance);
-                const cv = mean > 0 ? std / mean : 1.0;
-                result.spacing_cv = cv;
-                result.spacing_uniformity = Math.max(0, 1 - 2 * cv);
+            const response = await fetch(`/api/hexagonalness?${params}`);
+            if (!response.ok) {
+                console.error('Hexagonalness API error:', response.status);
+                return defaultResult;
             }
+
+            return await response.json();
+        } catch (err) {
+            console.error('Hexagonalness calculation failed:', err);
+            return defaultResult;
         }
-
-        // 2. Degree distribution (neighbors per node) - INTERIOR NODES ONLY
-        const degree = {};
-
-        // Initialize all nodes with degree 0
-        tubercles.forEach(t => { degree[t.id] = 0; });
-
-        // Count connections (use object key lookup for type coercion)
-        edges.forEach(e => {
-            const aId = e.tubercle_a_id ?? e.id1;
-            const bId = e.tubercle_b_id ?? e.id2;
-            if (degree[aId] !== undefined) degree[aId]++;
-            if (degree[bId] !== undefined) degree[bId]++;
-        });
-
-        // Filter to interior nodes only
-        const interiorDegrees = interiorTubercles.map(t => degree[t.id]);
-        if (interiorDegrees.length > 0) {
-            result.mean_degree = interiorDegrees.reduce((a, b) => a + b, 0) / interiorDegrees.length;
-
-            // Build histogram (interior nodes only)
-            const histogram = {};
-            interiorDegrees.forEach(d => {
-                histogram[d] = (histogram[d] || 0) + 1;
-            });
-            result.degree_histogram = histogram;
-
-            // Weighted score for degree distribution
-            let weightedScore = 0;
-            interiorDegrees.forEach(d => {
-                if (d >= 5 && d <= 7) weightedScore += 1.0;
-                else if (d === 4 || d === 8) weightedScore += 0.7;
-                else if (d === 3 || d === 9) weightedScore += 0.3;
-            });
-            result.degree_score = weightedScore / interiorDegrees.length;
-        }
-
-        // 3. Edge/node ratio - uses interior nodes
-        if (n_interior > 0) {
-            const ratio = edges.length / n_interior;
-            const idealRatio = 3.0;
-            const deviation = Math.abs(ratio - idealRatio);
-            result.edge_ratio_score = Math.max(0, 1 - deviation / 2);
-        }
-
-        // 4. Composite score (use configurable weights from settings)
-        const spacingWeight = window.settings?.get('hexSpacingWeight') ?? 0.40;
-        const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
-        const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
-
-        result.hexagonalness_score = (
-            spacingWeight * result.spacing_uniformity +
-            degreeWeight * result.degree_score +
-            edgeRatioWeight * result.edge_ratio_score
-        );
-
-        return result;
     }
 
     /**
@@ -1333,7 +1266,7 @@ window.editor = (function() {
 
                 // Update statistics with boundary counts
                 if (window.data) {
-                    const stats = calculateStatistics(tubercles, edges);
+                    const stats = await calculateStatistics();
                     stats.n_boundary = result.n_boundary;
                     stats.n_interior = result.n_interior;
                     window.data.setData(tubercles, edges, stats);
@@ -1663,6 +1596,73 @@ window.editor = (function() {
         );
     }
 
+    /**
+     * Clear all tubercles and edges from the current set
+     */
+    function clearAll() {
+        // Check if there's anything to clear
+        if (tubercles.length === 0 && edges.length === 0) {
+            window.app?.showToast('Nothing to clear', 'info');
+            return;
+        }
+
+        // Show confirmation dialog
+        const tubCount = tubercles.length;
+        const edgeCount = edges.length;
+        const confirmed = confirm(
+            `Are you sure you want to delete ALL data from the current set?\n\n` +
+            `This will delete:\n` +
+            `  - ${tubCount} tubercle(s)\n` +
+            `  - ${edgeCount} connection(s)\n\n` +
+            `This action can be undone with Ctrl+Z.`
+        );
+
+        if (!confirmed) return;
+
+        // Save copies for undo
+        const deletedTubs = tubercles.map(t => ({ ...t }));
+        const deletedEdges = edges.map(e => ({ ...e }));
+
+        // Clear arrays
+        tubercles.length = 0;
+        edges.length = 0;
+
+        // Push single undo operation
+        window.undoManager?.push({
+            type: window.undoManager.OperationType.DELETE_MULTI,
+            data: { tubs: deletedTubs, edges: deletedEdges },
+            redoData: {
+                tubIds: deletedTubs.map(t => t.id),
+                edgeKeys: deletedEdges.map(e => `${e.id1}-${e.id2}`)
+            }
+        });
+
+        // Clear any selections
+        window.overlay?.clearMultiSelection();
+        window.overlay?.deselect();
+
+        // Update displays
+        refreshDisplays();
+        markDirty();
+
+        // Track edits
+        if (deletedTubs.length > 0) {
+            window.sets?.trackEdit('deleted_tubercles', deletedTubs.length);
+        }
+        if (deletedEdges.length > 0) {
+            window.sets?.trackEdit('deleted_connections', deletedEdges.length);
+        }
+        logEdit('clear_all', {
+            tubCount: deletedTubs.length,
+            edgeCount: deletedEdges.length
+        });
+
+        window.app?.showToast(
+            `Cleared ${deletedTubs.length} tubercle(s) and ${deletedEdges.length} connection(s)`,
+            'success'
+        );
+    }
+
     // ========================================
     // Area Selection Mouse Handling
     // ========================================
@@ -1890,6 +1890,12 @@ window.editor = (function() {
             deleteSelectedBtn.addEventListener('click', deleteMultiSelected);
         }
 
+        // Clear All button
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', clearAll);
+        }
+
         // Listen for multi-selection changes to update button state
         document.addEventListener('multiSelectionChanged', (e) => {
             const { tubercleCount, edgeCount } = e.detail;
@@ -2030,6 +2036,7 @@ window.editor = (function() {
         handleCanvasClick,
         deleteSelected,
         deleteMultiSelected,
+        clearAll,
         nudgeSelected,
         cycleSelection,
         areTubesVisible,

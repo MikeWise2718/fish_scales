@@ -1,12 +1,16 @@
 """
-Tests for hexagonalness calculation consistency across all implementations.
+Tests for hexagonalness calculation consistency.
 
-Hexagonalness is calculated in multiple places:
+Hexagonalness is calculated in two Python locations:
 1. Python (core): fish_scale_analysis/core/measurement.py - calculate_hexagonalness()
+   Used by CLI and core processing, works with Tubercle/NeighborEdge objects.
 2. Python (MCP API): fish_scale_ui/routes/mcp_api.py - _calculate_hexagonalness_from_dicts()
-3. JavaScript: extraction.js, setUI.js, editor.js - calculateHexagonalness()
+   Single source of truth for web UI, works with dict representations.
 
-These tests ensure all implementations produce consistent results for the same input data.
+JavaScript modules call the /api/hexagonalness endpoint which delegates to the MCP API
+implementation, so there's no longer any JavaScript implementation to verify.
+
+These tests ensure the two Python implementations produce consistent results.
 """
 
 import pytest
@@ -403,16 +407,25 @@ class TestHexagonalnessConsistency:
             f"Spacing uniformity formula mismatch: got={result['spacing_uniformity']:.6f}, expected={expected_uniformity:.6f}"
 
     def test_edge_ratio_score_calculation(self, hexagonal_grid_data):
-        """Test edge_ratio_score formula: max(0, 1 - |ratio - 2.5| / 2)."""
+        """Test edge_ratio_score formula: max(0, 1 - |ratio - 3.0| / 2).
+
+        The edge ratio uses interior nodes only (not boundary nodes) and
+        ideal ratio of 3.0 (for hexagonal lattice).
+        """
         result = calculate_hexagonalness(
             hexagonal_grid_data['tubercles_objects'],
             hexagonal_grid_data['edges_objects'],
         )
 
-        n_nodes = hexagonal_grid_data['n_nodes']
+        # Use interior node count (n_interior_nodes), not total nodes
+        n_interior = result['n_interior_nodes']
         n_edges = hexagonal_grid_data['n_edges']
-        ratio = n_edges / n_nodes
-        expected_score = max(0, 1 - abs(ratio - 2.5) / 2)
+
+        if n_interior > 0:
+            ratio = n_edges / n_interior
+            expected_score = max(0, 1 - abs(ratio - 3.0) / 2)
+        else:
+            expected_score = 0.0
 
         assert abs(result['edge_ratio_score'] - expected_score) < 0.0001, \
             f"Edge ratio score mismatch: got={result['edge_ratio_score']:.6f}, expected={expected_score:.6f}"

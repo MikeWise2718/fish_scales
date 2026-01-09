@@ -1,5 +1,6 @@
 """Gemini provider for the fish scale agent using the google-genai SDK."""
 
+import base64
 import json
 import os
 from typing import Any, Callable
@@ -161,22 +162,54 @@ class GeminiAgentProvider(AgentLLMProvider):
 
             # Execute function calls and collect results
             function_response_parts = []
+            pending_images = []  # Images to send after function responses
+
             for fc in function_calls:
                 try:
                     result = tool_executor(fc.name, fc.arguments)
-                    # Convert result to string if needed
-                    if isinstance(result, (dict, list)):
-                        result_str = json.dumps(result, indent=2)
-                    else:
-                        result_str = str(result)
-                    function_response_parts.append(
-                        types.Part(
-                            function_response=types.FunctionResponse(
-                                name=fc.name,
-                                response={"result": result_str}
+
+                    # Check if result contains image data (from get_screenshot)
+                    if isinstance(result, dict) and "image_data" in result:
+                        # Gemini doesn't support images in function responses
+                        # Send function response as text, then image separately
+                        image_b64 = result["image_data"]
+                        # Strip data URI prefix if present
+                        if image_b64.startswith("data:"):
+                            image_b64 = image_b64.split(",", 1)[1]
+
+                        width = result.get("width", "unknown")
+                        height = result.get("height", "unknown")
+                        note = result.get("note", "")
+                        text_msg = f"Screenshot captured. Image dimensions: {width}x{height} pixels. {note}"
+
+                        function_response_parts.append(
+                            types.Part(
+                                function_response=types.FunctionResponse(
+                                    name=fc.name,
+                                    response={"result": text_msg}
+                                )
                             )
                         )
-                    )
+
+                        # Queue image to be sent after function responses
+                        pending_images.append({
+                            "data": base64.b64decode(image_b64),
+                            "text": "Here is the screenshot. Analyze the image to identify tubercles and gaps in the pattern.",
+                        })
+                    else:
+                        # Convert result to string if needed
+                        if isinstance(result, (dict, list)):
+                            result_str = json.dumps(result, indent=2)
+                        else:
+                            result_str = str(result)
+                        function_response_parts.append(
+                            types.Part(
+                                function_response=types.FunctionResponse(
+                                    name=fc.name,
+                                    response={"result": result_str}
+                                )
+                            )
+                        )
                 except StopAgentLoop:
                     # Re-raise control flow exceptions
                     raise
@@ -192,6 +225,21 @@ class GeminiAgentProvider(AgentLLMProvider):
 
             # Add function responses to history
             history.append(types.Content(role="user", parts=function_response_parts))
+
+            # Add any pending images as a separate user message
+            if pending_images:
+                image_parts = []
+                for img in pending_images:
+                    image_parts.append(
+                        types.Part(
+                            inline_data=types.Blob(
+                                mime_type="image/png",
+                                data=img["data"],
+                            )
+                        )
+                    )
+                    image_parts.append(types.Part(text=img["text"]))
+                history.append(types.Content(role="user", parts=image_parts))
 
             # Send function responses back to model
             response = self._client.models.generate_content(

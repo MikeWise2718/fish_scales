@@ -693,6 +693,22 @@
                         </button>
                         <a href="#" class="help-icon" data-edit="delete-multiple-itc" title="Help">?</a>
                     </div>
+                    <div class="edit-buttons" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-secondary" id="regenerateConnectionsBtn" disabled title="Clear all connections and regenerate using selected graph type">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6"/>
+                                <path d="M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                            Regenerate
+                        </button>
+                        <select id="editGraphType" class="param-select" style="width: auto; min-width: 100px;" title="Graph type for connection generation">
+                            <option value="delaunay">Delaunay</option>
+                            <option value="gabriel" selected>Gabriel</option>
+                            <option value="rng">RNG</option>
+                        </select>
+                        <a href="#" class="help-icon" data-edit="regenerate-connections" title="Help">?</a>
+                    </div>
                 </div>
 
                 <div class="edit-section" id="radiusControls">

@@ -14,6 +14,7 @@ window.undoManager = (function() {
         ADD_ITC: 'add_itc',
         DELETE_ITC: 'delete_itc',
         DELETE_MULTI: 'delete_multi',  // Batch delete tubercles and edges
+        REGENERATE_CONNECTIONS: 'regenerate_connections',  // Clear and regenerate all connections
     };
 
     /**

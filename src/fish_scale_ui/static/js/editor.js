@@ -61,6 +61,20 @@ window.editor = (function() {
 
         // Reset mode
         setMode(EditMode.NONE);
+
+        // Update regenerate button state
+        updateRegenerateButtonState();
+    }
+
+    /**
+     * Update regenerate connections button enabled state
+     */
+    function updateRegenerateButtonState() {
+        const btn = document.getElementById('regenerateConnectionsBtn');
+        if (btn) {
+            // Enable if we have at least 2 tubercles
+            btn.disabled = tubercles.length < 2;
+        }
     }
 
     /**
@@ -421,6 +435,9 @@ window.editor = (function() {
         window.sets?.trackEdit('added_tubercles');
         logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1) });
 
+        // Update regenerate button state
+        updateRegenerateButtonState();
+
         // Stay in add mode for multiple additions
         window.app?.showToast(`Added tubercle #${newTub.id}`, 'success');
     }
@@ -520,6 +537,9 @@ window.editor = (function() {
         updateChainNeighbors();
         updateModeUI();
         logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1), chain: true });
+
+        // Update regenerate button state
+        updateRegenerateButtonState();
 
         window.app?.showToast(`Added tubercle #${newTub.id}`, 'success');
     }
@@ -967,6 +987,9 @@ window.editor = (function() {
         }
         logEdit('delete_tub', { id });
 
+        // Update regenerate button state
+        updateRegenerateButtonState();
+
         window.app?.showToast(`Deleted tubercle #${id}`, 'success');
     }
 
@@ -1004,6 +1027,104 @@ window.editor = (function() {
         logEdit('delete_itc', { id1: edge.id1, id2: edge.id2 });
 
         window.app?.showToast(`Deleted connection ${edge.id1}-${edge.id2}`, 'success');
+    }
+
+    /**
+     * Regenerate all connections using the specified graph type
+     */
+    async function regenerateConnections() {
+        // Check calibration
+        const calibration = getCalibration();
+        if (!calibration || !calibration.um_per_px) {
+            window.app?.showToast('Please set calibration first', 'warning');
+            return;
+        }
+
+        // Need at least 2 tubercles
+        if (tubercles.length < 2) {
+            window.app?.showToast('Need at least 2 tubercles to generate connections', 'warning');
+            return;
+        }
+
+        // Get graph type from Edit tab dropdown
+        const graphTypeSelect = document.getElementById('editGraphType');
+        const graphType = graphTypeSelect?.value || 'gabriel';
+
+        // Get culling params from Configure tab
+        const params = window.configure?.getParams() || {};
+        const cullLongEdges = params.cull_long_edges !== undefined ? params.cull_long_edges : true;
+        const cullFactor = params.cull_factor || 1.8;
+
+        // Store old edges for undo
+        const oldEdges = edges.map(e => ({ ...e }));
+
+        try {
+            const response = await fetch('/api/regenerate-connections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tubercles: tubercles,
+                    graph_type: graphType,
+                    cull_long_edges: cullLongEdges,
+                    cull_factor: cullFactor,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                window.app?.showToast(result.error, 'error');
+                return;
+            }
+
+            // Update edges
+            edges = result.edges || [];
+
+            // Update tubercles with boundary flags if provided
+            if (result.tubercles) {
+                const boundaryMap = new Map();
+                result.tubercles.forEach(t => {
+                    boundaryMap.set(t.id, t.is_boundary);
+                });
+                tubercles.forEach(t => {
+                    if (boundaryMap.has(t.id)) {
+                        t.is_boundary = boundaryMap.get(t.id);
+                    }
+                });
+            }
+
+            // Push to undo stack
+            window.undoManager?.push({
+                type: window.undoManager.OperationType.REGENERATE_CONNECTIONS,
+                data: { oldEdges: oldEdges, graphType: graphType },
+                redoData: { newEdges: edges.map(e => ({ ...e })), graphType: graphType },
+            });
+
+            // Update displays
+            refreshDisplays();
+            markDirty();
+            window.sets?.trackEdit('regenerate_connections');
+            logEdit('regenerate_connections', { graph_type: graphType, n_edges: edges.length });
+
+            // Record history event
+            window.sets?.addHistoryEvent('auto_connect', {
+                graph_type: graphType,
+                n_tubercles: tubercles.length,
+                n_edges: edges.length,
+                cull_long_edges: cullLongEdges,
+                cull_factor: cullFactor,
+                calibration_um_per_pixel: calibration?.um_per_px,
+            });
+
+            window.app?.showToast(
+                `Regenerated ${edges.length} connections using ${graphType}`,
+                'success'
+            );
+
+        } catch (err) {
+            console.error('Connection regeneration failed:', err);
+            window.app?.showToast('Connection regeneration failed: ' + err.message, 'error');
+        }
     }
 
     /**
@@ -1366,10 +1487,16 @@ window.editor = (function() {
                 }
                 break;
             }
+            case window.undoManager.OperationType.REGENERATE_CONNECTIONS: {
+                // Restore old edges
+                edges = data.oldEdges.map(e => ({ ...e }));
+                break;
+            }
         }
 
         refreshDisplays();
         markDirty();
+        updateRegenerateButtonState();
     }
 
     /**
@@ -1443,10 +1570,16 @@ window.editor = (function() {
                 });
                 break;
             }
+            case window.undoManager.OperationType.REGENERATE_CONNECTIONS: {
+                // Re-apply the new edges
+                edges = redoData.newEdges.map(e => ({ ...e }));
+                break;
+            }
         }
 
         refreshDisplays();
         markDirty();
+        updateRegenerateButtonState();
     }
 
     /**
@@ -1590,6 +1723,9 @@ window.editor = (function() {
             edgeCount: deletedEdges.length
         });
 
+        // Update regenerate button state
+        updateRegenerateButtonState();
+
         window.app?.showToast(
             `Deleted ${deletedTubs.length} tubercle(s) and ${deletedEdges.length} connection(s)`,
             'success'
@@ -1656,6 +1792,9 @@ window.editor = (function() {
             tubCount: deletedTubs.length,
             edgeCount: deletedEdges.length
         });
+
+        // Update regenerate button state
+        updateRegenerateButtonState();
 
         window.app?.showToast(
             `Cleared ${deletedTubs.length} tubercle(s) and ${deletedEdges.length} connection(s)`,
@@ -1872,6 +2011,30 @@ window.editor = (function() {
             });
         }
 
+        // Regenerate Connections button
+        const regenerateConnectionsBtn = document.getElementById('regenerateConnectionsBtn');
+        if (regenerateConnectionsBtn) {
+            regenerateConnectionsBtn.addEventListener('click', regenerateConnections);
+        }
+
+        // Sync Edit tab graph type with Configure tab on load
+        const editGraphType = document.getElementById('editGraphType');
+        if (editGraphType) {
+            // Initialize from Configure tab's value
+            const configGraphType = document.getElementById('neighbor_graph');
+            if (configGraphType) {
+                editGraphType.value = configGraphType.value;
+            }
+
+            // Listen for Configure tab changes
+            document.addEventListener('paramsChanged', () => {
+                const configVal = document.getElementById('neighbor_graph')?.value;
+                if (configVal && editGraphType.value !== configVal) {
+                    editGraphType.value = configVal;
+                }
+            });
+        }
+
         // Area selection button
         const areaSelectBtn = document.getElementById('areaSelectBtn');
         if (areaSelectBtn) {
@@ -2047,6 +2210,7 @@ window.editor = (function() {
         chainGoForward,
         chainCycleNext,
         chainCyclePrev,
+        regenerateConnections,
         hasMultiSelection: () => window.overlay?.hasMultiSelection() || false,
     };
 })();

@@ -551,12 +551,40 @@ def list_providers():
                     "display_name": "Anthropic Claude",
                     "default_model": "claude-sonnet-4-20250514",
                     "env_var": "ANTHROPIC_API_KEY",
-                    "configured": true/false
+                    "configured": true/false,
+                    "available_models": [...]
                 },
                 ...
             ]
         }
     """
+    # Import OpenRouter model pricing
+    from fish_scale_agent.providers.openrouter import MODEL_PRICING
+
+    # Build available models list for OpenRouter with pricing
+    openrouter_models = []
+    for model_id, pricing in MODEL_PRICING.items():
+        # Categorize models by provider prefix
+        parts = model_id.split('/')
+        vendor = parts[0] if len(parts) > 1 else 'other'
+        model_name = parts[1] if len(parts) > 1 else model_id
+
+        # Skip models without vision capability (listed for reference only)
+        if 'deepseek' in model_id:
+            continue
+
+        openrouter_models.append({
+            'id': model_id,
+            'name': model_name,
+            'vendor': vendor,
+            'input_cost': pricing['input'],  # per million tokens
+            'output_cost': pricing['output'],  # per million tokens
+            'is_free': pricing['input'] == 0 and pricing['output'] == 0,
+        })
+
+    # Sort by vendor, then by cost
+    openrouter_models.sort(key=lambda m: (m['vendor'], m['input_cost'] + m['output_cost']))
+
     providers = [
         {
             'name': 'claude',
@@ -564,6 +592,16 @@ def list_providers():
             'default_model': 'claude-sonnet-4-20250514',
             'env_var': 'ANTHROPIC_API_KEY',
             'configured': bool(os.environ.get('ANTHROPIC_API_KEY')),
+            'available_models': [
+                {
+                    'id': 'claude-sonnet-4-20250514',
+                    'name': 'Claude Sonnet 4',
+                    'vendor': 'anthropic',
+                    'input_cost': 3.0,
+                    'output_cost': 15.0,
+                    'is_free': False,
+                }
+            ],
         },
         {
             'name': 'gemini',
@@ -571,6 +609,16 @@ def list_providers():
             'default_model': 'gemini-2.0-flash',
             'env_var': 'GEMINI_API_KEY',
             'configured': bool(os.environ.get('GEMINI_API_KEY')),
+            'available_models': [
+                {
+                    'id': 'gemini-2.0-flash',
+                    'name': 'Gemini 2.0 Flash',
+                    'vendor': 'google',
+                    'input_cost': 0.10,
+                    'output_cost': 0.40,
+                    'is_free': False,
+                }
+            ],
         },
         {
             'name': 'openrouter',
@@ -578,6 +626,7 @@ def list_providers():
             'default_model': 'anthropic/claude-sonnet-4',
             'env_var': 'OPENROUTER_API_KEY',
             'configured': bool(os.environ.get('OPENROUTER_API_KEY')),
+            'available_models': openrouter_models,
         },
     ]
 

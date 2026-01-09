@@ -2745,6 +2745,49 @@ body {
     max-width: 80px;
 }
 
+/* Model Cost Info */
+.model-cost-row {
+    margin-top: -0.5rem;
+}
+
+.model-cost-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-color);
+    border-radius: 0.25rem;
+    border: 1px solid var(--border-color);
+}
+
+.model-cost-info .cost-free {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.model-cost-info .cost-label {
+    color: var(--text-muted);
+}
+
+.model-cost-info .cost-input {
+    color: #0369a1;
+    font-weight: 500;
+}
+
+.model-cost-info .cost-output {
+    color: #7c3aed;
+    font-weight: 500;
+}
+
+/* Wider model select for OpenRouter */
+#agentModel {
+    min-width: 200px;
+}
+
+#agentModel optgroup {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
 /* Agent Control Buttons */
 .agent-controls {
     display: flex;

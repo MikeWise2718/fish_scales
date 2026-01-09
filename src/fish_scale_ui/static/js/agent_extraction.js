@@ -107,11 +107,30 @@ window.agentExtraction = (function() {
     }
 
     /**
+     * Format cost for display (per million tokens)
+     */
+    function formatCost(inputCost, outputCost) {
+        if (inputCost === 0 && outputCost === 0) {
+            return 'FREE';
+        }
+        // Show combined cost for simplicity, format nicely
+        const avgCost = (inputCost + outputCost) / 2;
+        if (avgCost < 0.1) {
+            return `$${avgCost.toFixed(3)}/M`;
+        } else if (avgCost < 1) {
+            return `$${avgCost.toFixed(2)}/M`;
+        } else {
+            return `$${avgCost.toFixed(1)}/M`;
+        }
+    }
+
+    /**
      * Populate the model select dropdown based on selected provider
      */
     function populateModelSelect() {
         const providerSelect = document.getElementById('agentProvider');
         const modelSelect = document.getElementById('agentModel');
+        const modelInfoDiv = document.getElementById('modelCostInfo');
         if (!providerSelect || !modelSelect) return;
 
         const providerName = providerSelect.value;
@@ -120,19 +139,110 @@ window.agentExtraction = (function() {
         // Clear existing options
         modelSelect.innerHTML = '';
 
-        if (provider) {
-            // Add default model option
+        if (provider && provider.available_models && provider.available_models.length > 0) {
+            const models = provider.available_models;
+
+            // For providers with multiple models, group by vendor
+            if (models.length > 1) {
+                // Group models by vendor
+                const byVendor = {};
+                models.forEach(m => {
+                    if (!byVendor[m.vendor]) {
+                        byVendor[m.vendor] = [];
+                    }
+                    byVendor[m.vendor].push(m);
+                });
+
+                // Create optgroups for each vendor
+                const vendorNames = {
+                    'anthropic': 'Anthropic',
+                    'openai': 'OpenAI',
+                    'google': 'Google',
+                    'mistralai': 'Mistral',
+                    'qwen': 'Qwen',
+                    'x-ai': 'xAI (Grok)',
+                    'z-ai': 'Zhipu (GLM)',
+                };
+
+                // Sort vendors alphabetically
+                const vendors = Object.keys(byVendor).sort();
+
+                vendors.forEach(vendor => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = vendorNames[vendor] || vendor;
+
+                    byVendor[vendor].forEach(model => {
+                        const opt = document.createElement('option');
+                        opt.value = model.id;
+                        const costStr = formatCost(model.input_cost, model.output_cost);
+                        opt.textContent = `${model.name} [${costStr}]`;
+                        // Store pricing data for later display
+                        opt.dataset.inputCost = model.input_cost;
+                        opt.dataset.outputCost = model.output_cost;
+                        opt.dataset.isFree = model.is_free;
+                        // Mark default
+                        if (model.id === provider.default_model) {
+                            opt.textContent += ' (default)';
+                        }
+                        optgroup.appendChild(opt);
+                    });
+
+                    modelSelect.appendChild(optgroup);
+                });
+
+                // Pre-select the default model
+                modelSelect.value = provider.default_model;
+            } else {
+                // Single model provider - just show it
+                const model = models[0];
+                const opt = document.createElement('option');
+                opt.value = model.id;
+                const costStr = formatCost(model.input_cost, model.output_cost);
+                opt.textContent = `${model.name} [${costStr}]`;
+                opt.dataset.inputCost = model.input_cost;
+                opt.dataset.outputCost = model.output_cost;
+                modelSelect.appendChild(opt);
+            }
+
+            // Update cost info display
+            updateModelCostInfo();
+        } else if (provider) {
+            // Fallback for providers without model list
             const defaultOpt = document.createElement('option');
             defaultOpt.value = '';
             defaultOpt.textContent = `Default (${provider.default_model})`;
             modelSelect.appendChild(defaultOpt);
-
-            // Provider-specific models could be added here if API returns them
         } else {
             const opt = document.createElement('option');
             opt.value = '';
             opt.textContent = '-- Select Provider First --';
             modelSelect.appendChild(opt);
+        }
+    }
+
+    /**
+     * Update the model cost info display based on selected model
+     */
+    function updateModelCostInfo() {
+        const modelSelect = document.getElementById('agentModel');
+        const infoDiv = document.getElementById('modelCostInfo');
+        if (!modelSelect || !infoDiv) return;
+
+        const selectedOpt = modelSelect.selectedOptions[0];
+        if (selectedOpt && selectedOpt.dataset.inputCost !== undefined) {
+            const inputCost = parseFloat(selectedOpt.dataset.inputCost);
+            const outputCost = parseFloat(selectedOpt.dataset.outputCost);
+
+            if (inputCost === 0 && outputCost === 0) {
+                infoDiv.innerHTML = '<span class="cost-free">FREE model - no API costs</span>';
+            } else {
+                infoDiv.innerHTML = `<span class="cost-label">Cost:</span> ` +
+                    `<span class="cost-input">$${inputCost.toFixed(2)}</span> input / ` +
+                    `<span class="cost-output">$${outputCost.toFixed(2)}</span> output per 1M tokens`;
+            }
+            infoDiv.style.display = 'block';
+        } else {
+            infoDiv.style.display = 'none';
         }
     }
 
@@ -1374,6 +1484,12 @@ window.agentExtraction = (function() {
         const providerSelect = document.getElementById('agentProvider');
         if (providerSelect) {
             providerSelect.addEventListener('change', populateModelSelect);
+        }
+
+        // Model select change - update cost info display
+        const modelSelect = document.getElementById('agentModel');
+        if (modelSelect) {
+            modelSelect.addEventListener('change', updateModelCostInfo);
         }
 
         // Use current params checkbox - toggle profile select

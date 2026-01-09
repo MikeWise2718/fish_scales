@@ -302,14 +302,17 @@ class OpenRouterAgentProvider(AgentLLMProvider):
             messages.append(assistant_msg)
 
             # Execute tool calls and collect results
+            # Collect any images to send after tool results
+            pending_images = []
+
             for tc in tool_calls:
                 try:
                     result = tool_executor(tc.name, tc.arguments)
 
                     # Check if result contains image data (from get_screenshot)
                     if isinstance(result, dict) and "image_data" in result:
-                        # For OpenRouter/OpenAI, we need to pass image as a user message
-                        # with image_url content type
+                        # OpenAI API doesn't support images in tool results
+                        # We need to add tool result as text, then add image in user message
                         image_b64 = result["image_data"]
                         if image_b64.startswith("data:"):
                             image_url = image_b64
@@ -319,22 +322,19 @@ class OpenRouterAgentProvider(AgentLLMProvider):
                         width = result.get("width", "unknown")
                         height = result.get("height", "unknown")
                         note = result.get("note", "")
-                        text_msg = f"Screenshot captured. Image dimensions: {width}x{height} pixels. {note} Analyze the image to identify tubercles and gaps in the pattern."
+                        text_msg = f"Screenshot captured. Image dimensions: {width}x{height} pixels. {note}"
 
-                        # Add tool result with image
+                        # Add tool result as text only
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tc.id,
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": image_url},
-                                },
-                                {
-                                    "type": "text",
-                                    "text": text_msg,
-                                },
-                            ],
+                            "content": text_msg,
+                        })
+
+                        # Queue image to be sent in a user message after all tool results
+                        pending_images.append({
+                            "url": image_url,
+                            "text": "Here is the screenshot. Analyze the image to identify tubercles and gaps in the pattern.",
                         })
                     else:
                         # Convert result to string if needed
@@ -357,6 +357,24 @@ class OpenRouterAgentProvider(AgentLLMProvider):
                         "tool_call_id": tc.id,
                         "content": f"Error: {str(e)}",
                     })
+
+            # After all tool results, add any pending images as a user message
+            # OpenAI API only supports images in user messages, not tool results
+            if pending_images:
+                user_content = []
+                for img in pending_images:
+                    user_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": img["url"]},
+                    })
+                    user_content.append({
+                        "type": "text",
+                        "text": img["text"],
+                    })
+                messages.append({
+                    "role": "user",
+                    "content": user_content,
+                })
 
         # Max iterations reached
         return text_response or "Max iterations reached without final response."

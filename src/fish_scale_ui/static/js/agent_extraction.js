@@ -529,16 +529,29 @@ window.agentExtraction = (function() {
 
         // Handle status data object from API
         if (data) {
-            // Update state values from API response
+            // Update state values from structured STATUS data
             if (data.iteration !== undefined) {
                 checkIterationChange(data.iteration);
                 state.currentIteration = data.iteration;
             }
+            if (data.max_iterations !== undefined) {
+                state.maxIterations = data.max_iterations;
+            }
             if (data.phase !== undefined) {
                 state.currentPhase = data.phase;
             }
-            if (data.tubercle_count !== undefined) {
+            // Handle both field names: tubercles (from STATUS) and tubercle_count (legacy)
+            if (data.tubercles !== undefined) {
+                state.currentTubercleCount = data.tubercles;
+            } else if (data.tubercle_count !== undefined) {
                 state.currentTubercleCount = data.tubercle_count;
+            }
+            if (data.edges !== undefined) {
+                state.currentITCCount = data.edges;
+            }
+            if (data.hexagonalness !== undefined && data.hexagonalness > state.bestScore) {
+                // Track best score from hexagonalness
+                state.bestScore = data.hexagonalness;
             }
             if (data.best_score !== undefined) {
                 state.bestScore = data.best_score;
@@ -1001,13 +1014,26 @@ window.agentExtraction = (function() {
     }
 
     /**
-     * Parse log lines to extract structured information
+     * Parse log lines to extract structured information.
+     * NOTE: Primary status data now comes from STATUS: lines parsed by the backend.
+     * This function is kept as a fallback for action tracking and cost parsing.
      * @param {string[]} logLines - Array of log line strings
      */
     function parseLogLines(logLines) {
-        // Look for iteration, phase, and score information in log output
+        // Look for phase, cost, and action information in log output
+        // Note: iteration/tubercles/edges now come from STATUS: lines via updateStatus()
         for (const line of logLines.slice(-20)) {  // Check last 20 lines
-            // Parse iteration numbers - matches both "Iteration N" and "Extraction [N/M]"
+            // Skip LLM prompt/response lines - they contain few-shot examples
+            if (line.includes('LLM-Prompt:') || line.includes('LLM-Response:')) {
+                continue;
+            }
+
+            // Skip STATUS lines - already parsed by backend
+            if (line.startsWith('STATUS:')) {
+                continue;
+            }
+
+            // Parse iteration numbers as fallback (matches "Iteration N" and "Extraction [N/M]")
             const iterMatch = line.match(/Iteration\s+(\d+)|Extraction\s*\[(\d+)/i);
             if (iterMatch) {
                 const iterNum = parseInt(iterMatch[1] || iterMatch[2], 10);

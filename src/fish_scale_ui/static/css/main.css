@@ -298,6 +298,17 @@ body {
     margin: 0 0.25rem;
 }
 
+.toolbar-filename {
+    font-size: 0.875rem;
+    color: var(--text-color);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
+    margin-left: 0.75rem;
+}
+
 .toolbar-spacer {
     flex: 1;
 }
@@ -315,6 +326,32 @@ body {
     flex-direction: column;
     background-color: var(--panel-bg);
     border-left: 1px solid var(--border-color);
+}
+
+.panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background-color: var(--bg-color);
+    border-bottom: 1px solid var(--border-color);
+    min-height: 2rem;
+}
+
+.current-filename {
+    font-size: 0.875rem;
+    color: var(--text-color);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 250px;
+}
+
+.panel-header-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
 }
 
 .tab-headers {

@@ -81,7 +81,7 @@ window.configure = (function() {
         const display = document.getElementById(`${id}_value`);
         if (display) {
             const val = parseFloat(value);
-            const formatted = isNaN(val) ? value : val.toFixed(2);
+            const formatted = isNaN(val) ? value : val.toFixed(3);
             if (display.tagName === 'INPUT') {
                 display.value = formatted;
             } else {

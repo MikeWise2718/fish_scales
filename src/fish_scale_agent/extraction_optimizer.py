@@ -4,6 +4,7 @@ This module implements an LLM-powered agent that iteratively tunes extraction
 parameters to maximize detection quality (measured by hexagonalness score).
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -859,7 +860,7 @@ class ExtractionOptimizer:
             f"{n_tubercles} tubercles, hexagonalness={metrics['hexagonalness']:.3f}"
         )
 
-        # Update state
+        # Update state first so we can include best_score in STATUS
         if self._state:
             self._state.iteration = self._extraction_count
             self._state.current_metrics = metrics
@@ -876,6 +877,20 @@ class ExtractionOptimizer:
 
             # Record this trial in history
             self._record_trial("")
+
+        # Output structured status for backend parsing (not via _log to avoid timestamp)
+        best_score = 0
+        if self._state and self._state.best_metrics:
+            best_score = self._state.best_metrics.get("hexagonalness", 0)
+        status_data = {
+            "iteration": self._extraction_count,
+            "max_iterations": self._max_iterations,
+            "hexagonalness": round(metrics["hexagonalness"], 3),
+            "tubercles": n_tubercles,
+            "edges": metrics.get("n_edges", 0),
+            "best_score": round(best_score, 3),
+        }
+        print(f"STATUS:{json.dumps(status_data)}", flush=True)
 
         return {
             "success": True,

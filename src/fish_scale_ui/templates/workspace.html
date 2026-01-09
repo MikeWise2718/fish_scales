@@ -83,7 +83,8 @@
             <button type="button" class="btn btn-secondary" id="newImageBtn" title="Load new image">
                 New Image
             </button>
-            <div class="toolbar-separator"></div>
+            <span class="toolbar-filename" id="toolbarFilename" title="Current image filename">No image loaded</span>
+            <div class="toolbar-spacer"></div>
             <button type="button" class="btn btn-icon" id="zoomInBtn" title="Zoom in (+)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/>
@@ -149,6 +150,12 @@
 
     <!-- Right Panel: Tabs -->
     <div class="tabs-panel" id="tabsPanel">
+        <div class="panel-header-row">
+            <span class="current-filename" id="currentFilename" title="Current image filename">No image loaded</span>
+            <div class="panel-header-controls">
+                <!-- Controls can be added here on the far right -->
+            </div>
+        </div>
         <div class="tab-headers">
             <button class="tab-header active" data-tab="image">Image</button>
             <button class="tab-header" data-tab="calibration">Calibration</button>
@@ -361,8 +368,9 @@
                             <a href="#" class="help-icon" data-param="threshold" title="Help">?</a>
                         </label>
                         <input type="range" id="threshold" class="param-input param-range"
-                               min="0.01" max="0.50" step="0.01" value="0.05">
-                        <span id="threshold_value" class="param-value">0.050</span>
+                               min="0.01" max="0.50" step="0.001" value="0.05">
+                        <input type="number" id="threshold_value" class="param-value param-value-editable"
+                               min="0.01" max="0.50" step="0.001" value="0.050">
                     </div>
 
                     <div class="param-row">
@@ -389,9 +397,9 @@
                             <a href="#" class="help-icon" data-param="circularity" title="Help">?</a>
                         </label>
                         <input type="range" id="min_circularity" class="param-input param-range"
-                               min="0.01" max="1" step="0.01" value="0.5">
+                               min="0.01" max="1" step="0.001" value="0.5">
                         <input type="number" id="min_circularity_value" class="param-value param-value-editable"
-                               min="0.01" max="1" step="0.01" value="0.50">
+                               min="0.01" max="1" step="0.001" value="0.500">
                     </div>
                 </div>
 
@@ -404,8 +412,9 @@
                             <a href="#" class="help-icon" data-param="clahe-clip" title="Help">?</a>
                         </label>
                         <input type="range" id="clahe_clip" class="param-input param-range"
-                               min="0.01" max="0.20" step="0.01" value="0.03">
-                        <span id="clahe_clip_value" class="param-value">0.030</span>
+                               min="0.01" max="0.20" step="0.001" value="0.03">
+                        <input type="number" id="clahe_clip_value" class="param-value param-value-editable"
+                               min="0.01" max="0.20" step="0.001" value="0.030">
                     </div>
 
                     <div class="param-row">
@@ -423,8 +432,9 @@
                             <a href="#" class="help-icon" data-param="blur-sigma" title="Help">?</a>
                         </label>
                         <input type="range" id="blur_sigma" class="param-input param-range"
-                               min="0" max="5" step="0.1" value="1.0">
-                        <span id="blur_sigma_value" class="param-value">1.000</span>
+                               min="0" max="5" step="0.001" value="1.0">
+                        <input type="number" id="blur_sigma_value" class="param-value param-value-editable"
+                               min="0" max="5" step="0.001" value="1.000">
                     </div>
                 </div>
 
@@ -1751,6 +1761,43 @@
     let lastStateHash = null;
     let currentImageUrl = null;
 
+    // Update filename display in toolbar and right panel header
+    function updateFilenameDisplay(url) {
+        const toolbarEl = document.getElementById('toolbarFilename');
+        const headerEl = document.getElementById('currentFilename');
+
+        if (!url) {
+            const defaultText = 'No image loaded';
+            if (toolbarEl) {
+                toolbarEl.textContent = defaultText;
+                toolbarEl.title = defaultText;
+            }
+            if (headerEl) {
+                headerEl.textContent = defaultText;
+                headerEl.title = defaultText;
+            }
+            return;
+        }
+
+        // Extract filename from URL path
+        let filename = 'Image loaded';
+        try {
+            const urlPath = decodeURIComponent(url);
+            filename = urlPath.split('/').pop().split('?')[0];
+        } catch (e) {
+            // Keep default
+        }
+
+        if (toolbarEl) {
+            toolbarEl.textContent = filename;
+            toolbarEl.title = filename;
+        }
+        if (headerEl) {
+            headerEl.textContent = filename;
+            headerEl.title = filename;
+        }
+    }
+
     function computeStateHash(state) {
         // Simple hash based on counts and image filename
         const tubCount = (state.tubercles || []).length;
@@ -1764,7 +1811,7 @@
         if (!mcpPollingEnabled) return;
 
         try {
-            const response = await fetch('/api/mcp/state');
+            const response = await fetch('/api/tools/state');
             const state = await response.json();
             const newHash = computeStateHash(state);
 
@@ -1780,6 +1827,7 @@
 
                     if (imgData.web_url && imgData.web_url !== currentImageUrl) {
                         currentImageUrl = imgData.web_url;
+                        updateFilenameDisplay(currentImageUrl);
                         window.imageViewer.loadImage(currentImageUrl);
                         // Wait for image to load before setting overlay
                         await new Promise(resolve => setTimeout(resolve, 300));
@@ -1795,7 +1843,7 @@
 
                     // Fetch and update statistics (computed on-the-fly)
                     try {
-                        const statsResponse = await fetch('/api/mcp/statistics');
+                        const statsResponse = await fetch('/api/tools/statistics');
                         const stats = await statsResponse.json();
                         updateStatisticsDisplay(stats);
                     } catch (e) {
@@ -1907,7 +1955,7 @@
         // If no URL param and MCP is enabled, check if MCP API has loaded an image
         if (!imgUrl && mcpPollingEnabled) {
             try {
-                const response = await fetch('/api/mcp/state');
+                const response = await fetch('/api/tools/state');
                 const state = await response.json();
                 lastStateHash = computeStateHash(state);
 
@@ -1918,6 +1966,7 @@
                     if (imgData.web_url) {
                         imgUrl = imgData.web_url;
                         currentImageUrl = imgUrl;
+                        updateFilenameDisplay(currentImageUrl);
                         // Also load any existing extraction data
                         if (state.tubercles && state.tubercles.length > 0) {
                             // Wait for image to load, then set overlay data
@@ -1929,7 +1978,7 @@
                                 }
                                 // Fetch statistics (computed on-the-fly)
                                 try {
-                                    const statsResponse = await fetch('/api/mcp/statistics');
+                                    const statsResponse = await fetch('/api/tools/statistics');
                                     const stats = await statsResponse.json();
                                     updateStatisticsDisplay(stats);
                                 } catch (e) {
@@ -1951,6 +2000,7 @@
 
         if (imgUrl) {
             currentImageUrl = imgUrl;
+            updateFilenameDisplay(currentImageUrl);
             window.imageViewer.loadImage(imgUrl);
         }
 

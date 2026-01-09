@@ -92,6 +92,19 @@ def _monitor_agent_process(session_id: str, process: subprocess.Popen,
                         status = _read_status(status_file)
                         status['log_lines'] = log_lines[-50:]  # Keep last 50 lines
                         status['last_output'] = line_str
+
+                        # Parse structured STATUS lines from agent
+                        if line_str.startswith('STATUS:'):
+                            try:
+                                status_data = json.loads(line_str[7:])  # Skip "STATUS:" prefix
+                                # Copy structured fields to status
+                                for key in ['iteration', 'max_iterations', 'hexagonalness',
+                                           'tubercles', 'edges', 'phase', 'best_score']:
+                                    if key in status_data:
+                                        status[key] = status_data[key]
+                            except json.JSONDecodeError:
+                                pass  # Ignore malformed STATUS lines
+
                         _write_status(status_file, status)
 
             if return_code is not None:

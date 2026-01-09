@@ -239,14 +239,6 @@ def rotate_image():
         return jsonify({'error': f'Failed to rotate image: {str(e)}'}), 400
 
 
-@api_bp.route('/current-image', methods=['GET'])
-def current_image():
-    """Get current image filename."""
-    return jsonify({
-        'filename': _current_image.get('filename'),
-    })
-
-
 @api_bp.route('/calibration', methods=['GET', 'POST'])
 def calibration():
     """Get or set calibration data."""
@@ -399,6 +391,45 @@ def get_profiles():
     """Get list of available detection profiles."""
     from fish_scale_ui.services.extraction import get_profiles_list
     return jsonify({'profiles': get_profiles_list()})
+
+
+@api_bp.route('/profile', methods=['POST'])
+def load_profile():
+    """Load a specific detection profile by name.
+
+    Request body:
+        {"name": "default"}
+
+    Returns:
+        {"parameters": {...profile parameters...}}
+    """
+    from fish_scale_analysis.profiles import get_profile
+
+    data = request.get_json() or {}
+    profile_name = data.get('name', 'default')
+
+    try:
+        profile = get_profile(profile_name)
+    except KeyError:
+        return jsonify({'error': f'Unknown profile: {profile_name}'}), 404
+
+    # Convert profile to parameters dict
+    parameters = {
+        'method': 'log',  # Default method
+        'threshold': profile.threshold,
+        'min_diameter_um': profile.min_diameter_um,
+        'max_diameter_um': profile.max_diameter_um,
+        'min_circularity': profile.min_circularity,
+        'clahe_clip': profile.clahe_clip,
+        'clahe_kernel': profile.clahe_kernel,
+        'blur_sigma': profile.blur_sigma,
+    }
+
+    return jsonify({
+        'success': True,
+        'profile': profile_name,
+        'parameters': parameters
+    })
 
 
 @api_bp.route('/extract', methods=['POST'])

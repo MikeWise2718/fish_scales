@@ -1762,7 +1762,7 @@
     let currentImageUrl = null;
 
     // Update filename display in toolbar and right panel header
-    function updateFilenameDisplay(url) {
+    async function updateFilenameDisplay(url) {
         const toolbarEl = document.getElementById('toolbarFilename');
         const headerEl = document.getElementById('currentFilename');
 
@@ -1779,13 +1779,22 @@
             return;
         }
 
-        // Extract filename from URL path
+        // Fetch the real filename from the API (not from URL which contains GUID)
         let filename = 'Image loaded';
         try {
-            const urlPath = decodeURIComponent(url);
-            filename = urlPath.split('/').pop().split('?')[0];
+            const response = await fetch('/api/current-image');
+            const data = await response.json();
+            if (data.filename) {
+                filename = data.filename;
+            }
         } catch (e) {
-            // Keep default
+            // Fallback to URL parsing if API fails
+            try {
+                const urlPath = decodeURIComponent(url);
+                filename = urlPath.split('/').pop().split('?')[0];
+            } catch (e2) {
+                // Keep default
+            }
         }
 
         if (toolbarEl) {
@@ -1827,7 +1836,7 @@
 
                     if (imgData.web_url && imgData.web_url !== currentImageUrl) {
                         currentImageUrl = imgData.web_url;
-                        updateFilenameDisplay(currentImageUrl);
+                        await updateFilenameDisplay(currentImageUrl);
                         window.imageViewer.loadImage(currentImageUrl);
                         // Wait for image to load before setting overlay
                         await new Promise(resolve => setTimeout(resolve, 300));
@@ -1966,7 +1975,7 @@
                     if (imgData.web_url) {
                         imgUrl = imgData.web_url;
                         currentImageUrl = imgUrl;
-                        updateFilenameDisplay(currentImageUrl);
+                        await updateFilenameDisplay(currentImageUrl);
                         // Also load any existing extraction data
                         if (state.tubercles && state.tubercles.length > 0) {
                             // Wait for image to load, then set overlay data
@@ -2000,7 +2009,7 @@
 
         if (imgUrl) {
             currentImageUrl = imgUrl;
-            updateFilenameDisplay(currentImageUrl);
+            await updateFilenameDisplay(currentImageUrl);
             window.imageViewer.loadImage(imgUrl);
         }
 

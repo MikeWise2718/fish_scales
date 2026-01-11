@@ -282,9 +282,6 @@ window.editor = (function() {
                 const modeClass = 'edit-mode-' + config.colorClass.replace('mode-', '');
                 container.classList.add('edit-mode-active');
                 container.classList.add(modeClass);
-                console.log('Added classes to container:', 'edit-mode-active', modeClass, container.classList.toString());
-            } else {
-                console.warn('imageContainer not found!');
             }
         } else {
             // Hide banner

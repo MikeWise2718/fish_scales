@@ -16,6 +16,52 @@ window.editor = (function() {
         AREA_SELECT: 'area_select',  // Area selection mode for multi-select
     };
 
+    // Mode banner configuration
+    const ModeBannerConfig = {
+        [EditMode.ADD_TUB]: {
+            icon: '\u2295',  // ⊕
+            title: 'Add Tubercle',
+            desc: 'Click on the image to place a new tubercle',
+            colorClass: 'mode-add',
+        },
+        [EditMode.ADD_ITC]: {
+            icon: '\u27F7',  // ⟷
+            title: 'Add Connection',
+            desc: 'Click first tubercle, then click second to connect',
+            colorClass: 'mode-add',
+        },
+        [EditMode.ADD_CHAIN]: {
+            icon: '\u26D3',  // ⛓
+            title: 'Chain Mode',
+            desc: 'Click to add connected tubercles. Arrow keys to navigate.',
+            colorClass: 'mode-add',
+        },
+        [EditMode.MOVE]: {
+            icon: '\u2725',  // ✥
+            title: 'Move Tubercle',
+            desc: 'Click on image to move the selected tubercle',
+            colorClass: 'mode-move',
+        },
+        [EditMode.DELETE_MULTI_TUB]: {
+            icon: '\u2296',  // ⊖
+            title: 'Delete Tubercles',
+            desc: 'Click on tubercles to delete them',
+            colorClass: 'mode-delete',
+        },
+        [EditMode.DELETE_MULTI_ITC]: {
+            icon: '\u2702',  // ✂
+            title: 'Delete Connections',
+            desc: 'Click on connections to delete them',
+            colorClass: 'mode-delete',
+        },
+        [EditMode.AREA_SELECT]: {
+            icon: '\u25A2',  // ▢
+            title: 'Area Select',
+            desc: 'Click and drag to select multiple items',
+            colorClass: 'mode-select',
+        },
+    };
+
     // Current state
     let currentMode = EditMode.NONE;
     let pendingFirstTub = null; // For ITC creation - first selected tubercle
@@ -192,6 +238,111 @@ window.editor = (function() {
     }
 
     /**
+     * Update the mode banner above the image
+     */
+    function updateModeBanner() {
+        const banner = document.getElementById('editModeBanner');
+        const iconEl = document.getElementById('editModeBannerIcon');
+        const titleEl = document.getElementById('editModeBannerTitle');
+        const descEl = document.getElementById('editModeBannerDesc');
+        const container = document.getElementById('imageContainer');
+
+        if (!banner) return;
+
+        // Remove all mode classes from banner and container
+        banner.classList.remove('mode-add', 'mode-delete', 'mode-move', 'mode-select');
+        if (container) {
+            container.classList.remove('edit-mode-active', 'edit-mode-add', 'edit-mode-delete', 'edit-mode-move', 'edit-mode-select');
+        }
+
+        // Get config for current mode
+        const config = ModeBannerConfig[currentMode];
+
+        if (config) {
+            // Show banner with appropriate content
+            iconEl.textContent = config.icon;
+            titleEl.textContent = config.title;
+
+            // Dynamic description based on mode state
+            let desc = config.desc;
+            if (currentMode === EditMode.ADD_ITC) {
+                desc = pendingFirstTub
+                    ? 'Click second tubercle to complete the connection'
+                    : 'Click first tubercle, then click second to connect';
+            } else if (currentMode === EditMode.ADD_CHAIN && chainCurrentId !== null) {
+                desc = `Selected: #${chainCurrentId}. Click to add connected tubercle or use arrow keys.`;
+            }
+            descEl.textContent = desc;
+
+            banner.classList.add(config.colorClass);
+            banner.style.display = 'flex';
+
+            // Add glow to image container
+            if (container) {
+                const modeClass = 'edit-mode-' + config.colorClass.replace('mode-', '');
+                container.classList.add('edit-mode-active');
+                container.classList.add(modeClass);
+                console.log('Added classes to container:', 'edit-mode-active', modeClass, container.classList.toString());
+            } else {
+                console.warn('imageContainer not found!');
+            }
+        } else {
+            // Hide banner
+            banner.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update the toolbar mode badge
+     */
+    function updateToolbarBadge() {
+        let badge = document.getElementById('toolbarModeBadge');
+        const toolbar = document.querySelector('.image-toolbar');
+
+        if (!toolbar) return;
+
+        const config = ModeBannerConfig[currentMode];
+
+        if (config) {
+            // Create badge if it doesn't exist
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.id = 'toolbarModeBadge';
+                badge.className = 'toolbar-mode-badge';
+                badge.innerHTML = `
+                    <span class="toolbar-mode-badge-text"></span>
+                    <span class="toolbar-mode-badge-exit">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </span>
+                `;
+                badge.addEventListener('click', () => setMode(EditMode.NONE));
+
+                // Insert after filename
+                const filename = document.getElementById('toolbarFilename');
+                if (filename && filename.nextSibling) {
+                    toolbar.insertBefore(badge, filename.nextSibling);
+                } else {
+                    toolbar.appendChild(badge);
+                }
+            }
+
+            // Update badge content and style
+            badge.classList.remove('mode-add', 'mode-delete', 'mode-move', 'mode-select');
+            badge.classList.add(config.colorClass);
+            badge.querySelector('.toolbar-mode-badge-text').textContent = config.title;
+            badge.style.display = 'inline-flex';
+        } else {
+            // Hide badge
+            if (badge) {
+                badge.style.display = 'none';
+            }
+        }
+    }
+
+    /**
      * Update UI to reflect current mode
      */
     function updateModeUI() {
@@ -276,34 +427,77 @@ window.editor = (function() {
                 hintEl.style.display = 'none';
             }
         }
+
+        // Update mode banner and toolbar badge
+        updateModeBanner();
+        updateToolbarBadge();
     }
 
     /**
      * Update cursor based on mode
+     * Uses data URI SVG cursors for cross-browser compatibility
      */
     function updateCursor() {
         const container = document.getElementById('imageContainer');
         if (!container) return;
 
-        switch (currentMode) {
-            case EditMode.ADD_TUB:
-            case EditMode.ADD_CHAIN:
-                container.style.cursor = 'crosshair';
-                break;
-            case EditMode.ADD_ITC:
-                container.style.cursor = 'pointer';
-                break;
-            case EditMode.MOVE:
-                container.style.cursor = 'move';
-                break;
-            case EditMode.DELETE_MULTI_TUB:
-            case EditMode.DELETE_MULTI_ITC:
-            case EditMode.AREA_SELECT:
-                container.style.cursor = 'crosshair';
-                break;
-            default:
-                container.style.cursor = '';
+        // Data URI SVG cursors - more reliable than file paths
+        // Hotspot at center (12, 12) for 24x24 cursors
+        const cursorSvgs = {
+            // Add tubercle: circle with plus (blue)
+            [EditMode.ADD_TUB]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="white" stroke-width="2.5"/><circle cx="12" cy="12" r="9" fill="none" stroke="#3b82f6" stroke-width="1.5"/><line x1="12" y1="6" x2="12" y2="18" stroke="white" stroke-width="2.5"/><line x1="12" y1="6" x2="12" y2="18" stroke="#3b82f6" stroke-width="1.5"/><line x1="6" y1="12" x2="18" y2="12" stroke="white" stroke-width="2.5"/><line x1="6" y1="12" x2="18" y2="12" stroke="#3b82f6" stroke-width="1.5"/></svg>`,
+
+            // Add connection: two circles with line (blue)
+            [EditMode.ADD_ITC]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="6" cy="12" r="4" fill="none" stroke="white" stroke-width="2"/><circle cx="6" cy="12" r="4" fill="none" stroke="#3b82f6" stroke-width="1"/><circle cx="18" cy="12" r="4" fill="none" stroke="white" stroke-width="2"/><circle cx="18" cy="12" r="4" fill="none" stroke="#3b82f6" stroke-width="1"/><line x1="10" y1="12" x2="14" y2="12" stroke="white" stroke-width="2.5"/><line x1="10" y1="12" x2="14" y2="12" stroke="#3b82f6" stroke-width="1.5"/></svg>`,
+
+            // Chain: three connected circles (blue)
+            [EditMode.ADD_CHAIN]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="5" cy="12" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="5" cy="12" r="3" fill="none" stroke="#3b82f6" stroke-width="1"/><circle cx="12" cy="12" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="#3b82f6" stroke-width="1"/><circle cx="19" cy="12" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="19" cy="12" r="3" fill="none" stroke="#3b82f6" stroke-width="1"/><line x1="8" y1="12" x2="9" y2="12" stroke="white" stroke-width="2"/><line x1="8" y1="12" x2="9" y2="12" stroke="#3b82f6" stroke-width="1"/><line x1="15" y1="12" x2="16" y2="12" stroke="white" stroke-width="2"/><line x1="15" y1="12" x2="16" y2="12" stroke="#3b82f6" stroke-width="1"/></svg>`,
+
+            // Move: four-way arrow (amber)
+            [EditMode.MOVE]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2 L15 6 L13 6 L13 11 L18 11 L18 9 L22 12 L18 15 L18 13 L13 13 L13 18 L15 18 L12 22 L9 18 L11 18 L11 13 L6 13 L6 15 L2 12 L6 9 L6 11 L11 11 L11 6 L9 6 Z" fill="#f59e0b" stroke="white" stroke-width="1"/></svg>`,
+
+            // Delete tubercle: circle with X (red)
+            [EditMode.DELETE_MULTI_TUB]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="white" stroke-width="2.5"/><circle cx="12" cy="12" r="9" fill="none" stroke="#ef4444" stroke-width="1.5"/><line x1="8" y1="8" x2="16" y2="16" stroke="white" stroke-width="2.5"/><line x1="8" y1="8" x2="16" y2="16" stroke="#ef4444" stroke-width="1.5"/><line x1="16" y1="8" x2="8" y2="16" stroke="white" stroke-width="2.5"/><line x1="16" y1="8" x2="8" y2="16" stroke="#ef4444" stroke-width="1.5"/></svg>`,
+
+            // Delete connection: line with X (red)
+            [EditMode.DELETE_MULTI_ITC]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="12" x2="20" y2="12" stroke="white" stroke-width="3.5"/><line x1="4" y1="12" x2="20" y2="12" stroke="#ef4444" stroke-width="2"/><line x1="9" y1="7" x2="15" y2="17" stroke="white" stroke-width="2.5"/><line x1="9" y1="7" x2="15" y2="17" stroke="#ef4444" stroke-width="1.5"/><line x1="15" y1="7" x2="9" y2="17" stroke="white" stroke-width="2.5"/><line x1="15" y1="7" x2="9" y2="17" stroke="#ef4444" stroke-width="1.5"/></svg>`,
+
+            // Area select: dashed rectangle (purple)
+            [EditMode.AREA_SELECT]: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-dasharray="4,2"/><rect x="4" y="4" width="16" height="16" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,2"/><rect x="2" y="2" width="4" height="4" fill="white" stroke="#8b5cf6" stroke-width="1"/><rect x="18" y="2" width="4" height="4" fill="white" stroke="#8b5cf6" stroke-width="1"/><rect x="2" y="18" width="4" height="4" fill="white" stroke="#8b5cf6" stroke-width="1"/><rect x="18" y="18" width="4" height="4" fill="white" stroke="#8b5cf6" stroke-width="1"/></svg>`,
+        };
+
+        const fallbacks = {
+            [EditMode.ADD_TUB]: 'crosshair',
+            [EditMode.ADD_ITC]: 'pointer',
+            [EditMode.ADD_CHAIN]: 'crosshair',
+            [EditMode.MOVE]: 'move',
+            [EditMode.DELETE_MULTI_TUB]: 'crosshair',
+            [EditMode.DELETE_MULTI_ITC]: 'crosshair',
+            [EditMode.AREA_SELECT]: 'crosshair',
+        };
+
+        const svg = cursorSvgs[currentMode];
+        const fallback = fallbacks[currentMode];
+
+        // Get all elements that need cursor styling
+        const wrapper = document.getElementById('imageWrapper');
+        const image = document.getElementById('mainImage');
+        const canvas = document.getElementById('overlayCanvas');
+
+        let cursorValue = '';
+        if (svg) {
+            // Encode the SVG for use in a data URI
+            const encoded = encodeURIComponent(svg)
+                .replace(/'/g, '%27')
+                .replace(/"/g, '%22');
+            cursorValue = `url("data:image/svg+xml,${encoded}") 12 12, ${fallback}`;
         }
+
+        // Apply cursor to container and all child elements including canvas
+        container.style.cursor = cursorValue;
+        if (wrapper) wrapper.style.cursor = cursorValue;
+        if (image) image.style.cursor = cursorValue;
+        if (canvas) canvas.style.cursor = cursorValue;
     }
 
     /**
@@ -1919,6 +2113,14 @@ window.editor = (function() {
                 setData(e.detail.tubercles, e.detail.edges);
             }
         });
+
+        // Banner exit button
+        const bannerExitBtn = document.getElementById('editModeBannerExit');
+        if (bannerExitBtn) {
+            bannerExitBtn.addEventListener('click', () => {
+                setMode(EditMode.NONE);
+            });
+        }
 
         // Initialize buttons
         const addTubBtn = document.getElementById('addTubBtn');

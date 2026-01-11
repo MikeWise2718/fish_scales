@@ -6,6 +6,22 @@
 <div class="workspace">
     <!-- Left Panel: Image Display -->
     <div class="image-panel">
+        <!-- Edit Mode Banner - shows when edit mode is active -->
+        <div class="edit-mode-banner" id="editModeBanner" style="display: none;">
+            <div class="edit-mode-banner-content">
+                <span class="edit-mode-banner-icon" id="editModeBannerIcon"></span>
+                <div class="edit-mode-banner-text">
+                    <span class="edit-mode-banner-title" id="editModeBannerTitle"></span>
+                    <span class="edit-mode-banner-desc" id="editModeBannerDesc"></span>
+                </div>
+            </div>
+            <button type="button" class="edit-mode-banner-exit" id="editModeBannerExit" title="Exit mode (Esc)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
         <div class="image-container" id="imageContainer">
             <div class="image-wrapper" id="imageWrapper">
                 <img id="mainImage" src="" alt="Main Image" style="display: none;">

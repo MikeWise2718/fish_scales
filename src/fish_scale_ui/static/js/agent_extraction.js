@@ -1,5 +1,5 @@
 /**
- * Fish Scale Measurement UI - Agent Extraction Tab
+ * Fish Scale Measurement UI - AgenticExtraction Tab
  *
  * This module handles LLM agent-based optimization for tubercle detection.
  * The agent iteratively refines detection parameters to maximize hexagonalness score.
@@ -1089,7 +1089,7 @@ window.agentExtraction = (function() {
                 stopPolling();
                 updateStatus('Extraction complete');
                 updateUI();
-                window.app?.showToast('Agent extraction complete', 'success');
+                window.app?.showToast('AgenticExtraction complete', 'success');
 
                 // Refresh data from MCP state
                 refreshFromMCP();
@@ -1132,10 +1132,20 @@ window.agentExtraction = (function() {
     function parseLogLines(logLines) {
         // Look for phase, cost, and action information in log output
         // Note: iteration/tubercles/edges now come from STATUS: lines via updateStatus()
-        for (const line of logLines.slice(-20)) {  // Check last 20 lines
-            // Skip LLM prompt/response lines - they contain few-shot examples
-            if (line.includes('LLM-Prompt:') || line.includes('LLM-Response:')) {
-                continue;
+        // Check all available lines (backend keeps last 50, so check all of them)
+        for (const line of logLines) {
+            // Parse LLM prompt/response lines FIRST before any continue statements
+            // These need to be captured for the LLM Communication display
+            const promptMatch = line.match(/LLM-Prompt:\s*(.+)$/i);
+            if (promptMatch) {
+                state.lastPrompt = promptMatch[1].replace(/ \| /g, '\n');
+                continue;  // Skip other parsing for prompt lines
+            }
+
+            const responseMatch = line.match(/LLM-Response:\s*(.+)$/i);
+            if (responseMatch) {
+                state.currentReasoning = responseMatch[1].replace(/ \| /g, '\n');
+                continue;  // Skip other parsing for response lines
             }
 
             // Skip STATUS lines - already parsed by backend
@@ -1196,20 +1206,8 @@ window.agentExtraction = (function() {
                 state.lastPromptSize = parseInt(promptStatsMatch[1], 10);
             }
 
-            // Parse full prompt (multiline, pipe-separated)
-            // Format: "LLM-Prompt: prompt text here | with pipes for newlines"
-            const promptMatch = line.match(/LLM-Prompt:\s*(.+)$/i);
-            if (promptMatch) {
-                state.lastPrompt = promptMatch[1].replace(/ \| /g, '\n');
-            }
-
-            // Parse full LLM response JSON
-            // Format: "LLM-Response: { | "text": "...", | "tool_calls": [...] | }"
-            const responseMatch = line.match(/LLM-Response:\s*(.+)$/i);
-            if (responseMatch) {
-                // Convert pipe separators back to newlines for display
-                state.currentReasoning = responseMatch[1].replace(/ \| /g, '\n');
-            }
+            // NOTE: LLM-Prompt and LLM-Response parsing moved to top of loop
+            // to ensure they are captured before any continue statements
 
             // Parse hexagonalness scores - but NOT "Target hexagonalness" which is a config value
             // Match patterns like "Hexagonalness: 0.72" or "hexagonalness 0.72" but not "Target hexagonalness: 0.7"
@@ -1410,7 +1408,7 @@ window.agentExtraction = (function() {
 
         if (startBtn) {
             startBtn.disabled = state.isRunning;
-            startBtn.textContent = state.isRunning ? 'Running...' : 'Start Agent Extraction';
+            startBtn.textContent = state.isRunning ? 'Running...' : 'Start AgenticExtraction';
         }
         if (stopBtn) {
             stopBtn.disabled = !state.isRunning;
@@ -1454,7 +1452,7 @@ window.agentExtraction = (function() {
      * Initialize the module
      */
     function init() {
-        console.log('Initializing agent extraction module');
+        console.log('Initializing AgenticExtraction module');
 
         // Load available providers
         loadProviders();

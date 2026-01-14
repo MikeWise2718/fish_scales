@@ -176,15 +176,14 @@
             <button class="tab-header active" data-tab="image">Image</button>
             <button class="tab-header" data-tab="calibration">Calibration</button>
             <button class="tab-header" data-tab="extraction">Extraction</button>
+            {% if agent_tabs.extraction %}
+            <button class="tab-header" data-tab="agent-extraction">AgenticExtraction</button>
+            {% endif %}
             <button class="tab-header" data-tab="edit">Edit</button>
             <button class="tab-header" data-tab="data">Data</button>
             <button class="tab-header" data-tab="log">Log</button>
             <button class="tab-header" data-tab="settings">Settings</button>
             <button class="tab-header" data-tab="about">About</button>
-            <!-- DEBUG: agent_tabs.extraction = {{ agent_tabs.extraction }} -->
-            {% if agent_tabs.extraction %}
-            <button class="tab-header" data-tab="agent-extraction">Agent Extraction</button>
-            {% endif %}
             {% if agent_tabs.editing %}
             <button class="tab-header" data-tab="agent-editing">Agent Editing</button>
             {% endif %}
@@ -1455,7 +1454,7 @@
                     <table class="about-table">
                         <tr>
                             <td>Application Version</td>
-                            <td>{{ version_info.app_version }}</td>
+                            <td>{{ version_info.app_version }} ({{ version_info.app_version_date }})</td>
                         </tr>
                         <tr>
                             <td>Python Version</td>
@@ -1490,9 +1489,9 @@
             </div>
 
             {% if agent_tabs.extraction %}
-            <!-- Agent Extraction Tab -->
+            <!-- AgenticExtraction Tab -->
             <div class="tab-pane" data-tab="agent-extraction">
-                <h2>Agent Extraction</h2>
+                <h2>AgenticExtraction</h2>
                 <p class="tab-description">Configure and run LLM-powered automated tubercle detection.</p>
 
                 <!-- Configuration Section -->
@@ -1734,7 +1733,7 @@
                     <h3>Run Agent</h3>
                     <div class="extraction-buttons agent-controls">
                         <button type="button" class="btn btn-primary" id="startAgentBtn">
-                            Start Agent Extraction
+                            Start AgenticExtraction
                         </button>
                         <button type="button" class="btn btn-secondary" id="stopAgentBtn" disabled>
                             Stop

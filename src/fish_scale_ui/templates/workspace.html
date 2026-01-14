@@ -663,6 +663,14 @@
                         </button>
                         <a href="#" class="help-icon" data-edit="add-chain" title="Help">?</a>
                     </div>
+                    <div class="default-diameter-control" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                        <label for="defaultTubercleDiameter" class="param-label">Default Diameter (µm):</label>
+                        <input type="number" id="defaultTubercleDiameter" class="param-input"
+                               step="0.001" min="0.001" placeholder="auto"
+                               title="Diameter for new tubercles. Leave empty to use mean of existing tubercles.">
+                        <a href="#" class="help-icon" data-edit="default-diameter" title="Help">?</a>
+                        <span class="hint" id="defaultDiameterHint" style="margin-left: 0.5rem; font-size: 0.85em;">Requires calibration</span>
+                    </div>
                 </div>
 
                 <div class="edit-section">

@@ -23,6 +23,7 @@ def save_annotations(
     sets: list = None,
     activeSetId: str = None,
     custom_filename: str = None,
+    defaultTubercleDiameterUm: float = None,
 ) -> dict:
     """
     Save annotation data to files.
@@ -49,6 +50,7 @@ def save_annotations(
         sets: List of set dicts (v2/v3 format)
         activeSetId: ID of the active set (v2/v3 format)
         custom_filename: Optional custom base filename for Save As
+        defaultTubercleDiameterUm: Default diameter for new tubercles in micrometers
 
     Returns:
         Dict with success status and file paths
@@ -139,6 +141,9 @@ def save_annotations(
             'activeSetId': activeSetId,
             'sets': sets or [],
         }
+        # Add optional per-image settings
+        if defaultTubercleDiameterUm is not None:
+            annotations_data['defaultTubercleDiameterUm'] = defaultTubercleDiameterUm
     else:
         # V1 format (legacy) - for backward compatibility only
         annotations_data = {

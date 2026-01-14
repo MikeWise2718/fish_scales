@@ -71,6 +71,7 @@ window.editor = (function() {
     let chainNeighborIndex = -1; // Currently highlighted neighbor (-1 = none)
     let allowDeleteWithoutConfirm = false;
     let defaultRadius = null; // Will be set from mean diameter
+    let userDefaultDiameterUm = null; // User-specified default diameter in µm (from input field)
 
     // Data references (synced with overlay and data modules)
     let tubercles = [];
@@ -80,6 +81,75 @@ window.editor = (function() {
     // Get current calibration for conversions
     function getCalibration() {
         return window.calibration?.getCurrentCalibration();
+    }
+
+    /**
+     * Get the effective default radius for new tubercles.
+     * Uses user-specified diameter if set, otherwise falls back to calculated mean.
+     * @returns {number} Radius in pixels
+     */
+    function getEffectiveDefaultRadius() {
+        // If user has specified a diameter in µm, convert to radius in pixels
+        if (userDefaultDiameterUm !== null && userDefaultDiameterUm > 0) {
+            const calibration = getCalibration();
+            const umPerPx = calibration?.um_per_px;
+            if (umPerPx && umPerPx > 0) {
+                return (userDefaultDiameterUm / 2) / umPerPx; // diameter -> radius, µm -> px
+            }
+        }
+        // Fall back to calculated default
+        return defaultRadius || 10;
+    }
+
+    /**
+     * Set the user-specified default diameter (in µm)
+     * @param {number|null} diameterUm - Diameter in micrometers, or null to use auto
+     */
+    function setDefaultDiameterUm(diameterUm) {
+        userDefaultDiameterUm = diameterUm;
+        updateDefaultDiameterHint();
+    }
+
+    /**
+     * Get the user-specified default diameter (in µm)
+     * @returns {number|null}
+     */
+    function getDefaultDiameterUm() {
+        return userDefaultDiameterUm;
+    }
+
+    /**
+     * Update the hint text for the default diameter input
+     */
+    function updateDefaultDiameterHint() {
+        const hint = document.getElementById('defaultDiameterHint');
+        const input = document.getElementById('defaultTubercleDiameter');
+        if (!hint) return;
+
+        const calibration = getCalibration();
+        const umPerPx = calibration?.um_per_px;
+
+        if (!umPerPx || umPerPx <= 0) {
+            hint.textContent = 'Requires calibration';
+            hint.style.color = 'var(--panel-dark-text-dim)';
+            if (input) input.disabled = true;
+            return;
+        }
+
+        if (input) input.disabled = false;
+
+        // Show current auto value if field is empty
+        if (!userDefaultDiameterUm && tubercles.length > 0) {
+            const meanDiamUm = tubercles.reduce((sum, t) => sum + (t.radius_px * 2 * umPerPx), 0) / tubercles.length;
+            hint.textContent = `Auto: ${meanDiamUm.toFixed(3)} µm`;
+            hint.style.color = 'var(--panel-dark-text-muted)';
+        } else if (!userDefaultDiameterUm) {
+            const defaultDiamUm = (defaultRadius || 10) * 2 * umPerPx;
+            hint.textContent = `Default: ${defaultDiamUm.toFixed(3)} µm`;
+            hint.style.color = 'var(--panel-dark-text-muted)';
+        } else {
+            hint.textContent = '';
+        }
     }
 
     /**
@@ -110,6 +180,9 @@ window.editor = (function() {
 
         // Update regenerate button state
         updateRegenerateButtonState();
+
+        // Update default diameter hint (shows auto value based on current data)
+        updateDefaultDiameterHint();
     }
 
     /**
@@ -601,13 +674,14 @@ window.editor = (function() {
     function addTubercle(x, y) {
         const calibration = getCalibration();
         const umPerPx = calibration?.um_per_px || 0.14;
+        const effectiveRadius = getEffectiveDefaultRadius();
 
         const newTub = {
             id: nextTubId++,
             centroid_x: x,
             centroid_y: y,
-            radius_px: defaultRadius,
-            diameter_um: (defaultRadius * 2) * umPerPx,
+            radius_px: effectiveRadius,
+            diameter_um: (effectiveRadius * 2) * umPerPx,
             circularity: 1.0, // Perfect circle for manual addition
         };
 
@@ -624,7 +698,7 @@ window.editor = (function() {
         refreshDisplays();
         markDirty();
         window.sets?.trackEdit('added_tubercles');
-        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1) });
+        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: effectiveRadius.toFixed(1) });
 
         // Update regenerate button state
         updateRegenerateButtonState();
@@ -656,13 +730,14 @@ window.editor = (function() {
 
         const calibration = getCalibration();
         const umPerPx = calibration?.um_per_px || 0.14;
+        const effectiveRadius = getEffectiveDefaultRadius();
 
         const newTub = {
             id: nextTubId++,
             centroid_x: x,
             centroid_y: y,
-            radius_px: defaultRadius,
-            diameter_um: (defaultRadius * 2) * umPerPx,
+            radius_px: effectiveRadius,
+            diameter_um: (effectiveRadius * 2) * umPerPx,
             circularity: 1.0,
         };
 
@@ -727,7 +802,7 @@ window.editor = (function() {
         }
         updateChainNeighbors();
         updateModeUI();
-        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: defaultRadius.toFixed(1), chain: true });
+        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: effectiveRadius.toFixed(1), chain: true });
 
         // Update regenerate button state
         updateRegenerateButtonState();
@@ -2153,6 +2228,33 @@ window.editor = (function() {
             });
         }
 
+        // Default tubercle diameter input
+        const defaultDiameterInput = document.getElementById('defaultTubercleDiameter');
+        if (defaultDiameterInput) {
+            defaultDiameterInput.addEventListener('change', (e) => {
+                const val = e.target.value.trim();
+                if (val === '') {
+                    setDefaultDiameterUm(null);
+                } else {
+                    const num = parseFloat(val);
+                    if (!isNaN(num) && num > 0) {
+                        setDefaultDiameterUm(num);
+                    }
+                }
+                // Mark as dirty since per-image setting changed
+                markDirty();
+            });
+            // Also handle input event for immediate feedback
+            defaultDiameterInput.addEventListener('input', () => {
+                updateDefaultDiameterHint();
+            });
+        }
+
+        // Listen for calibration changes to update hint
+        document.addEventListener('calibrationChanged', () => {
+            updateDefaultDiameterHint();
+        });
+
         const moveBtn = document.getElementById('moveBtn');
         if (moveBtn) {
             moveBtn.addEventListener('click', () => {
@@ -2411,5 +2513,8 @@ window.editor = (function() {
         chainCyclePrev,
         regenerateConnections,
         hasMultiSelection: () => window.overlay?.hasMultiSelection() || false,
+        getDefaultDiameterUm,
+        setDefaultDiameterUm,
+        updateDefaultDiameterHint,
     };
 })();

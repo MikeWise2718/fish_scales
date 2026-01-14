@@ -48,6 +48,7 @@ Version 3.0 introduces per-set calibration snapshots for provenance tracking and
     "min_circularity": 0.5
   },
   "activeSetId": "set-abc123",
+  "defaultTubercleDiameterUm": 4.5,
   "sets": [
     {
       "id": "set-abc123",
@@ -113,6 +114,7 @@ Version 3.0 introduces per-set calibration snapshots for provenance tracking and
 | `version` | String `"3.0"` instead of integer |
 | `purpose` | New field describing file purpose |
 | `modified` | Timestamp of last modification |
+| `defaultTubercleDiameterUm` | **Optional**: User-specified default diameter (µm) for new tubercles |
 | `sets[].calibration_um_per_pixel` | **New**: Per-set calibration snapshot |
 | `sets[].tubercles[].source` | **New**: `"extracted"` or `"manual"` |
 | `sets[].history[].calibration_um_per_pixel` | **New**: Calibration recorded in history events |

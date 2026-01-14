@@ -1006,6 +1006,7 @@ def save_annotations():
         activeSetId = data.get('activeSetId')
         statistics = data.get('statistics', {})
         parameters = data.get('parameters', {})
+        defaultTubercleDiameterUm = data.get('defaultTubercleDiameterUm')
 
         # Count total tubercles across all sets
         total_tubercles = sum(len(s.get('tubercles', [])) for s in sets)
@@ -1028,6 +1029,7 @@ def save_annotations():
                 statistics=statistics,
                 parameters=parameters,
                 custom_filename=custom_filename,
+                defaultTubercleDiameterUm=defaultTubercleDiameterUm,
             )
 
             # Skip overwrite warning if we've already saved this session

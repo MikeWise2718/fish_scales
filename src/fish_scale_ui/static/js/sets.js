@@ -66,6 +66,12 @@ window.sets = (function() {
     function init() {
         clear();
         createSet('Base');
+        // Clear per-image settings
+        window.editor?.setDefaultDiameterUm?.(null);
+        const input = document.getElementById('defaultTubercleDiameter');
+        if (input) {
+            input.value = '';
+        }
     }
 
     /**
@@ -734,7 +740,7 @@ window.sets = (function() {
             await consolidateEdits(id);
         }
 
-        return {
+        const result = {
             activeSetId: currentSetId,
             sets: setOrder.map(id => ({
                 id: sets[id].id,
@@ -748,6 +754,14 @@ window.sets = (function() {
                 history: sets[id].history,
             })),
         };
+
+        // Include per-image settings
+        const defaultDiameterUm = window.editor?.getDefaultDiameterUm?.();
+        if (defaultDiameterUm !== null && defaultDiameterUm !== undefined) {
+            result.defaultTubercleDiameterUm = defaultDiameterUm;
+        }
+
+        return result;
     }
 
     /**
@@ -801,6 +815,23 @@ window.sets = (function() {
             currentSetId = data.activeSetId;
         } else {
             currentSetId = setOrder[0];
+        }
+
+        // Load per-image settings
+        if (data.defaultTubercleDiameterUm !== undefined && data.defaultTubercleDiameterUm !== null) {
+            window.editor?.setDefaultDiameterUm?.(data.defaultTubercleDiameterUm);
+            // Update UI input field
+            const input = document.getElementById('defaultTubercleDiameter');
+            if (input) {
+                input.value = data.defaultTubercleDiameterUm.toFixed(3);
+            }
+        } else {
+            // Clear the setting if not present in loaded data
+            window.editor?.setDefaultDiameterUm?.(null);
+            const input = document.getElementById('defaultTubercleDiameter');
+            if (input) {
+                input.value = '';
+            }
         }
 
         // Dispatch event

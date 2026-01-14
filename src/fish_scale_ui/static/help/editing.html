@@ -155,6 +155,8 @@
             <li><a href="#overview">Overview</a></li>
             <li><a href="#add-tubercle">Add Tubercle</a></li>
             <li><a href="#add-connection">Add Connection</a></li>
+            <li><a href="#add-chain">Chain Mode</a></li>
+            <li><a href="#default-diameter">Default Diameter</a></li>
             <li><a href="#move">Move Tubercle</a></li>
             <li><a href="#delete-selected">Delete Selected</a></li>
             <li><a href="#delete-multiple-tub">Delete Multiple Tubercles</a></li>
@@ -198,7 +200,7 @@
             <li>Click the <strong>Add Tubercle</strong> button (shows a circle with a + sign)</li>
             <li>The cursor changes to a crosshair and the status shows "Click on image to place tubercle"</li>
             <li>Click anywhere on the image to place a new tubercle at that location</li>
-            <li>The tubercle is created with the mean diameter of existing tubercles</li>
+            <li>The tubercle is created with the <a href="#default-diameter">Default Diameter</a> (see below)</li>
             <li>You remain in Add mode to place more tubercles. Press <kbd>Escape</kbd> to exit</li>
         </ol>
 
@@ -222,6 +224,57 @@
 
         <div class="note">
             <strong>Note:</strong> You cannot create a duplicate connection between the same two tubercles, and you cannot connect a tubercle to itself.
+        </div>
+    </div>
+
+    <div class="section" id="add-chain">
+        <h3 class="param-name">Chain Mode</h3>
+        <p>Chain Mode allows you to add multiple connected tubercles in sequence, which is useful for tracing rows of tubercles.</p>
+
+        <ol class="step-list">
+            <li>Click the <strong>Chain Mode</strong> button (shows three connected circles)</li>
+            <li>Click on an existing tubercle to start the chain, or click empty space to create a new starting tubercle</li>
+            <li>Each subsequent click adds a new tubercle automatically connected to the previous one</li>
+            <li>Use arrow keys to navigate between neighbors</li>
+            <li>Press <kbd>Escape</kbd> to exit Chain Mode</li>
+        </ol>
+
+        <div class="tip">
+            <strong>Tip:</strong> Click on any existing tubercle to make it the current node in the chain. This lets you branch off from existing tubercles.
+        </div>
+    </div>
+
+    <div class="section" id="default-diameter">
+        <h3 class="param-name">Default Diameter</h3>
+        <p>Controls the diameter (in micrometers) of newly added tubercles.</p>
+
+        <h4>How the Default is Calculated</h4>
+        <p>When the field is <strong>empty</strong> (showing "auto"), the diameter for new tubercles is determined as follows:</p>
+
+        <ol class="step-list">
+            <li><strong>If tubercles already exist:</strong> Uses the <em>mean diameter</em> of all existing tubercles in the current set</li>
+            <li><strong>If no tubercles exist:</strong> Uses a fallback of 10 pixels (converted to µm using calibration)</li>
+        </ol>
+
+        <p>The hint text next to the field shows the current auto-calculated value (e.g., "Auto: 4.523 µm").</p>
+
+        <h4>Setting a Custom Diameter</h4>
+        <p>Enter a specific value in micrometers to override the automatic calculation. This is useful when:</p>
+        <ul>
+            <li>You know the expected tubercle size from reference literature</li>
+            <li>You want all new tubercles to have a consistent size</li>
+            <li>The existing tubercles have highly variable sizes and the mean isn't representative</li>
+        </ul>
+
+        <h4>Storage</h4>
+        <p>The custom diameter value is saved <strong>per-image</strong> in the annotations file. When you reload the image, your custom value is restored.</p>
+
+        <div class="note">
+            <strong>Requires Calibration:</strong> This field is disabled until calibration is set, because the diameter is specified in micrometers which requires knowing the µm/pixel conversion factor.
+        </div>
+
+        <div class="tip">
+            <strong>Tip:</strong> After adding a tubercle, you can still adjust its individual size using the Radius controls while it's selected.
         </div>
     </div>
 

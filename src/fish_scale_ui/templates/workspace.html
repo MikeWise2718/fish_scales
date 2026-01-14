@@ -1495,8 +1495,16 @@
                 <p class="tab-description">Configure and run LLM-powered automated tubercle detection.</p>
 
                 <!-- Configuration Section -->
-                <div class="config-section agent-section">
-                    <h3>Agent Configuration</h3>
+                <div class="config-section agent-section agent-section-collapsible" data-section="agent-config">
+                    <h3 class="agent-section-header">
+                        <span class="agent-section-title">Agent Configuration</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
                     <div class="agent-config-form">
                         <div class="param-row agent-config-row">
                             <label for="agentProvider">Provider</label>
@@ -1549,11 +1557,20 @@
                                    min="5" max="100" step="5" value="30">
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 <!-- Status Section -->
-                <div class="config-section agent-section">
-                    <h3>Status</h3>
+                <div class="config-section agent-section agent-section-collapsible" data-section="agent-status">
+                    <h3 class="agent-section-header">
+                        <span class="agent-section-title">Status</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
                     <div id="agentStatusPanel" class="agent-status-section">
                         <div class="agent-status-row">
                             <span class="agent-status-label">State:</span>
@@ -1588,27 +1605,54 @@
                             <span id="agentStepTime" class="agent-status-value">-</span>
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 <!-- Current Parameters Section -->
-                <div class="config-section agent-section">
-                    <h3>Current Parameters</h3>
+                <div class="config-section agent-section agent-section-collapsible" data-section="agent-params">
+                    <h3 class="agent-section-header">
+                        <span class="agent-section-title">Current Parameters</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
                     <div id="agentParamsDisplay" class="agent-params-display">
                         <p class="hint">Parameters will be displayed when agent is configured.</p>
+                    </div>
                     </div>
                 </div>
 
                 <!-- Progress Chart Section -->
-                <div class="config-section agent-section">
-                    <h3>Progress</h3>
+                <div class="config-section agent-section agent-section-collapsible" data-section="agent-progress">
+                    <h3 class="agent-section-header">
+                        <span class="agent-section-title">Progress</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
                     <div class="agent-chart-container">
                         <canvas id="agentChart"></canvas>
                     </div>
+                    </div>
                 </div>
 
-                <!-- LLM Communication Section (Collapsible) -->
-                <div class="config-section agent-section">
-                    <h3>LLM Communication</h3>
+                <!-- LLM Communication Section -->
+                <div class="config-section agent-section agent-section-collapsible" data-section="agent-llm">
+                    <h3 class="agent-section-header">
+                        <span class="agent-section-title">LLM Communication</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
 
                     <!-- Last Prompt -->
                     <div class="agent-collapsible collapsed">
@@ -1684,20 +1728,20 @@
                             <pre id="agentActionSummary">No actions yet.</pre>
                         </div>
                     </div>
+                    </div>
                 </div>
 
-                <!-- Costs Section (Collapsible) -->
-                <div class="config-section agent-section">
-                    <div class="agent-collapsible collapsed">
-                        <div class="agent-collapsible-header">
-                            <h3 style="margin: 0;">Costs</h3>
-                            <span class="agent-collapsible-toggle">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </span>
-                        </div>
-                        <div class="agent-collapsible-content">
+                <!-- Costs Section -->
+                <div class="config-section agent-section agent-section-collapsible" data-section="agent-costs">
+                    <h3 class="agent-section-header">
+                        <span class="agent-section-title">Costs</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
                             <div class="agent-costs-panel">
                                 <div class="agent-cost-row">
                                     <span class="agent-cost-label">Model:</span>
@@ -1724,7 +1768,6 @@
                                     <span id="agentCostLastStep" class="agent-cost-value">$0.0000</span>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 </div>
 
@@ -1746,6 +1789,34 @@
                         </button>
                         <span class="spinner" id="agentSpinner" style="display: none;"></span>
                     </div>
+                </div>
+
+                <!-- Status Line (always visible at bottom) -->
+                <div class="agent-status-line" id="agentStatusLine">
+                    <span class="status-line-item">
+                        <span class="status-line-label">State:</span>
+                        <span id="agentStatusLineState" class="status-line-value">Idle</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">Iter:</span>
+                        <span id="agentStatusLineIter" class="status-line-value">-</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">Best:</span>
+                        <span id="agentStatusLineBest" class="status-line-value">-</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">TUB:</span>
+                        <span id="agentStatusLineTub" class="status-line-value">-</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">Time:</span>
+                        <span id="agentStatusLineTime" class="status-line-value">-</span>
+                    </span>
                 </div>
             </div>
             {% endif %}

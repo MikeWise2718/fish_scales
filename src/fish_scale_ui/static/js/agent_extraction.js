@@ -743,6 +743,9 @@ window.agentExtraction = (function() {
 
         // Update step time
         updateStepTime();
+
+        // Update status line at bottom
+        updateStatusLine();
     }
 
     /**
@@ -1563,8 +1566,9 @@ window.agentExtraction = (function() {
      * Initialize collapsible sections for prompt/response display
      */
     function initCollapsibles() {
-        const collapsibles = document.querySelectorAll('.agent-collapsible-header');
-        collapsibles.forEach(header => {
+        // Initialize inner collapsibles (Last Prompt, Last Response, etc.)
+        const innerCollapsibles = document.querySelectorAll('.agent-collapsible-header');
+        innerCollapsibles.forEach(header => {
             header.addEventListener('click', (e) => {
                 // Don't toggle if clicking on a button
                 if (e.target.closest('button')) {
@@ -1576,6 +1580,86 @@ window.agentExtraction = (function() {
                 }
             });
         });
+
+        // Initialize main section collapsibles with localStorage persistence
+        const STORAGE_KEY = 'agentSectionCollapsed';
+        let collapsedSections = {};
+
+        // Load collapsed state from localStorage
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                collapsedSections = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.warn('Failed to load section collapse state:', e);
+        }
+
+        // Save collapsed state to localStorage
+        function saveCollapsedState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsedSections));
+            } catch (e) {
+                console.warn('Failed to save section collapse state:', e);
+            }
+        }
+
+        // Apply initial collapsed state and bind click handlers
+        const sectionCollapsibles = document.querySelectorAll('.agent-section-collapsible');
+        sectionCollapsibles.forEach(section => {
+            const sectionId = section.dataset.section;
+            const header = section.querySelector('.agent-section-header');
+
+            if (!sectionId || !header) return;
+
+            // Apply saved collapsed state
+            if (collapsedSections[sectionId]) {
+                section.classList.add('collapsed');
+            }
+
+            // Bind click handler
+            header.addEventListener('click', () => {
+                section.classList.toggle('collapsed');
+                collapsedSections[sectionId] = section.classList.contains('collapsed');
+                saveCollapsedState();
+            });
+        });
+    }
+
+    /**
+     * Update the status line at the bottom of the tab
+     */
+    function updateStatusLine() {
+        const stateEl = document.getElementById('agentStatusLineState');
+        const iterEl = document.getElementById('agentStatusLineIter');
+        const bestEl = document.getElementById('agentStatusLineBest');
+        const tubEl = document.getElementById('agentStatusLineTub');
+        const timeEl = document.getElementById('agentStatusLineTime');
+
+        if (stateEl) {
+            const mainStateEl = document.getElementById('agentState');
+            stateEl.textContent = mainStateEl ? mainStateEl.textContent : '-';
+        }
+
+        if (iterEl) {
+            const mainIterEl = document.getElementById('agentIteration');
+            iterEl.textContent = mainIterEl ? mainIterEl.textContent : '-';
+        }
+
+        if (bestEl) {
+            const mainBestEl = document.getElementById('agentBestScore');
+            bestEl.textContent = mainBestEl ? mainBestEl.textContent : '-';
+        }
+
+        if (tubEl) {
+            const mainTubEl = document.getElementById('agentTubercleCount');
+            tubEl.textContent = mainTubEl ? mainTubEl.textContent : '-';
+        }
+
+        if (timeEl) {
+            const mainTimeEl = document.getElementById('agentElapsed');
+            timeEl.textContent = mainTimeEl ? mainTimeEl.textContent : '-';
+        }
     }
 
     // Initialize on DOM ready

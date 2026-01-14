@@ -72,6 +72,9 @@ window.editor = (function() {
     let allowDeleteWithoutConfirm = false;
     let defaultRadius = null; // Will be set from mean diameter
     let userDefaultDiameterUm = null; // User-specified default diameter in µm (from input field)
+    let autoSizeEnabled = false; // Whether to auto-size tubercles from image analysis
+    let autoSizeRegionFactor = 6; // Region size multiplier for auto-size detection
+    let autoSizeShowRegion = false; // Whether to show the analyzed region as visual feedback
 
     // Data references (synced with overlay and data modules)
     let tubercles = [];
@@ -150,6 +153,138 @@ window.editor = (function() {
         } else {
             hint.textContent = '';
         }
+    }
+
+    /**
+     * Update the hint and enabled state for auto-size checkbox
+     */
+    function updateAutoSizeHint() {
+        const hint = document.getElementById('autoSizeHint');
+        const checkbox = document.getElementById('autoSizeEnabled');
+        if (!hint || !checkbox) return;
+
+        const calibration = getCalibration();
+        const umPerPx = calibration?.um_per_px;
+
+        if (!umPerPx || umPerPx <= 0) {
+            hint.textContent = 'Requires calibration';
+            hint.style.color = 'var(--panel-dark-text-dim)';
+            checkbox.disabled = true;
+            return;
+        }
+
+        checkbox.disabled = false;
+        hint.textContent = 'Uses current detection parameters';
+        hint.style.color = 'var(--panel-dark-text-muted)';
+    }
+
+    /**
+     * Set auto-size enabled state
+     * @param {boolean} enabled
+     */
+    function setAutoSizeEnabled(enabled) {
+        autoSizeEnabled = enabled;
+        // Persist to settings
+        window.settings?.set('editor.autoSizeEnabled', enabled);
+    }
+
+    /**
+     * Get auto-size enabled state
+     * @returns {boolean}
+     */
+    function isAutoSizeEnabled() {
+        return autoSizeEnabled;
+    }
+
+    /**
+     * Analyze a point to get auto-sized diameter
+     * @param {number} x - X coordinate in pixels
+     * @param {number} y - Y coordinate in pixels
+     * @returns {Promise<{diameter_px: number, diameter_um: number, radius_px: number, center_x: number, center_y: number} | null>}
+     */
+    async function analyzePointForSize(x, y) {
+        const params = window.configure?.getParams() || {};
+
+        try {
+            const response = await fetch('/api/analyze-point', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    x,
+                    y,
+                    parameters: params,
+                    region_factor: autoSizeRegionFactor
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Auto-size API error:', response.status, errorText);
+                window.app?.showToast(`Auto-size failed: ${response.status}`, 'warning');
+                return null;
+            }
+
+            const result = await response.json();
+
+            // Show region echo if enabled
+            if (autoSizeShowRegion && result.region) {
+                const selectedBlob = result.detected ? {
+                    center_x: result.center_x,
+                    center_y: result.center_y,
+                    radius_px: result.radius_px,
+                } : null;
+                showRegionEcho(result.region, result.all_blobs || [], selectedBlob);
+            }
+
+            if (result.success && result.detected) {
+                const analysis = {
+                    diameter_px: result.diameter_px,
+                    diameter_um: result.diameter_um,
+                    radius_px: result.radius_px,
+                    center_x: result.center_x,
+                    center_y: result.center_y,
+                    circularity: result.circularity,
+                };
+                // Include ellipse parameters if available
+                if (result.major_axis_px !== undefined) {
+                    analysis.major_axis_px = result.major_axis_px;
+                    analysis.minor_axis_px = result.minor_axis_px;
+                    analysis.major_axis_um = result.major_axis_um;
+                    analysis.minor_axis_um = result.minor_axis_um;
+                    analysis.orientation = result.orientation;
+                    analysis.eccentricity = result.eccentricity;
+                }
+                return analysis;
+            }
+            // No blob detected - this is fine, will fall back to default
+            if (result.reason) {
+                console.log('Auto-size: no blob detected -', result.reason);
+            }
+            return null;
+        } catch (error) {
+            console.error('Auto-size analysis failed:', error);
+            window.app?.showToast(`Auto-size error: ${error.message}`, 'warning');
+            return null;
+        }
+    }
+
+    /**
+     * Show a temporary rectangle indicating the analyzed region with detected blobs
+     * @param {Object} region - Region bounds {x_min, y_min, x_max, y_max}
+     * @param {Array} allBlobs - All detected blobs [{center_x, center_y, radius_px}, ...]
+     * @param {Object|null} selectedBlob - The blob that was selected (closest to click), or null
+     */
+    function showRegionEcho(region, allBlobs, selectedBlob) {
+        // Use overlay module to draw the region and blobs
+        window.overlay?.showTemporaryRegion(
+            region.x_min,
+            region.y_min,
+            region.x_max - region.x_min,
+            region.y_max - region.y_min,
+            3000, // Duration in ms
+            allBlobs,
+            selectedBlob
+        );
     }
 
     /**
@@ -573,26 +708,31 @@ window.editor = (function() {
     /**
      * Handle click on the overlay canvas
      */
-    function handleCanvasClick(x, y) {
-        switch (currentMode) {
-            case EditMode.ADD_TUB:
-                addTubercle(x, y);
-                break;
-            case EditMode.ADD_ITC:
-                handleItcClick(x, y);
-                break;
-            case EditMode.ADD_CHAIN:
-                addTubercleToChain(x, y);
-                break;
-            case EditMode.MOVE:
-                handleMoveClick(x, y);
-                break;
-            case EditMode.DELETE_MULTI_TUB:
-                handleDeleteMultiTubClick(x, y);
-                break;
-            case EditMode.DELETE_MULTI_ITC:
-                handleDeleteMultiItcClick(x, y);
-                break;
+    async function handleCanvasClick(x, y) {
+        try {
+            switch (currentMode) {
+                case EditMode.ADD_TUB:
+                    await addTubercle(x, y);
+                    break;
+                case EditMode.ADD_ITC:
+                    handleItcClick(x, y);
+                    break;
+                case EditMode.ADD_CHAIN:
+                    await addTubercleToChain(x, y);
+                    break;
+                case EditMode.MOVE:
+                    handleMoveClick(x, y);
+                    break;
+                case EditMode.DELETE_MULTI_TUB:
+                    handleDeleteMultiTubClick(x, y);
+                    break;
+                case EditMode.DELETE_MULTI_ITC:
+                    handleDeleteMultiItcClick(x, y);
+                    break;
+            }
+        } catch (error) {
+            console.error('Error handling canvas click:', error);
+            window.app?.showToast(`Error: ${error.message}`, 'error');
         }
     }
 
@@ -671,10 +811,25 @@ window.editor = (function() {
     /**
      * Add a new tubercle at position
      */
-    function addTubercle(x, y) {
+    async function addTubercle(x, y) {
         const calibration = getCalibration();
         const umPerPx = calibration?.um_per_px || 0.14;
-        const effectiveRadius = getEffectiveDefaultRadius();
+
+        let effectiveRadius = getEffectiveDefaultRadius();
+        let autoSized = false;
+        let analysisResult = null;
+
+        // Try auto-sizing if enabled
+        if (autoSizeEnabled) {
+            analysisResult = await analyzePointForSize(x, y);
+            if (analysisResult) {
+                effectiveRadius = analysisResult.radius_px;
+                autoSized = true;
+                // Phase 2: snap to detected center
+                x = analysisResult.center_x;
+                y = analysisResult.center_y;
+            }
+        }
 
         const newTub = {
             id: nextTubId++,
@@ -682,8 +837,19 @@ window.editor = (function() {
             centroid_y: y,
             radius_px: effectiveRadius,
             diameter_um: (effectiveRadius * 2) * umPerPx,
-            circularity: 1.0, // Perfect circle for manual addition
+            circularity: autoSized && analysisResult?.circularity !== undefined
+                ? analysisResult.circularity : 1.0,
         };
+
+        // Add ellipse parameters if available from auto-sizing
+        if (autoSized && analysisResult?.major_axis_px !== undefined) {
+            newTub.major_axis_px = analysisResult.major_axis_px;
+            newTub.minor_axis_px = analysisResult.minor_axis_px;
+            newTub.major_axis_um = analysisResult.major_axis_um;
+            newTub.minor_axis_um = analysisResult.minor_axis_um;
+            newTub.orientation = analysisResult.orientation;
+            newTub.eccentricity = analysisResult.eccentricity;
+        }
 
         tubercles.push(newTub);
 
@@ -698,20 +864,23 @@ window.editor = (function() {
         refreshDisplays();
         markDirty();
         window.sets?.trackEdit('added_tubercles');
-        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: effectiveRadius.toFixed(1) });
+        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: effectiveRadius.toFixed(1), autoSized });
 
         // Update regenerate button state
         updateRegenerateButtonState();
 
         // Stay in add mode for multiple additions
-        window.app?.showToast(`Added tubercle #${newTub.id}`, 'success');
+        const sizeInfo = autoSized
+            ? `auto-sized: ${newTub.diameter_um.toFixed(2)} µm`
+            : `default: ${newTub.diameter_um.toFixed(2)} µm`;
+        window.app?.showToast(`Added tubercle #${newTub.id} (${sizeInfo})`, 'success');
     }
 
     /**
      * Add a tubercle to the chain (with auto-connection to current)
      * Or select an existing tubercle if clicked on one
      */
-    function addTubercleToChain(x, y) {
+    async function addTubercleToChain(x, y) {
         // Check if clicking on an existing tubercle
         const clickedTub = findTubercleAt(x, y);
         if (clickedTub) {
@@ -730,7 +899,22 @@ window.editor = (function() {
 
         const calibration = getCalibration();
         const umPerPx = calibration?.um_per_px || 0.14;
-        const effectiveRadius = getEffectiveDefaultRadius();
+
+        let effectiveRadius = getEffectiveDefaultRadius();
+        let autoSized = false;
+        let analysisResult = null;
+
+        // Try auto-sizing if enabled
+        if (autoSizeEnabled) {
+            analysisResult = await analyzePointForSize(x, y);
+            if (analysisResult) {
+                effectiveRadius = analysisResult.radius_px;
+                autoSized = true;
+                // Phase 2: snap to detected center
+                x = analysisResult.center_x;
+                y = analysisResult.center_y;
+            }
+        }
 
         const newTub = {
             id: nextTubId++,
@@ -738,8 +922,19 @@ window.editor = (function() {
             centroid_y: y,
             radius_px: effectiveRadius,
             diameter_um: (effectiveRadius * 2) * umPerPx,
-            circularity: 1.0,
+            circularity: autoSized && analysisResult?.circularity !== undefined
+                ? analysisResult.circularity : 1.0,
         };
+
+        // Add ellipse parameters if available from auto-sizing
+        if (autoSized && analysisResult?.major_axis_px !== undefined) {
+            newTub.major_axis_px = analysisResult.major_axis_px;
+            newTub.minor_axis_px = analysisResult.minor_axis_px;
+            newTub.major_axis_um = analysisResult.major_axis_um;
+            newTub.minor_axis_um = analysisResult.minor_axis_um;
+            newTub.orientation = analysisResult.orientation;
+            newTub.eccentricity = analysisResult.eccentricity;
+        }
 
         tubercles.push(newTub);
 
@@ -802,12 +997,15 @@ window.editor = (function() {
         }
         updateChainNeighbors();
         updateModeUI();
-        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: effectiveRadius.toFixed(1), chain: true });
+        logEdit('add_tub', { id: newTub.id, x: x.toFixed(1), y: y.toFixed(1), radius: effectiveRadius.toFixed(1), chain: true, autoSized });
 
         // Update regenerate button state
         updateRegenerateButtonState();
 
-        window.app?.showToast(`Added tubercle #${newTub.id}`, 'success');
+        const sizeInfo = autoSized
+            ? `auto-sized: ${newTub.diameter_um.toFixed(2)} µm`
+            : `default: ${newTub.diameter_um.toFixed(2)} µm`;
+        window.app?.showToast(`Added tubercle #${newTub.id} (${sizeInfo})`, 'success');
     }
 
     /**
@@ -1552,13 +1750,21 @@ window.editor = (function() {
             const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
             const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
 
-            const params = new URLSearchParams({
-                spacing_weight: spacingWeight,
-                degree_weight: degreeWeight,
-                edge_ratio_weight: edgeRatioWeight,
-            });
+            // Get current data from overlay (ensures fresh calculation)
+            const tubercles = window.overlay?.getTubercles() || [];
+            const edges = window.overlay?.getEdges() || [];
 
-            const response = await fetch(`/api/hexagonalness?${params}`);
+            const response = await fetch('/api/hexagonalness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    spacing_weight: spacingWeight,
+                    degree_weight: degreeWeight,
+                    edge_ratio_weight: edgeRatioWeight,
+                    tubercles: tubercles,
+                    edges: edges,
+                }),
+            });
             if (!response.ok) {
                 console.error('Hexagonalness API error:', response.status);
                 return defaultResult;
@@ -2250,10 +2456,67 @@ window.editor = (function() {
             });
         }
 
-        // Listen for calibration changes to update hint
+        // Listen for calibration changes to update hints
         document.addEventListener('calibrationChanged', () => {
             updateDefaultDiameterHint();
+            updateAutoSizeHint();
         });
+
+        // Auto-size checkbox
+        const autoSizeCheckbox = document.getElementById('autoSizeEnabled');
+        if (autoSizeCheckbox) {
+            // Initialize from settings
+            const savedAutoSize = window.settings?.get('editor.autoSizeEnabled');
+            if (savedAutoSize !== undefined) {
+                autoSizeEnabled = savedAutoSize;
+                autoSizeCheckbox.checked = autoSizeEnabled;
+            }
+            updateAutoSizeHint();
+
+            autoSizeCheckbox.addEventListener('change', (e) => {
+                setAutoSizeEnabled(e.target.checked);
+            });
+        }
+
+        // Auto-size region factor slider
+        const regionFactorSlider = document.getElementById('autoSizeRegionFactor');
+        const regionFactorValue = document.getElementById('autoSizeRegionFactorValue');
+        if (regionFactorSlider) {
+            // Initialize from settings
+            const savedFactor = window.settings?.get('editor.autoSizeRegionFactor');
+            if (savedFactor !== undefined) {
+                autoSizeRegionFactor = savedFactor;
+                regionFactorSlider.value = savedFactor;
+            }
+            if (regionFactorValue) {
+                regionFactorValue.textContent = `${regionFactorSlider.value}x`;
+            }
+
+            regionFactorSlider.addEventListener('input', (e) => {
+                const factor = parseInt(e.target.value);
+                autoSizeRegionFactor = factor;
+                if (regionFactorValue) {
+                    regionFactorValue.textContent = `${factor}x`;
+                }
+                window.settings?.set('editor.autoSizeRegionFactor', factor);
+            });
+        }
+
+        // Auto-size show region checkbox
+        const showRegionCheckbox = document.getElementById('autoSizeShowRegion');
+        if (showRegionCheckbox) {
+            // Initialize from settings
+            const savedShowRegion = window.settings?.get('editor.autoSizeShowRegion');
+            if (savedShowRegion !== undefined) {
+                autoSizeShowRegion = savedShowRegion;
+                showRegionCheckbox.checked = autoSizeShowRegion;
+            }
+
+            showRegionCheckbox.addEventListener('change', (e) => {
+                autoSizeShowRegion = e.target.checked;
+                window.settings?.set('editor.autoSizeShowRegion', e.target.checked);
+            });
+        }
 
         const moveBtn = document.getElementById('moveBtn');
         if (moveBtn) {
@@ -2516,5 +2779,8 @@ window.editor = (function() {
         getDefaultDiameterUm,
         setDefaultDiameterUm,
         updateDefaultDiameterHint,
+        isAutoSizeEnabled,
+        setAutoSizeEnabled,
+        updateAutoSizeHint,
     };
 })();

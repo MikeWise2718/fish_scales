@@ -671,6 +671,29 @@
                         <a href="#" class="help-icon" data-edit="default-diameter" title="Help">?</a>
                         <span class="hint" id="defaultDiameterHint" style="margin-left: 0.5rem; font-size: 0.85em;">Requires calibration</span>
                     </div>
+                    <div class="auto-size-control" style="margin-top: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="autoSizeEnabled" disabled
+                                   title="When enabled, analyzes the image at click location to determine optimal tubercle size">
+                            <span>Auto-size from image</span>
+                            <a href="#" class="help-icon" data-edit="auto-size" title="Help">?</a>
+                        </label>
+                        <span class="hint" id="autoSizeHint" style="margin-left: 1.5rem; font-size: 0.85em; display: block;">Requires calibration</span>
+                        <div class="auto-size-options" style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                <label for="autoSizeRegionFactor" style="font-size: 0.85em; min-width: 80px;">Region size:</label>
+                                <input type="range" id="autoSizeRegionFactor" min="1" max="10" value="6" step="1"
+                                       style="flex: 1; max-width: 100px;"
+                                       title="Multiplier for detection region size (larger = more stable but slower)">
+                                <span id="autoSizeRegionFactorValue" style="font-size: 0.85em; min-width: 25px;">6x</span>
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85em;">
+                                <input type="checkbox" id="autoSizeShowRegion"
+                                       title="Briefly show the analyzed region on the image">
+                                <span>Show analyzed region</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="edit-section">

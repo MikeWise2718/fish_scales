@@ -37,6 +37,10 @@ window.settings = (function() {
         customPanelTextDim: '#64748b',
         customPanelBorder: '#334155',
         customPanelGrid: '#333344',
+        // Editor settings
+        'editor.autoSizeEnabled': false, // Auto-size tubercles from image analysis
+        'editor.autoSizeRegionFactor': 6, // Region size multiplier for auto-size detection
+        'editor.autoSizeShowRegion': false, // Show analyzed region as visual feedback
     };
 
     // Predefined theme color palettes

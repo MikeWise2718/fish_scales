@@ -235,3 +235,164 @@ def get_profiles_list() -> list:
             'max_diameter_um': profile.max_diameter_um,
         })
     return profiles
+
+
+def analyze_point_for_tubercle(
+    image_path: str,
+    x: float,
+    y: float,
+    um_per_px: float,
+    method: str = "log",
+    threshold: float = 0.05,
+    min_diameter_um: float = 2.0,
+    max_diameter_um: float = 10.0,
+    min_circularity: float = 0.5,
+    clahe_clip: float = 0.03,
+    clahe_kernel: int = 8,
+    blur_sigma: float = 1.0,
+    region_factor: float = 6.0,
+) -> dict:
+    """
+    Analyze a point in the image to detect if there's a tubercle there.
+
+    Extracts a region around (x, y), runs blob detection, and returns
+    the closest blob to the click point.
+
+    Args:
+        image_path: Path to the image file
+        x: X coordinate of the click point (in pixels)
+        y: Y coordinate of the click point (in pixels)
+        um_per_px: Calibration in micrometers per pixel
+        method: Detection method (log, dog, ellipse, lattice)
+        threshold: Detection threshold
+        min_diameter_um: Minimum tubercle diameter in micrometers
+        max_diameter_um: Maximum tubercle diameter in micrometers
+        min_circularity: Minimum circularity filter
+        clahe_clip: CLAHE clip limit
+        clahe_kernel: CLAHE kernel size
+        blur_sigma: Gaussian blur sigma
+
+    Returns:
+        Dictionary with detection results:
+        - success: True
+        - detected: True/False
+        - If detected: diameter_px, diameter_um, radius_px, center_x, center_y, circularity
+        - If not detected: reason (no_blob_found or click_not_on_blob)
+    """
+    # Calculate region size based on max_diameter and region_factor
+    # Larger factor = more stable detection with sufficient context for CLAHE
+    max_diameter_px = max_diameter_um / um_per_px
+    region_size = int(max_diameter_px * region_factor)
+    # Minimum region must fit the max blob; maximum prevents slowdown
+    min_size = max(30, int(max_diameter_px * 1.5))  # At least 1.5x the max blob size
+    max_size = 600
+    region_size = max(min_size, min(max_size, region_size))
+
+    # Load image
+    image = load_image(Path(image_path))
+    h, w = image.shape[:2]
+
+    # Calculate region bounds (centered on click point)
+    half = region_size // 2
+    x_min = max(0, int(x - half))
+    x_max = min(w, int(x + half))
+    y_min = max(0, int(y - half))
+    y_max = min(h, int(y + half))
+
+    # Extract and preprocess region
+    region = image[y_min:y_max, x_min:x_max]
+    preprocessed, _ = preprocess_pipeline(
+        region,
+        clahe_clip=clahe_clip,
+        clahe_kernel=clahe_kernel,
+        blur_sigma=blur_sigma,
+    )
+
+    # Create local calibration for the region
+    calibration = CalibrationData(
+        um_per_pixel=um_per_px,
+        scale_bar_length_um=0,
+        scale_bar_length_px=0,
+        method="manual"
+    )
+
+    # Detect tubercles in the region
+    tubercles = detect_tubercles(
+        preprocessed,
+        calibration,
+        min_diameter_um=min_diameter_um,
+        max_diameter_um=max_diameter_um,
+        threshold=threshold,
+        min_circularity=min_circularity,
+        edge_margin_px=0,  # Don't exclude edges in small region
+        method=method,
+        refine_ellipse=True,
+    )
+
+    # Region bounds for visual feedback
+    region_bounds = {
+        "x_min": x_min,
+        "y_min": y_min,
+        "x_max": x_max,
+        "y_max": y_max,
+    }
+
+    # Convert all detected blobs to global coordinates for visualization
+    all_blobs = []
+    for tub in tubercles:
+        all_blobs.append({
+            "center_x": float(tub.centroid[0] + x_min),
+            "center_y": float(tub.centroid[1] + y_min),
+            "radius_px": float(tub.radius_px),
+        })
+
+    if not tubercles:
+        return {"success": True, "detected": False, "reason": "no_blob_found", "region": region_bounds, "all_blobs": []}
+
+    # Find the blob closest to the click point (in local coordinates)
+    click_local_x = x - x_min
+    click_local_y = y - y_min
+
+    closest = None
+    closest_dist = float('inf')
+
+    for tub in tubercles:
+        dx = tub.centroid[0] - click_local_x
+        dy = tub.centroid[1] - click_local_y
+        dist = (dx**2 + dy**2) ** 0.5
+        if dist < closest_dist:
+            closest_dist = dist
+            closest = tub
+
+    # Check if closest blob is within reasonable distance
+    # (should be within the detected radius)
+    if closest_dist > closest.radius_px * 1.5:
+        return {"success": True, "detected": False, "reason": "click_not_on_blob", "region": region_bounds, "all_blobs": all_blobs}
+
+    # Convert center back to global coordinates
+    global_x = closest.centroid[0] + x_min
+    global_y = closest.centroid[1] + y_min
+
+    result = {
+        "success": True,
+        "detected": True,
+        "diameter_px": closest.diameter_px,
+        "diameter_um": closest.diameter_um,
+        "radius_px": closest.radius_px,
+        "center_x": global_x,
+        "center_y": global_y,
+        "circularity": closest.circularity,
+        "region": region_bounds,
+        "all_blobs": all_blobs,
+    }
+
+    # Include ellipse parameters if available
+    if closest.major_axis_px is not None:
+        result["major_axis_px"] = closest.major_axis_px
+        result["minor_axis_px"] = closest.minor_axis_px
+        result["major_axis_um"] = closest.major_axis_um
+        result["minor_axis_um"] = closest.minor_axis_um
+        result["orientation"] = closest.orientation
+        result["eccentricity"] = closest.eccentricity
+
+    return result

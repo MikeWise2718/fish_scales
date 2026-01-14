@@ -157,6 +157,7 @@
             <li><a href="#add-connection">Add Connection</a></li>
             <li><a href="#add-chain">Chain Mode</a></li>
             <li><a href="#default-diameter">Default Diameter</a></li>
+            <li><a href="#auto-size">Auto-size from Image</a></li>
             <li><a href="#move">Move Tubercle</a></li>
             <li><a href="#delete-selected">Delete Selected</a></li>
             <li><a href="#delete-multiple-tub">Delete Multiple Tubercles</a></li>
@@ -275,6 +276,58 @@
 
         <div class="tip">
             <strong>Tip:</strong> After adding a tubercle, you can still adjust its individual size using the Radius controls while it's selected.
+        </div>
+    </div>
+
+    <div class="section" id="auto-size">
+        <h3 class="param-name">Auto-size from Image</h3>
+        <p>When enabled, analyzes the image at each click location to automatically determine the correct tubercle size.</p>
+
+        <h4>How It Works</h4>
+        <ol class="step-list">
+            <li>When you click to add a tubercle, a region around the click point is extracted</li>
+            <li>The region is analyzed using the current detection parameters from the Configure tab</li>
+            <li>If blobs are detected, the one closest to your click is identified</li>
+            <li>If your click is within 1.5× the blob's radius:
+                <ul>
+                    <li>The tubercle is placed at the <strong>blob's center</strong> (snapped)</li>
+                    <li>The blob's <strong>detected diameter</strong> and ellipse parameters are used</li>
+                </ul>
+            </li>
+            <li>If no blob is close enough to your click (or none detected):
+                <ul>
+                    <li>The tubercle is placed at your <strong>exact click position</strong></li>
+                    <li>The <strong>Default Diameter</strong> is used</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h4>Controls</h4>
+        <ul>
+            <li><strong>Region size slider (1x-10x):</strong> Controls how large an area is analyzed around your click. Larger regions provide more stable detection (better CLAHE context) but are slower. Smaller regions are faster and more localized.</li>
+            <li><strong>Show analyzed region:</strong> When enabled, displays an orange dashed rectangle showing the analyzed area, with detected blobs highlighted. The overlay fades after 3 seconds. Useful for understanding detection behavior.</li>
+        </ul>
+
+        <h4>When to Use</h4>
+        <ul>
+            <li><strong>Variable tubercle sizes:</strong> When tubercles vary significantly in size across the image</li>
+            <li><strong>Filling gaps:</strong> When adding missed tubercles that should match their neighbors</li>
+            <li><strong>Accurate measurements:</strong> When precise diameter measurements are important</li>
+        </ul>
+
+        <h4>When NOT to Use</h4>
+        <ul>
+            <li><strong>Noisy images:</strong> Detection may pick up noise instead of the intended feature</li>
+            <li><strong>Uniform tubercles:</strong> If all tubercles are similar size, default diameter is faster</li>
+            <li><strong>Low contrast:</strong> Detection may fail in areas with poor contrast</li>
+        </ul>
+
+        <div class="note">
+            <strong>Requires Calibration:</strong> This feature requires calibration to be set because the detection parameters use micrometer-based size filters.
+        </div>
+
+        <div class="tip">
+            <strong>Tip:</strong> Enable "Show analyzed region" to see exactly what the detection found. This helps you understand why a particular size was chosen or why it fell back to the default.
         </div>
     </div>
 

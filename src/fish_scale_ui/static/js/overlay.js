@@ -324,6 +324,50 @@ window.overlay = (function() {
         if (isAreaSelecting && areaSelectStart && areaSelectEnd) {
             drawAreaSelectionRect(areaSelectStart, areaSelectEnd, colors);
         }
+
+        // Draw temporary region (auto-size feedback)
+        if (temporaryRegion) {
+            ctx.save();
+
+            // Draw region rectangle
+            ctx.strokeStyle = `rgba(255, 165, 0, ${temporaryRegion.opacity})`; // Orange
+            ctx.fillStyle = `rgba(255, 165, 0, ${temporaryRegion.opacity * 0.15})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.fillRect(temporaryRegion.x, temporaryRegion.y, temporaryRegion.width, temporaryRegion.height);
+            ctx.strokeRect(temporaryRegion.x, temporaryRegion.y, temporaryRegion.width, temporaryRegion.height);
+
+            // Draw all detected blobs
+            ctx.setLineDash([]);
+            if (temporaryRegion.allBlobs && temporaryRegion.allBlobs.length > 0) {
+                temporaryRegion.allBlobs.forEach(blob => {
+                    const isSelected = temporaryRegion.selectedBlob &&
+                        Math.abs(blob.center_x - temporaryRegion.selectedBlob.center_x) < 1 &&
+                        Math.abs(blob.center_y - temporaryRegion.selectedBlob.center_y) < 1;
+
+                    if (isSelected) {
+                        // Selected blob: green, filled
+                        ctx.strokeStyle = `rgba(0, 255, 0, ${temporaryRegion.opacity})`;
+                        ctx.fillStyle = `rgba(0, 255, 0, ${temporaryRegion.opacity * 0.3})`;
+                        ctx.lineWidth = 3;
+                    } else {
+                        // Other blobs: cyan, unfilled
+                        ctx.strokeStyle = `rgba(0, 255, 255, ${temporaryRegion.opacity})`;
+                        ctx.fillStyle = 'transparent';
+                        ctx.lineWidth = 1.5;
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(blob.center_x, blob.center_y, blob.radius_px, 0, Math.PI * 2);
+                    if (isSelected) {
+                        ctx.fill();
+                    }
+                    ctx.stroke();
+                });
+            }
+
+            ctx.restore();
+        }
     }
 
     // Draw a multi-selected tubercle (with fill and thicker stroke)
@@ -1032,6 +1076,58 @@ window.overlay = (function() {
         };
     }
 
+    // Temporary region display for auto-size feedback
+    let temporaryRegion = null;
+    let temporaryRegionTimeout = null;
+
+    /**
+     * Show a temporary rectangle on the overlay (fades out after duration)
+     * @param {number} x - X coordinate of top-left corner
+     * @param {number} y - Y coordinate of top-left corner
+     * @param {number} width - Width of rectangle
+     * @param {number} height - Height of rectangle
+     * @param {number} duration - Duration to show in milliseconds
+     * @param {Array} allBlobs - All detected blobs [{center_x, center_y, radius_px}, ...]
+     * @param {Object|null} selectedBlob - The blob that was selected, or null
+     */
+    function showTemporaryRegion(x, y, width, height, duration = 3000, allBlobs = [], selectedBlob = null) {
+        // Clear any existing timeout
+        if (temporaryRegionTimeout) {
+            clearTimeout(temporaryRegionTimeout);
+        }
+
+        temporaryRegion = { x, y, width, height, opacity: 1.0, allBlobs, selectedBlob };
+        render();
+
+        // Fade out over the last 500ms
+        const fadeStart = duration - 500;
+        const fadeSteps = 10;
+        const fadeStepDuration = 500 / fadeSteps;
+
+        // Start fade after initial display
+        setTimeout(() => {
+            let step = 0;
+            const fadeInterval = setInterval(() => {
+                step++;
+                if (temporaryRegion) {
+                    temporaryRegion.opacity = 1.0 - (step / fadeSteps);
+                    render();
+                }
+                if (step >= fadeSteps) {
+                    clearInterval(fadeInterval);
+                    temporaryRegion = null;
+                    render();
+                }
+            }, fadeStepDuration);
+        }, fadeStart);
+
+        // Clear after full duration (backup)
+        temporaryRegionTimeout = setTimeout(() => {
+            temporaryRegion = null;
+            render();
+        }, duration + 100);
+    }
+
     // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', init);
 
@@ -1072,5 +1168,6 @@ window.overlay = (function() {
         isInAreaSelectMode,
         getCanvas,
         clientToImageCoords,
+        showTemporaryRegion,
     };
 })();

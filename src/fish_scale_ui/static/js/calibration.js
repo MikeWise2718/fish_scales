@@ -70,6 +70,10 @@ window.calibration = (function() {
                 if (data.calibration) {
                     currentCalibration = data.calibration;
                     updateDisplay();
+                    // Notify other modules that calibration changed
+                    document.dispatchEvent(new CustomEvent('calibrationChanged', {
+                        detail: { calibration: currentCalibration }
+                    }));
                 } else {
                     displayAutoEstimate();
                 }
@@ -95,6 +99,10 @@ window.calibration = (function() {
                 updateDisplay();
                 window.app.showToast('Calibration applied', 'success');
                 window.app.loadLog();
+                // Notify other modules that calibration changed
+                document.dispatchEvent(new CustomEvent('calibrationChanged', {
+                    detail: { calibration: currentCalibration }
+                }));
             }
         })
         .catch(err => {
@@ -303,6 +311,10 @@ window.calibration = (function() {
                 currentCalibration.method = 'loaded';
             }
             updateDisplay();
+            // Notify other modules that calibration changed
+            document.dispatchEvent(new CustomEvent('calibrationChanged', {
+                detail: { calibration: currentCalibration }
+            }));
         }
     }
 

@@ -970,6 +970,12 @@ def regenerate_connections():
             'cull_factor': cull_factor,
         })
 
+        # Update server-side state so hexagonalness API returns correct data
+        _extraction_data['tubercles'] = updated_tubercles
+        _extraction_data['edges'] = edges
+        _extraction_data['statistics'] = statistics
+        _extraction_data['dirty'] = True
+
         return jsonify({
             'success': True,
             'edges': edges,
@@ -1486,26 +1492,44 @@ def user_endpoint():
     })
 
 
-@api_bp.route('/hexagonalness', methods=['GET'])
+@api_bp.route('/hexagonalness', methods=['GET', 'POST'])
 def calculate_hexagonalness():
     """Calculate hexagonalness with custom weights.
 
-    Query parameters:
+    GET query parameters:
         spacing_weight: float (default 0.40)
         degree_weight: float (default 0.45)
         edge_ratio_weight: float (default 0.15)
+
+    POST body (optional - uses server state if not provided):
+        {
+            "tubercles": [...],
+            "edges": [...],
+            "spacing_weight": 0.40,
+            "degree_weight": 0.45,
+            "edge_ratio_weight": 0.15
+        }
 
     Returns component scores and weighted hexagonalness score.
     """
     from fish_scale_ui.routes.mcp_api import _calculate_hexagonalness_from_dicts
 
-    # Get weights from query params
-    spacing_weight = float(request.args.get('spacing_weight', 0.40))
-    degree_weight = float(request.args.get('degree_weight', 0.45))
-    edge_ratio_weight = float(request.args.get('edge_ratio_weight', 0.15))
-
-    tubercles = _extraction_data.get('tubercles', [])
-    edges = _extraction_data.get('edges', [])
+    # Handle both GET and POST
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        spacing_weight = float(data.get('spacing_weight', 0.40))
+        degree_weight = float(data.get('degree_weight', 0.45))
+        edge_ratio_weight = float(data.get('edge_ratio_weight', 0.15))
+        # Use provided data if available, otherwise fall back to server state
+        tubercles = data.get('tubercles', _extraction_data.get('tubercles', []))
+        edges = data.get('edges', _extraction_data.get('edges', []))
+    else:
+        # GET request - use query params and server state
+        spacing_weight = float(request.args.get('spacing_weight', 0.40))
+        degree_weight = float(request.args.get('degree_weight', 0.45))
+        edge_ratio_weight = float(request.args.get('edge_ratio_weight', 0.15))
+        tubercles = _extraction_data.get('tubercles', [])
+        edges = _extraction_data.get('edges', [])
 
     # Use the canonical implementation from mcp_api
     result = _calculate_hexagonalness_from_dicts(tubercles, edges)
@@ -1520,3 +1544,84 @@ def calculate_hexagonalness():
         result['hexagonalness_score'] = float(score)
 
     return jsonify(result)
+
+
+@api_bp.route('/analyze-point', methods=['POST'])
+def analyze_point():
+    """Analyze image at a point to detect tubercle size.
+
+    Extracts a region around the specified point, runs blob detection
+    with the given parameters, and returns the detected blob info.
+
+    POST body:
+        {
+            "x": 245.5,
+            "y": 312.8,
+            "parameters": {
+                "method": "log",
+                "threshold": 0.05,
+                "min_diameter_um": 2.0,
+                "max_diameter_um": 10.0,
+                "min_circularity": 0.5,
+                "clahe_clip": 0.03,
+                "clahe_kernel": 8,
+                "blur_sigma": 1.0
+            }
+        }
+
+    Returns (blob detected):
+        {
+            "success": true,
+            "detected": true,
+            "diameter_px": 28.5,
+            "diameter_um": 4.275,
+            "radius_px": 14.25,
+            "center_x": 244.2,
+            "center_y": 313.1,
+            "circularity": 0.87
+        }
+
+    Returns (no blob detected):
+        {
+            "success": true,
+            "detected": false,
+            "reason": "no_blob_found"
+        }
+    """
+    from fish_scale_ui.services.extraction import analyze_point_for_tubercle
+
+    if not _current_image['path']:
+        return jsonify({'success': False, 'error': 'No image loaded'}), 400
+
+    if not _current_image.get('calibration'):
+        return jsonify({'success': False, 'error': 'Calibration not set'}), 400
+
+    data = request.get_json() or {}
+    x = float(data.get('x', 0))
+    y = float(data.get('y', 0))
+    parameters = data.get('parameters', {})
+
+    um_per_px = _current_image['calibration'].get('um_per_px', 0.33)
+    image_path = _current_image.get('web_path') or _current_image['path']
+
+    region_factor = float(data.get('region_factor', 6.0))
+
+    try:
+        result = analyze_point_for_tubercle(
+            image_path=image_path,
+            x=x,
+            y=y,
+            um_per_px=um_per_px,
+            method=parameters.get('method', 'log'),
+            threshold=float(parameters.get('threshold', 0.05)),
+            min_diameter_um=float(parameters.get('min_diameter_um', 2.0)),
+            max_diameter_um=float(parameters.get('max_diameter_um', 10.0)),
+            min_circularity=float(parameters.get('min_circularity', 0.5)),
+            clahe_clip=float(parameters.get('clahe_clip', 0.03)),
+            clahe_kernel=int(parameters.get('clahe_kernel', 8)),
+            blur_sigma=float(parameters.get('blur_sigma', 1.0)),
+            region_factor=region_factor,
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

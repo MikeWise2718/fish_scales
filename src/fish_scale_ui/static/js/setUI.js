@@ -1044,13 +1044,21 @@ window.setUI = (function() {
             const degreeWeight = window.settings?.get('hexDegreeWeight') ?? 0.45;
             const edgeRatioWeight = window.settings?.get('hexEdgeRatioWeight') ?? 0.15;
 
-            const params = new URLSearchParams({
-                spacing_weight: spacingWeight,
-                degree_weight: degreeWeight,
-                edge_ratio_weight: edgeRatioWeight,
-            });
+            // Get current data from overlay (ensures fresh calculation)
+            const tubercles = window.overlay?.getTubercles() || [];
+            const edges = window.overlay?.getEdges() || [];
 
-            const response = await fetch(`/api/hexagonalness?${params}`);
+            const response = await fetch('/api/hexagonalness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    spacing_weight: spacingWeight,
+                    degree_weight: degreeWeight,
+                    edge_ratio_weight: edgeRatioWeight,
+                    tubercles: tubercles,
+                    edges: edges,
+                }),
+            });
             if (!response.ok) {
                 console.error('Hexagonalness API error:', response.status);
                 return defaultResult;

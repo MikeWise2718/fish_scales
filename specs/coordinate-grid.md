@@ -1,5 +1,17 @@
 # Coordinate Grid Overlay Specification
 
+## Implementation Status
+
+| Feature | Status | Version | Notes |
+|---------|--------|---------|-------|
+| Grid toggle checkbox | ✅ Done | 0.2.14 | Added to overlay toggles |
+| Grid drawing function | ✅ Done | 0.2.14 | `drawCoordinateGrid()` in overlay.js |
+| Data tab X/Y units | ✅ Done | 0.2.14 | Shows µm when calibrated, px otherwise |
+| Grid color setting | ✅ Done | 0.2.15 | Default: light magenta (#ff88ff) |
+| Grid opacity setting | ✅ Done | 0.2.16 | Range: 10-100%, default: 35% |
+
+**Current Version:** 0.2.16 (2026-01-15)
+
 ## Overview
 
 Add a coordinate grid overlay to the left-hand image panel, controlled by a checkbox like the other display options (Tubes, ITCs, Scale, etc.). The grid displays coordinate values in the same units as the Tubercle X and Y columns in the Data tab.
@@ -349,52 +361,53 @@ document.addEventListener('calibrationChanged', () => {
 });
 ```
 
-## Settings Integration (Optional Enhancement)
+## Settings Integration ✅ Implemented
 
-Add grid customization options to the Settings tab:
+Grid customization options in Settings → Overlay Display:
 
-- Grid line color/opacity
-- Grid label size
-- Grid position preference (labels inside vs outside)
-- Minimum grid spacing
+- ✅ **Grid color** - Color picker + hex input (default: #ff88ff light magenta)
+- ✅ **Grid opacity** - Slider 10-100% (default: 35%)
+- ⏳ Grid label size - Not implemented
+- ⏳ Grid position preference - Not implemented
+- ⏳ Minimum grid spacing - Not implemented
 
 ## Testing Checklist
 
 1. **Toggle functionality**
-   - [ ] Grid checkbox appears in overlay toggles
-   - [ ] Checking/unchecking shows/hides grid
-   - [ ] Grid state persists correctly with other toggles
+   - [x] Grid checkbox appears in overlay toggles
+   - [x] Checking/unchecking shows/hides grid
+   - [x] Grid state persists correctly with other toggles
 
 2. **Grid rendering**
-   - [ ] Grid lines draw correctly across image
-   - [ ] Grid spacing is reasonable (5-10 lines)
-   - [ ] Labels are readable and positioned correctly
-   - [ ] Grid works with zoom/pan
+   - [x] Grid lines draw correctly across image
+   - [x] Grid spacing is reasonable (~6 lines)
+   - [x] Labels are readable and positioned correctly
+   - [x] Grid works with zoom/pan
 
 3. **Coordinate consistency**
-   - [ ] With calibration: Grid shows µm, Data tab shows µm
-   - [ ] Without calibration: Grid shows px, Data tab shows px
-   - [ ] Clicking a tubercle in overlay → Data tab coordinates match grid position
+   - [x] With calibration: Grid shows µm, Data tab shows µm
+   - [x] Without calibration: Grid shows px, Data tab shows px
+   - [x] Clicking a tubercle in overlay → Data tab coordinates match grid position
 
 4. **Edge cases**
-   - [ ] Very large images (>5000px)
-   - [ ] Very small images (<500px)
-   - [ ] Extreme calibration values
-   - [ ] No calibration set
+   - [ ] Very large images (>5000px) - Not tested
+   - [ ] Very small images (<500px) - Not tested
+   - [ ] Extreme calibration values - Not tested
+   - [x] No calibration set - Works, shows px
 
-## Files to Modify
+## Files Modified
 
-| File | Changes |
-|------|---------|
-| `src/fish_scale_ui/templates/workspace.html` | Add Grid checkbox, update table headers with IDs |
-| `src/fish_scale_ui/static/js/overlay.js` | Add toggle state, handler, and `drawCoordinateGrid()` function |
-| `src/fish_scale_ui/static/js/data.js` | Convert X/Y to µm, update headers dynamically |
+| File | Changes | Status |
+|------|---------|--------|
+| `src/fish_scale_ui/templates/workspace.html` | Grid checkbox, table header IDs, grid color/opacity settings | ✅ Done |
+| `src/fish_scale_ui/static/js/overlay.js` | Toggle state, handler, `drawCoordinateGrid()`, `formatGridLabel()` | ✅ Done |
+| `src/fish_scale_ui/static/js/data.js` | `updateCoordinateHeaders()`, X/Y conversion to µm, calibration listener | ✅ Done |
+| `src/fish_scale_ui/static/js/settings.js` | `gridColor` and `gridOpacity` settings, handlers, applyToUI | ✅ Done |
 
-## Version Update
+## Version History
 
-Per project conventions, increment patch version in:
-- `pyproject.toml`
-- `src/fish_scale_analysis/__init__.py`
-- `src/fish_scale_ui/__init__.py`
-- `src/fish_scale_mcp/__init__.py`
-- `src/fish_scale_agent/__init__.py`
+| Version | Date | Changes |
+|---------|------|---------|
+| 0.2.14 | 2026-01-15 | Initial implementation: grid overlay, Data tab units |
+| 0.2.15 | 2026-01-15 | Added configurable grid color (light magenta default) |
+| 0.2.16 | 2026-01-15 | Added configurable grid opacity (10-100%, default 35%) |

@@ -682,7 +682,10 @@ def start_edit_agent():
             "auto_connect_method": "delaunay" | "gabriel" | "rng" (default: "gabriel"),
             "verbose": bool (default: true),
             "image_path": str (optional, use if image not already loaded),
-            "calibration": float (optional, um/px if not already set)
+            "calibration": float (optional, um/px if not already set),
+            "goal": "hex_pattern" | "bright_spots" (default: "hex_pattern"),
+            "spot_count": int (default: 20, for bright_spots goal),
+            "min_separation": int (default: 30, for bright_spots goal)
         }
 
     Returns:
@@ -711,6 +714,9 @@ def start_edit_agent():
     calibration = data.get('calibration')
     debug_seeds = data.get('debug_seeds')
     debug_seed_radius = data.get('debug_seed_radius')
+    goal = data.get('goal', 'hex_pattern')
+    spot_count = data.get('spot_count', 20)
+    min_separation = data.get('min_separation', 30)
 
     # Validate provider
     valid_providers = ['claude', 'gemini', 'openrouter']
@@ -803,6 +809,12 @@ def start_edit_agent():
         cmd.extend(['--debug-seeds', debug_seeds])
         if debug_seed_radius:
             cmd.extend(['--debug-seed-radius', str(debug_seed_radius)])
+
+    # Goal selection (hex_pattern or bright_spots)
+    cmd.extend(['--goal', goal])
+    if goal == 'bright_spots':
+        cmd.extend(['--spot-count', str(spot_count)])
+        cmd.extend(['--min-separation', str(min_separation)])
 
     # Get UI URL from request or use default
     ui_url = data.get('ui_url')

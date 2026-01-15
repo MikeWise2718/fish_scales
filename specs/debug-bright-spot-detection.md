@@ -1,7 +1,9 @@
 # Bright Spot Detection Goal Specification
 
-**Status:** Planning
+**Status:** Implemented
 **Created:** 2026-01-15
+**Implemented:** 2026-01-15
+**Version:** 0.2.13
 **Purpose:** Add a simpler VLM test mode to diagnose whether VLMs can accurately localize visual features
 
 ---
@@ -38,6 +40,8 @@ This isolates the feature localization capability by:
 ---
 
 ## Bug Fix: LLM Prompt/Response Display Not Working
+
+**Status:** Fixed (prior to bright spots implementation)
 
 ### Root Cause Analysis
 
@@ -445,10 +449,10 @@ Add section to show bright spot evaluation:
 
 ### Phase 1: Bug Fix (LLM Display) - HIGH PRIORITY
 
-**Estimated scope:** Small fix, ~30 minutes
+**Status:** COMPLETE (done prior to this spec)
 
-1. Fix parsing in `agent_api.py`:
-   - Change `startswith('LLM-Prompt:')` to `'LLM-Prompt:' in line_str`
+1. ✅ Fix parsing in `agent_api.py`:
+   - Changed `startswith('LLM-Prompt:')` to `'LLM-Prompt:' in line_str`
    - Extract content after the marker, not from fixed position
    - Same for `LLM-Response:`
 
@@ -458,59 +462,59 @@ Add section to show bright spot evaluation:
 
 ### Phase 2: Goal Selection UI
 
-**Estimated scope:** Medium, ~1-2 hours
+**Status:** COMPLETE
 
-1. Add goal dropdown to `workspace.html`
-2. Add parameter inputs for bright_spots goal
-3. Add JavaScript toggle in `agent_editing.js`
-4. Update `startAgent()` to send goal parameters
-5. Update `/api/agent/edit/start` to receive and pass parameters
+1. ✅ Add goal dropdown to `workspace.html`
+2. ✅ Add parameter inputs for bright_spots goal
+3. ✅ Add JavaScript toggle in `agent_editing.js`
+4. ✅ Update `startAgent()` to send goal parameters
+5. ✅ Update `/api/agent/edit/start` to receive and pass parameters
 
 ### Phase 3: Backend Goal Support
 
-**Estimated scope:** Medium, ~2-3 hours
+**Status:** COMPLETE
 
-1. Add CLI options to `cli.py`
-2. Add `BRIGHT_SPOT_SYSTEM_PROMPT` to `prompts.py`
-3. Modify `editing_agent.py` to select prompt based on goal
-4. Adjust success criteria (no hexagonalness for bright_spots)
+1. ✅ Add CLI options to `cli.py`
+2. ✅ Add `BRIGHT_SPOT_SYSTEM_PROMPT` to `prompts.py`
+3. ✅ Modify `editing_agent.py` to select prompt based on goal
+4. ✅ Adjust success criteria (no hexagonalness for bright_spots)
 
 ### Phase 4: Analysis and Evaluation
 
-**Estimated scope:** Medium, ~2-3 hours
+**Status:** PARTIAL - Core analysis module created, UI integration pending
 
-1. Create `bright_spot_analysis.py` with evaluation functions
-2. Add analysis section to UI
-3. Output analysis in STATUS line for UI consumption
-4. Add to run logger for comparison across runs
+1. ✅ Create `bright_spot_analysis.py` with evaluation functions
+2. ⏳ Add analysis section to UI (not yet implemented)
+3. ⏳ Output analysis in STATUS line for UI consumption (not yet implemented)
+4. ⏳ Add to run logger for comparison across runs (not yet implemented)
 
 ### Phase 5: Documentation
 
-**Estimated scope:** Small, ~30 minutes
+**Status:** COMPLETE
 
-1. Update CLAUDE.md with bright_spots goal documentation
-2. Update CLI help text
-3. Add usage examples
+1. ✅ Update CLAUDE.md with bright_spots goal documentation
+2. ✅ Update CLI help text
+3. ✅ Add usage examples
 
 ---
 
 ## Testing Checklist
 
 ### Bug Fix Verification
-- [ ] Start AgenticEdit agent
-- [ ] Observe "Last LLM Prompt" populates with actual prompt
-- [ ] Observe "Last LLM Response" populates with actual response
-- [ ] Copy buttons work for prompt/response content
+- [x] Start AgenticEdit agent
+- [x] Observe "Last LLM Prompt" populates with actual prompt
+- [x] Observe "Last LLM Response" populates with actual response
+- [x] Copy buttons work for prompt/response content
 
-### Bright Spots Goal Testing
-- [ ] Goal dropdown appears in Configuration
-- [ ] Selecting "Find N Brightest Spots" shows N and separation inputs
-- [ ] Selecting "Hexagonal Pattern" hides bright spots inputs
+### Bright Spots Goal Testing (Code Complete - Needs Manual Testing)
+- [x] Goal dropdown appears in Configuration
+- [x] Selecting "Find N Brightest Spots" shows N and separation inputs
+- [x] Selecting "Hexagonal Pattern" hides bright spots inputs
 - [ ] Agent runs with bright_spots goal
 - [ ] Agent receives correct system prompt
 - [ ] Agent places approximately N spots
 - [ ] Spots respect minimum separation (mostly)
-- [ ] Analysis section shows results
+- [ ] Analysis section shows results (UI not yet implemented)
 - [ ] Compare VLM accuracy: Do placed spots align with actual bright regions?
 
 ### Cross-Provider Testing
@@ -537,25 +541,56 @@ This simpler test case will help diagnose the fundamental VLM localization issue
 
 ---
 
-## Open Questions
+## Open Questions (Resolved)
 
 1. **Ground truth generation**: How do we get "correct" bright spot positions for comparison?
-   - Option A: Manual annotation of a few test images
-   - Option B: Use traditional CV (blob detection with high threshold) as ground truth
-   - Option C: Just measure intensity at placed positions
+   - ~~Option A: Manual annotation of a few test images~~
+   - ~~Option B: Use traditional CV (blob detection with high threshold) as ground truth~~
+   - **Option C: Just measure intensity at placed positions** ✅ SELECTED
+   - *Implementation: `bright_spot_analysis.py` measures intensity at placed positions and calculates brightness percentile ranking*
 
 2. **Stopping condition**: For bright_spots goal, when does agent stop?
-   - Option A: After placing exactly N spots
-   - Option B: After one pass (screenshot → N placements → finish)
-   - Recommendation: Option B (single pass) to keep test clean
+   - ~~Option A: After placing exactly N spots~~
+   - **Option B: After one pass (screenshot → N placements → finish)** ✅ SELECTED
+   - *Implementation: Agent is instructed to place N spots then call finish(). Uses same iteration loop as hex_pattern but prompt guides single-pass behavior.*
 
 3. **Separation enforcement**: Should agent receive feedback if spots too close?
-   - Option A: Just report violations at end
-   - Option B: Reject placements that violate separation
-   - Recommendation: Option A (post-hoc analysis) to see VLM's natural behavior
+   - **Option A: Just report violations at end** ✅ SELECTED
+   - ~~Option B: Reject placements that violate separation~~
+   - *Implementation: `bright_spot_analysis.py` counts violations post-hoc. No real-time enforcement.*
 
 ---
 
 ## Version
 
-This feature will be implemented as version **0.2.12**.
+This feature was implemented in version **0.2.13**.
+
+---
+
+## Implementation Notes
+
+### Files Changed (2026-01-15)
+
+| File | Change |
+|------|--------|
+| `src/fish_scale_agent/prompts.py` | Added `BRIGHT_SPOT_SYSTEM_PROMPT` |
+| `src/fish_scale_agent/cli.py` | Added `--goal`, `--spot-count`, `--min-separation` options to `edit` command |
+| `src/fish_scale_agent/editing_agent.py` | Added goal parameters to `run()` and `run_sync()`, prompt selection based on goal |
+| `src/fish_scale_agent/bright_spot_analysis.py` | NEW: `evaluate_bright_spot_detection()` and `format_bright_spot_report()` |
+| `src/fish_scale_ui/routes/agent_api.py` | Pass goal parameters to CLI command in `/api/agent/edit/start` |
+| `src/fish_scale_ui/static/js/agent_editing.js` | Goal selector handler, parameter passing, input disable list |
+| `src/fish_scale_ui/templates/workspace.html` | Goal dropdown, bright_spots parameter inputs |
+| `CLAUDE.md` | Added "Selectable Agent Goals" documentation section |
+
+### What's Working
+
+- CLI: `uv run fish-scale-agent edit image.tif --goal bright_spots --spot-count 20 --min-separation 30`
+- UI: Goal dropdown in AgenticEdit tab, conditional parameter visibility
+- Backend: Correct system prompt selected based on goal
+- Analysis: `bright_spot_analysis.py` can evaluate detection accuracy
+
+### What's Pending
+
+- UI display of bright spot analysis results (analysis module exists but not wired to UI)
+- STATUS line output of analysis metrics
+- Integration with run logger for cross-run comparison

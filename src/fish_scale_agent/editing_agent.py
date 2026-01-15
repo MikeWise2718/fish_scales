@@ -751,6 +751,9 @@ class EditingAgent:
         on_iteration: Callable[[EditingState], None] | None = None,
         debug_seeds: str | None = None,
         debug_seed_radius: float = 15.0,
+        goal: str = "hex_pattern",
+        spot_count: int = 20,
+        min_separation: int = 30,
     ) -> EditingState:
         """Run the pattern completion agent loop.
 
@@ -764,11 +767,14 @@ class EditingAgent:
             on_iteration: Callback after each iteration
             debug_seeds: Debug seed pattern ("corners", "grid3x3", "cross", or custom coords)
             debug_seed_radius: Radius for debug seed tubercles in pixels
+            goal: Agent goal ("hex_pattern" or "bright_spots")
+            spot_count: Number of spots to find (for bright_spots goal)
+            min_separation: Minimum pixel separation between spots (for bright_spots goal)
 
         Returns:
             Final editing state
         """
-        from .prompts import EDITING_AGENT_SYSTEM_PROMPT, get_debug_seed_prompt_section
+        from .prompts import EDITING_AGENT_SYSTEM_PROMPT, BRIGHT_SPOT_SYSTEM_PROMPT, get_debug_seed_prompt_section
 
         self._log(f"Starting editing agent: max_iter={max_iterations}, plateau={plateau_threshold}")
         self._log(f"Provider: {self.provider.provider_name}/{self.provider.model_name}")
@@ -835,18 +841,30 @@ class EditingAgent:
         cal_data = initial_state.get("calibration", {})
         cal_value = cal_data.get("um_per_px", calibration or 0)
 
-        # Build system prompt
-        system_prompt = EDITING_AGENT_SYSTEM_PROMPT.format(
-            plateau_threshold=plateau_threshold,
-            image_name=image_name,
-            image_width=image_width,
-            image_height=image_height,
-            calibration=cal_value,
-            initial_tubercle_count=n_tubercles,
-            initial_hexagonalness=f"{hexagonalness:.3f}",
-            initial_coverage=f"{coverage:.1f}",
-            max_iterations=max_iterations,
-        )
+        # Build system prompt based on goal
+        if goal == "bright_spots":
+            self._log(f"Goal: bright_spots (find {spot_count} spots, min separation {min_separation}px)")
+            system_prompt = BRIGHT_SPOT_SYSTEM_PROMPT.format(
+                spot_count=spot_count,
+                min_separation=min_separation,
+                image_name=image_name,
+                image_width=image_width,
+                image_height=image_height,
+                calibration=cal_value,
+            )
+        else:
+            self._log("Goal: hex_pattern (complete hexagonal pattern)")
+            system_prompt = EDITING_AGENT_SYSTEM_PROMPT.format(
+                plateau_threshold=plateau_threshold,
+                image_name=image_name,
+                image_width=image_width,
+                image_height=image_height,
+                calibration=cal_value,
+                initial_tubercle_count=n_tubercles,
+                initial_hexagonalness=f"{hexagonalness:.3f}",
+                initial_coverage=f"{coverage:.1f}",
+                max_iterations=max_iterations,
+            )
 
         # Append debug seed section if enabled
         if debug_seed_config and hasattr(self, '_debug_seeds_placed'):
@@ -861,8 +879,26 @@ class EditingAgent:
             system_prompt += "\n\n" + debug_prompt
             self._log(f"Added debug seed section to system prompt ({len(debug_seed_config.positions)} seeds)")
 
-        # Build initial user message
-        user_message = f"""Analyze this fish scale image and complete the tubercle pattern.
+        # Build initial user message based on goal
+        if goal == "bright_spots":
+            user_message = f"""Find the {spot_count} brightest circular spots in this fish scale image.
+
+Image info:
+- Dimensions: {image_width}x{image_height} pixels
+- Calibration: {cal_value} um/px
+- Target spot count: {spot_count}
+- Minimum separation: {min_separation} pixels
+
+Your task:
+1. Get a screenshot to see the image
+2. Identify the {spot_count} brightest circular spots
+3. Add a tubercle marker at each bright spot location
+4. Verify placements with a final screenshot
+5. Call finish() when done
+
+Focus only on brightness - ignore pattern completion. Mark real bright spots only."""
+        else:
+            user_message = f"""Analyze this fish scale image and complete the tubercle pattern.
 
 Current state:
 - Tubercles: {n_tubercles}
@@ -1204,6 +1240,9 @@ Start by getting a screenshot to see the current state, then systematically scan
         on_iteration: Callable[[EditingState], None] | None = None,
         debug_seeds: str | None = None,
         debug_seed_radius: float = 15.0,
+        goal: str = "hex_pattern",
+        spot_count: int = 20,
+        min_separation: int = 30,
     ) -> EditingState:
         """Synchronous version of run().
 
@@ -1217,6 +1256,9 @@ Start by getting a screenshot to see the current state, then systematically scan
             on_iteration: Callback after each iteration
             debug_seeds: Debug seed pattern ("corners", "grid3x3", "cross", or custom coords)
             debug_seed_radius: Radius for debug seed tubercles in pixels
+            goal: Agent goal ("hex_pattern" or "bright_spots")
+            spot_count: Number of spots to find (for bright_spots goal)
+            min_separation: Minimum pixel separation between spots (for bright_spots goal)
 
         Returns:
             Final editing state
@@ -1234,6 +1276,9 @@ Start by getting a screenshot to see the current state, then systematically scan
                 on_iteration=on_iteration,
                 debug_seeds=debug_seeds,
                 debug_seed_radius=debug_seed_radius,
+                goal=goal,
+                spot_count=spot_count,
+                min_separation=min_separation,
             )
         )
 

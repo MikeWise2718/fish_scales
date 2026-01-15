@@ -220,6 +220,28 @@ def create_parser() -> argparse.ArgumentParser:
             "Larger seeds are more visible but may interfere with detection."
         ),
     )
+    edit_parser.add_argument(
+        "--goal",
+        type=str,
+        choices=["hex_pattern", "bright_spots"],
+        default="hex_pattern",
+        help=(
+            "Agent goal: 'hex_pattern' completes hexagonal tubercle pattern (default), "
+            "'bright_spots' finds N brightest circular spots in image."
+        ),
+    )
+    edit_parser.add_argument(
+        "--spot-count", "-n",
+        type=int,
+        default=20,
+        help="Number of spots to find (for bright_spots goal, default: 20)",
+    )
+    edit_parser.add_argument(
+        "--min-separation",
+        type=int,
+        default=30,
+        help="Minimum pixel separation between spots (for bright_spots goal, default: 30)",
+    )
 
     return parser
 
@@ -425,6 +447,11 @@ def cmd_edit(args):
         )
         sys.exit(1)
 
+    # Get goal parameters
+    goal = getattr(args, 'goal', 'hex_pattern')
+    spot_count = getattr(args, 'spot_count', 20)
+    min_separation = getattr(args, 'min_separation', 30)
+
     # Get provider
     provider = get_provider(args.provider, args.model, getattr(args, 'api_key', None))
 
@@ -443,6 +470,10 @@ def cmd_edit(args):
         console.print(f"Calibration: [cyan]{args.calibration} um/px[/cyan]")
     if debug_seeds:
         console.print(f"Debug seeds: [magenta]{debug_seeds}[/magenta] (radius: {debug_seed_radius}px)")
+    if goal == "bright_spots":
+        console.print(f"Goal: [yellow]Find {spot_count} brightest spots[/yellow] (min separation: {min_separation}px)")
+    else:
+        console.print(f"Goal: [cyan]Hexagonal pattern completion[/cyan]")
     console.print()
 
     # Track iteration progress
@@ -479,6 +510,9 @@ def cmd_edit(args):
             on_iteration=on_iteration,
             debug_seeds=debug_seeds,
             debug_seed_radius=debug_seed_radius,
+            goal=goal,
+            spot_count=spot_count,
+            min_separation=min_separation,
         )
 
         # Print final summary

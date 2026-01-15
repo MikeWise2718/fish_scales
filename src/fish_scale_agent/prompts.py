@@ -354,3 +354,81 @@ def get_debug_seed_prompt_section(
         center_x=center_x,
         center_y=center_y,
     )
+
+
+# System prompt for bright spot detection goal
+BRIGHT_SPOT_SYSTEM_PROMPT = """You are analyzing a grayscale SEM image to locate the brightest circular spots.
+
+## Your Task
+
+Find exactly {spot_count} of the brightest circular spots in this image and mark them with add_tubercle().
+
+## What Makes a "Bright Spot"
+
+- HIGH INTENSITY (white/light gray) circular or oval region
+- Typically 10-30 pixels in diameter
+- Contrasts clearly against the darker background
+- Should be actual image features, not noise or artifacts
+
+## Rules
+
+1. **Find exactly {spot_count} spots** - no more, no less
+2. **Prioritize brightness** - find the BRIGHTEST spots first
+3. **Minimum separation** - spots must be at least {min_separation} pixels apart
+4. **Only real features** - do NOT mark background noise or artifacts
+5. **Accurate positions** - place markers at the CENTER of each bright spot
+
+## Strategy
+
+1. Get a screenshot to see the image
+2. Identify the {spot_count} brightest circular spots
+3. For each spot (starting with brightest):
+   - Estimate the center coordinates (x, y)
+   - Call add_tubercle(x, y)
+4. Get a final screenshot to verify placements
+5. Call finish() when all {spot_count} spots are marked
+
+## Coordinate System
+
+- Origin (0, 0) is TOP-LEFT
+- X increases to the RIGHT
+- Y increases DOWNWARD
+- Image dimensions: {image_width} x {image_height} pixels
+- Calibration: {calibration} um/pixel
+
+## Example
+
+For an image with many bright tubercles, finding the 10 brightest:
+
+```
+1. get_screenshot() -> See grayscale image with bright circular spots
+2. Identify the 10 brightest spots by visual inspection
+3. add_tubercle(x=245, y=180)  # Brightest spot
+4. add_tubercle(x=410, y=295)  # 2nd brightest
+5. ... continue for all 10 ...
+6. get_screenshot() -> Verify all 10 markers are on bright spots
+7. finish(reason="Marked 10 brightest spots as requested")
+```
+
+## Evaluation Criteria
+
+Your success will be measured by:
+1. **Position accuracy**: How close are your markers to actual bright spots?
+2. **Brightness ranking**: Did you find the truly brightest spots?
+3. **Separation compliance**: Are all spots at least {min_separation}px apart?
+
+## Important
+
+- Do NOT complete any hexagonal pattern
+- Do NOT add more than {spot_count} spots
+- ONLY mark spots where you see actual bright circular features
+- If you cannot find {spot_count} distinct bright spots, mark as many as you can find and explain
+
+## Current Session Info
+
+- Image: {image_name}
+- Dimensions: {image_width} x {image_height} pixels
+- Calibration: {calibration} um/pixel
+- Target spot count: {spot_count}
+- Minimum separation: {min_separation} pixels
+"""

@@ -271,6 +271,9 @@ window.agentEditing = (function() {
         const autoConnectMethod = document.getElementById('editAgentAutoConnectMethod')?.value || 'gabriel';
         const debugSeeds = document.getElementById('editAgentDebugSeeds')?.value || '';
         const debugSeedRadius = parseFloat(document.getElementById('editAgentDebugSeedRadius')?.value) || 15;
+        const goal = document.getElementById('editAgentGoal')?.value || 'hex_pattern';
+        const spotCount = parseInt(document.getElementById('editAgentSpotCount')?.value, 10) || 20;
+        const minSeparation = parseInt(document.getElementById('editAgentMinSeparation')?.value, 10) || 30;
 
         // Check if provider is configured
         const providerInfo = state.providers.find(p => p.name === provider);
@@ -385,6 +388,9 @@ window.agentEditing = (function() {
                     auto_connect_method: autoConnectMethod,
                     debug_seeds: debugSeeds || undefined,
                     debug_seed_radius: debugSeeds ? debugSeedRadius : undefined,
+                    goal: goal,
+                    spot_count: goal === 'bright_spots' ? spotCount : undefined,
+                    min_separation: goal === 'bright_spots' ? minSeparation : undefined,
                     verbose: true,
                     image_path: currentImage?.path || currentImage?.web_path,
                     calibration: calibration.um_per_px,
@@ -1228,6 +1234,9 @@ window.agentEditing = (function() {
             'editAgentPlateauThreshold',
             'editAgentAutoConnect',
             'editAgentAutoConnectMethod',
+            'editAgentGoal',
+            'editAgentSpotCount',
+            'editAgentMinSeparation',
         ];
         configInputs.forEach(id => {
             const el = document.getElementById(id);
@@ -1339,6 +1348,14 @@ window.agentEditing = (function() {
             const radiusRow = document.getElementById('editAgentDebugSeedRadiusRow');
             if (radiusRow) {
                 radiusRow.style.display = e.target.value ? 'flex' : 'none';
+            }
+        });
+
+        // Goal dropdown change - show/hide bright spots parameters
+        document.getElementById('editAgentGoal')?.addEventListener('change', (e) => {
+            const brightSpotsParams = document.getElementById('editAgentBrightSpotsParams');
+            if (brightSpotsParams) {
+                brightSpotsParams.style.display = e.target.value === 'bright_spots' ? 'block' : 'none';
             }
         });
 

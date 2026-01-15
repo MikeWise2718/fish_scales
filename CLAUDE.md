@@ -342,6 +342,44 @@ In the AgenticEdit tab, use the "Debug Seeds" dropdown to select a pattern (Corn
 | VLM adds tubercles on top of seeds | VLM not perceiving overlay |
 | VLM adds regular grid ignoring seeds | VLM hallucinating ideal pattern |
 
+### Selectable Agent Goals
+
+The editing agent supports two goals:
+
+| Goal ID | Name | Description |
+|---------|------|-------------|
+| `hex_pattern` | Hexagonal Pattern Completion | Complete the hexagonal tubercle pattern (default behavior) |
+| `bright_spots` | Find N Brightest Spots | Locate the N brightest circular spots in the image |
+
+**CLI Usage:**
+```bash
+# Default: hexagonal pattern completion
+uv run fish-scale-agent edit image.tif --calibration 0.14
+
+# Bright spots goal: find 20 brightest spots with 30px min separation
+uv run fish-scale-agent edit image.tif --calibration 0.14 --goal bright_spots --spot-count 20 --min-separation 30
+
+# Customize spot count
+uv run fish-scale-agent edit image.tif --calibration 0.14 --goal bright_spots -n 50 --min-separation 25
+```
+
+**UI Usage:**
+In the AgenticEdit tab Configuration section, use the "Agent Goal" dropdown to select between:
+- **Hexagonal Pattern Completion** (default) - Completes the tubercle pattern
+- **Find N Brightest Spots** - Simpler test mode for VLM feature localization
+
+When "Find N Brightest Spots" is selected, additional parameters appear:
+- **Number of Spots (N)**: Target count of spots to find (default: 20)
+- **Min Separation (px)**: Minimum pixel distance between spots (default: 30)
+
+**Purpose of Bright Spots Goal:**
+This simpler test mode isolates the VLM's feature localization capability by removing pattern-completion complexity. It helps diagnose whether VLMs can accurately locate visual features (bright spots) without requiring semantic pattern reasoning.
+
+**Evaluation Metrics (for bright_spots goal):**
+- **Mean Intensity**: Average pixel intensity at placed spot centers
+- **Brightness Ranking Score**: 0-1 measure of whether truly brightest spots were found
+- **Separation Violations**: Number of spot pairs violating minimum separation
+
 ## Extraction Parameter Optimization Agent
 
 A separate LLM-powered agent for finding optimal extraction parameters, complementing the pattern completion agent above.

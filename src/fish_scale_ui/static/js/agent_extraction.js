@@ -1567,7 +1567,11 @@ window.agentExtraction = (function() {
      */
     function initCollapsibles() {
         // Initialize inner collapsibles (Last Prompt, Last Response, etc.)
-        const innerCollapsibles = document.querySelectorAll('.agent-collapsible-header');
+        // Scope to agent-extraction tab to avoid conflict with agent_editing.js
+        const tabContainer = document.querySelector('.tab-pane[data-tab="agent-extraction"]');
+        if (!tabContainer) return;
+
+        const innerCollapsibles = tabContainer.querySelectorAll('.agent-collapsible-header');
         innerCollapsibles.forEach(header => {
             header.addEventListener('click', (e) => {
                 // Don't toggle if clicking on a button
@@ -1604,8 +1608,8 @@ window.agentExtraction = (function() {
             }
         }
 
-        // Apply initial collapsed state and bind click handlers
-        const sectionCollapsibles = document.querySelectorAll('.agent-section-collapsible');
+        // Apply initial collapsed state and bind click handlers (scoped to this tab)
+        const sectionCollapsibles = tabContainer.querySelectorAll('.agent-section-collapsible');
         sectionCollapsibles.forEach(section => {
             const sectionId = section.dataset.section;
             const header = section.querySelector('.agent-section-header');

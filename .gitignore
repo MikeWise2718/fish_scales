@@ -33,6 +33,7 @@ tests/log/
 *.log
 agent_logs/
 log/
+AgenticEditingImages/
 
 # Saved annotation files
 annotations/

@@ -717,6 +717,7 @@ def start_edit_agent():
     goal = data.get('goal', 'hex_pattern')
     spot_count = data.get('spot_count', 20)
     min_separation = data.get('min_separation', 30)
+    log_images = data.get('log_images', False)
 
     # Validate provider
     valid_providers = ['claude', 'gemini', 'openrouter']
@@ -815,6 +816,10 @@ def start_edit_agent():
     if goal == 'bright_spots':
         cmd.extend(['--spot-count', str(spot_count)])
         cmd.extend(['--min-separation', str(min_separation)])
+
+    # Image logging for debugging
+    if log_images:
+        cmd.append('--log-images')
 
     # Get UI URL from request or use default
     ui_url = data.get('ui_url')

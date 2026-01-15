@@ -242,6 +242,12 @@ def create_parser() -> argparse.ArgumentParser:
         default=30,
         help="Minimum pixel separation between spots (for bright_spots goal, default: 30)",
     )
+    edit_parser.add_argument(
+        "--log-images",
+        action="store_true",
+        default=False,
+        help="Log images sent to VLM to AgenticEditingImages/ folder for debugging",
+    )
 
     return parser
 
@@ -513,6 +519,7 @@ def cmd_edit(args):
             goal=goal,
             spot_count=spot_count,
             min_separation=min_separation,
+            log_images=args.log_images,
         )
 
         # Print final summary

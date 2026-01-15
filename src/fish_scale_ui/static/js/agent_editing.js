@@ -53,6 +53,133 @@ window.agentEditing = (function() {
         pollIntervalMs: 1000,
     };
 
+    // Storage key for persisting user preferences
+    const CONFIG_STORAGE_KEY = 'editAgentConfig';
+
+    // Default configuration values
+    const configDefaults = {
+        provider: 'claude',
+        model: '',  // Empty means use provider default
+        maxIterations: 30,
+        plateauThreshold: 3,
+        autoConnect: true,
+        autoConnectMethod: 'gabriel',
+        debugSeeds: '',
+        debugSeedRadius: 15,
+        goal: 'hex_pattern',
+        spotCount: 20,
+        minSeparation: 30,
+        logImages: false,
+    };
+
+    // Current saved configuration
+    let savedConfig = { ...configDefaults };
+
+    /**
+     * Load configuration from localStorage and apply to UI
+     */
+    function loadConfig() {
+        try {
+            const stored = localStorage.getItem(CONFIG_STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                savedConfig = { ...configDefaults, ...parsed };
+            }
+        } catch (e) {
+            console.warn('Failed to load edit agent config:', e);
+        }
+
+        // Apply to UI elements (after a short delay to ensure providers are loaded)
+        setTimeout(() => {
+            applyConfigToUI();
+        }, 100);
+    }
+
+    /**
+     * Apply saved configuration to UI elements
+     */
+    function applyConfigToUI() {
+        const elements = {
+            'editAgentProvider': savedConfig.provider,
+            'editAgentMaxIterations': savedConfig.maxIterations,
+            'editAgentPlateauThreshold': savedConfig.plateauThreshold,
+            'editAgentAutoConnect': savedConfig.autoConnect,
+            'editAgentAutoConnectMethod': savedConfig.autoConnectMethod,
+            'editAgentDebugSeeds': savedConfig.debugSeeds,
+            'editAgentDebugSeedRadius': savedConfig.debugSeedRadius,
+            'editAgentGoal': savedConfig.goal,
+            'editAgentSpotCount': savedConfig.spotCount,
+            'editAgentMinSeparation': savedConfig.minSeparation,
+            'editAgentLogImages': savedConfig.logImages,
+        };
+
+        for (const [id, value] of Object.entries(elements)) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+
+            if (el.type === 'checkbox') {
+                el.checked = value;
+            } else {
+                el.value = value;
+            }
+        }
+
+        // Trigger change events to update dependent UI
+        const providerEl = document.getElementById('editAgentProvider');
+        if (providerEl) {
+            providerEl.dispatchEvent(new Event('change'));
+            // After provider change populates models, set saved model
+            setTimeout(() => {
+                const modelEl = document.getElementById('editAgentModel');
+                if (modelEl && savedConfig.model) {
+                    modelEl.value = savedConfig.model;
+                }
+            }, 150);
+        }
+
+        // Show/hide debug seed radius row
+        const debugSeedsEl = document.getElementById('editAgentDebugSeeds');
+        const radiusRow = document.getElementById('editAgentDebugSeedRadiusRow');
+        if (debugSeedsEl && radiusRow) {
+            radiusRow.style.display = debugSeedsEl.value ? 'flex' : 'none';
+        }
+
+        // Show/hide bright spots params
+        const goalEl = document.getElementById('editAgentGoal');
+        const brightSpotsParams = document.getElementById('editAgentBrightSpotsParams');
+        if (goalEl && brightSpotsParams) {
+            brightSpotsParams.style.display = goalEl.value === 'bright_spots' ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Save current UI configuration to localStorage
+     */
+    function saveConfig() {
+        const newConfig = {
+            provider: document.getElementById('editAgentProvider')?.value || configDefaults.provider,
+            model: document.getElementById('editAgentModel')?.value || '',
+            maxIterations: parseInt(document.getElementById('editAgentMaxIterations')?.value, 10) || configDefaults.maxIterations,
+            plateauThreshold: parseInt(document.getElementById('editAgentPlateauThreshold')?.value, 10) || configDefaults.plateauThreshold,
+            autoConnect: document.getElementById('editAgentAutoConnect')?.checked ?? configDefaults.autoConnect,
+            autoConnectMethod: document.getElementById('editAgentAutoConnectMethod')?.value || configDefaults.autoConnectMethod,
+            debugSeeds: document.getElementById('editAgentDebugSeeds')?.value || '',
+            debugSeedRadius: parseFloat(document.getElementById('editAgentDebugSeedRadius')?.value) || configDefaults.debugSeedRadius,
+            goal: document.getElementById('editAgentGoal')?.value || configDefaults.goal,
+            spotCount: parseInt(document.getElementById('editAgentSpotCount')?.value, 10) || configDefaults.spotCount,
+            minSeparation: parseInt(document.getElementById('editAgentMinSeparation')?.value, 10) || configDefaults.minSeparation,
+            logImages: document.getElementById('editAgentLogImages')?.checked || false,
+        };
+
+        savedConfig = newConfig;
+
+        try {
+            localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(savedConfig));
+        } catch (e) {
+            console.warn('Failed to save edit agent config:', e);
+        }
+    }
+
     /**
      * Log an event to the server (appears in Log tab)
      */
@@ -274,6 +401,7 @@ window.agentEditing = (function() {
         const goal = document.getElementById('editAgentGoal')?.value || 'hex_pattern';
         const spotCount = parseInt(document.getElementById('editAgentSpotCount')?.value, 10) || 20;
         const minSeparation = parseInt(document.getElementById('editAgentMinSeparation')?.value, 10) || 30;
+        const logImages = document.getElementById('editAgentLogImages')?.checked || false;
 
         // Check if provider is configured
         const providerInfo = state.providers.find(p => p.name === provider);
@@ -391,6 +519,7 @@ window.agentEditing = (function() {
                     goal: goal,
                     spot_count: goal === 'bright_spots' ? spotCount : undefined,
                     min_separation: goal === 'bright_spots' ? minSeparation : undefined,
+                    log_images: logImages,
                     verbose: true,
                     image_path: currentImage?.path || currentImage?.web_path,
                     calibration: calibration.um_per_px,
@@ -1237,6 +1366,7 @@ window.agentEditing = (function() {
             'editAgentGoal',
             'editAgentSpotCount',
             'editAgentMinSeparation',
+            'editAgentLogImages',
         ];
         configInputs.forEach(id => {
             const el = document.getElementById(id);
@@ -1248,6 +1378,10 @@ window.agentEditing = (function() {
      * Initialize collapsible sections
      */
     function initCollapsibles() {
+        // Scope to agent-editing tab to avoid conflict with agent_extraction.js
+        const tabContainer = document.querySelector('.tab-pane[data-tab="agent-editing"]');
+        if (!tabContainer) return;
+
         const STORAGE_KEY = 'editAgentSectionCollapsed';
         let collapsedSections = {};
 
@@ -1268,8 +1402,8 @@ window.agentEditing = (function() {
             }
         }
 
-        // Section header click handlers
-        const sectionHeaders = document.querySelectorAll('.edit-agent-section-header');
+        // Section header click handlers (scoped to this tab)
+        const sectionHeaders = tabContainer.querySelectorAll('.edit-agent-section-header');
         sectionHeaders.forEach(header => {
             const section = header.closest('.edit-agent-section');
             const sectionId = section?.dataset.section;
@@ -1288,8 +1422,8 @@ window.agentEditing = (function() {
             });
         });
 
-        // Inner collapsibles (prompt/response)
-        const innerHeaders = document.querySelectorAll('.edit-agent-collapsible-header');
+        // Inner collapsibles (prompt/response) - scoped to this tab
+        const innerHeaders = tabContainer.querySelectorAll('.edit-agent-collapsible-header');
         innerHeaders.forEach(header => {
             header.addEventListener('click', (e) => {
                 if (e.target.closest('button')) return;
@@ -1307,17 +1441,48 @@ window.agentEditing = (function() {
 
         loadProviders();
 
+        // Load saved configuration after providers are loaded
+        loadConfig();
+
         // Button handlers
         document.getElementById('startEditAgentBtn')?.addEventListener('click', startAgent);
         document.getElementById('stopEditAgentBtn')?.addEventListener('click', stopAgent);
         document.getElementById('resetEditAgentBtn')?.addEventListener('click', reset);
         document.getElementById('acceptEditResultBtn')?.addEventListener('click', acceptResult);
 
-        // Provider change
-        document.getElementById('editAgentProvider')?.addEventListener('change', populateModelSelect);
+        // Provider change - also save config
+        document.getElementById('editAgentProvider')?.addEventListener('change', () => {
+            populateModelSelect();
+            saveConfig();
+        });
 
-        // Model change
-        document.getElementById('editAgentModel')?.addEventListener('change', updateModelCostInfo);
+        // Model change - also save config
+        document.getElementById('editAgentModel')?.addEventListener('change', () => {
+            updateModelCostInfo();
+            saveConfig();
+        });
+
+        // Config inputs that should trigger saveConfig on change
+        const configInputIds = [
+            'editAgentMaxIterations',
+            'editAgentPlateauThreshold',
+            'editAgentAutoConnect',
+            'editAgentAutoConnectMethod',
+            'editAgentDebugSeedRadius',
+            'editAgentSpotCount',
+            'editAgentMinSeparation',
+            'editAgentLogImages',
+        ];
+        configInputIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', saveConfig);
+                // For number inputs, also save on input (as user types)
+                if (el.type === 'number') {
+                    el.addEventListener('input', saveConfig);
+                }
+            }
+        });
 
         // Copy buttons
         document.getElementById('copyEditPromptBtn')?.addEventListener('click', (e) => {
@@ -1343,20 +1508,22 @@ window.agentEditing = (function() {
             clearActions();
         });
 
-        // Debug seeds dropdown change - show/hide radius input
+        // Debug seeds dropdown change - show/hide radius input and save config
         document.getElementById('editAgentDebugSeeds')?.addEventListener('change', (e) => {
             const radiusRow = document.getElementById('editAgentDebugSeedRadiusRow');
             if (radiusRow) {
                 radiusRow.style.display = e.target.value ? 'flex' : 'none';
             }
+            saveConfig();
         });
 
-        // Goal dropdown change - show/hide bright spots parameters
+        // Goal dropdown change - show/hide bright spots parameters and save config
         document.getElementById('editAgentGoal')?.addEventListener('change', (e) => {
             const brightSpotsParams = document.getElementById('editAgentBrightSpotsParams');
             if (brightSpotsParams) {
                 brightSpotsParams.style.display = e.target.value === 'bright_spots' ? 'block' : 'none';
             }
+            saveConfig();
         });
 
         // Copy button for seed analysis

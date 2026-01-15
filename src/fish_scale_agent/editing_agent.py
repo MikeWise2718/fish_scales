@@ -358,6 +358,79 @@ class EditingAgent:
     # and this ensures coordinates are in a consistent range
     VLM_MAX_SIZE = (768, 768)
 
+    def _setup_image_logging(self, image_name: str) -> None:
+        """Set up directory and naming for image logging.
+
+        Args:
+            image_name: The image filename (from state, e.g. 'P1_Fig4_Atractosteus_simplex_7.07um.tif')
+        """
+        # Create output directory
+        self._image_log_dir = Path("AgenticEditingImages")
+        self._image_log_dir.mkdir(exist_ok=True)
+
+        # Extract base image name (without extension)
+        if image_name and image_name != "unknown":
+            # Remove extension if present
+            self._image_basename = Path(image_name).stem
+        else:
+            self._image_basename = "unknown"
+
+        # Get model name from provider and sanitize for filename
+        self._model_name_for_log = getattr(self.provider, 'model_name', 'unknown_model')
+        # Replace characters that are invalid in filenames
+        self._model_name_for_log = (
+            self._model_name_for_log
+            .replace('/', '-')
+            .replace('\\', '-')
+            .replace(':', '-')
+        )
+
+        self._log(f"Image logging enabled: {self._image_log_dir}/ (image: {self._image_basename})")
+
+    def _log_vlm_image(self, image_b64: str) -> None:
+        """Log an image being sent to the VLM.
+
+        Saves both the decoded PNG and the raw base64 text to files.
+        """
+        if not self._log_images or not self._image_log_dir:
+            return
+
+        import base64
+        from io import BytesIO
+
+        try:
+            from PIL import Image
+        except ImportError:
+            self._log("Warning: PIL not available, skipping image logging")
+            return
+
+        self._image_log_counter += 1
+
+        # Build filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        counter = f"{self._image_log_counter:03d}"
+        base_name = f"{self._image_basename}_{self._model_name_for_log}_{timestamp}_{counter}"
+
+        # Strip data URI prefix if present
+        b64_data = image_b64
+        if b64_data.startswith("data:"):
+            b64_data = b64_data.split(",", 1)[1]
+
+        # Save base64 text file
+        b64_path = self._image_log_dir / f"{base_name}_b64.txt"
+        b64_path.write_text(b64_data)
+
+        # Save decoded PNG
+        try:
+            image_bytes = base64.b64decode(b64_data)
+            img = Image.open(BytesIO(image_bytes))
+            png_path = self._image_log_dir / f"{base_name}.png"
+            img.save(png_path, "PNG")
+
+            self._log(f"Logged image #{self._image_log_counter}: {png_path.name} ({len(b64_data)} chars)")
+        except Exception as e:
+            self._log(f"Error saving image #{self._image_log_counter}: {e}")
+
     def _get_screenshot(self, overlay: bool = True, numbers: bool = False) -> dict:
         """Capture current view, scaled for VLM processing.
 
@@ -389,6 +462,10 @@ class EditingAgent:
         self._scale_factor = data.get("scale_factor", 1.0)
 
         self._log(f"Screenshot: {scaled_width}x{scaled_height} px (original: {orig_width}x{orig_height}, scale: {self._scale_factor:.3f})")
+
+        # Log image if enabled (for debugging VLM image interpretation issues)
+        if data.get("image_b64"):
+            self._log_vlm_image(data["image_b64"])
 
         # Tell the VLM the SCALED dimensions - these are the coordinates it should use
         return {
@@ -754,6 +831,7 @@ class EditingAgent:
         goal: str = "hex_pattern",
         spot_count: int = 20,
         min_separation: int = 30,
+        log_images: bool = False,
     ) -> EditingState:
         """Run the pattern completion agent loop.
 
@@ -770,6 +848,7 @@ class EditingAgent:
             goal: Agent goal ("hex_pattern" or "bright_spots")
             spot_count: Number of spots to find (for bright_spots goal)
             min_separation: Minimum pixel separation between spots (for bright_spots goal)
+            log_images: Whether to log images sent to VLM to AgenticEditingImages/
 
         Returns:
             Final editing state
@@ -778,6 +857,13 @@ class EditingAgent:
 
         self._log(f"Starting editing agent: max_iter={max_iterations}, plateau={plateau_threshold}")
         self._log(f"Provider: {self.provider.provider_name}/{self.provider.model_name}")
+
+        # Initialize image logging state (actual setup is deferred until we have state data)
+        self._log_images = log_images
+        self._image_log_counter = 0
+        self._image_log_dir: Path | None = None
+        self._image_basename: str = ""
+        self._model_name_for_log: str = ""
 
         # Store config and reset state
         self._max_iterations = max_iterations
@@ -840,6 +926,10 @@ class EditingAgent:
         image_height = image_info.get("height", 0)
         cal_data = initial_state.get("calibration", {})
         cal_value = cal_data.get("um_per_px", calibration or 0)
+
+        # Now we have image info, set up image logging if enabled
+        if log_images:
+            self._setup_image_logging(image_name)
 
         # Build system prompt based on goal
         if goal == "bright_spots":
@@ -1243,6 +1333,7 @@ Start by getting a screenshot to see the current state, then systematically scan
         goal: str = "hex_pattern",
         spot_count: int = 20,
         min_separation: int = 30,
+        log_images: bool = False,
     ) -> EditingState:
         """Synchronous version of run().
 
@@ -1259,6 +1350,7 @@ Start by getting a screenshot to see the current state, then systematically scan
             goal: Agent goal ("hex_pattern" or "bright_spots")
             spot_count: Number of spots to find (for bright_spots goal)
             min_separation: Minimum pixel separation between spots (for bright_spots goal)
+            log_images: Whether to log images sent to VLM to AgenticEditingImages/
 
         Returns:
             Final editing state
@@ -1279,6 +1371,7 @@ Start by getting a screenshot to see the current state, then systematically scan
                 goal=goal,
                 spot_count=spot_count,
                 min_separation=min_separation,
+                log_images=log_images,
             )
         )
 

@@ -542,6 +542,101 @@ window.data = (function() {
         return statistics;
     }
 
+    // ===== CSV Copy Functions =====
+
+    /**
+     * Copy text to clipboard with visual feedback
+     * @param {string} text - Text to copy
+     * @param {HTMLElement} button - Button element for visual feedback
+     */
+    async function copyToClipboard(text, button) {
+        try {
+            await navigator.clipboard.writeText(text);
+            // Visual feedback
+            if (button) {
+                button.classList.add('copied');
+                setTimeout(() => button.classList.remove('copied'), 1500);
+            }
+            window.app?.showToast('Copied to clipboard', 'success');
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            window.app?.showToast('Failed to copy to clipboard', 'error');
+        }
+    }
+
+    /**
+     * Generate CSV from tubercle data and copy to clipboard
+     */
+    function copyTubToCsv() {
+        if (tubercles.length === 0) {
+            window.app?.showToast('No tubercle data to copy', 'warning');
+            return;
+        }
+
+        const calibration = window.calibration?.getCurrentCalibration();
+        const hasCalibration = calibration && calibration.um_per_px;
+        const coordUnit = hasCalibration ? 'um' : 'px';
+
+        // CSV header
+        const headers = ['ID', `X_${coordUnit}`, `Y_${coordUnit}`, 'Diameter_um', 'Circularity', 'Boundary', 'Source'];
+        const rows = [headers.join(',')];
+
+        // Data rows
+        tubercles.forEach(tub => {
+            let x, y;
+            if (hasCalibration) {
+                x = (tub.centroid_x * calibration.um_per_px).toFixed(2);
+                y = (tub.centroid_y * calibration.um_per_px).toFixed(2);
+            } else {
+                x = tub.centroid_x.toFixed(2);
+                y = tub.centroid_y.toFixed(2);
+            }
+            const row = [
+                tub.id,
+                x,
+                y,
+                tub.diameter_um.toFixed(3),
+                tub.circularity.toFixed(3),
+                tub.is_boundary ? 'Y' : 'N',
+                tub.source || 'extracted'
+            ];
+            rows.push(row.join(','));
+        });
+
+        const csv = rows.join('\n');
+        const btn = document.getElementById('copyTubCsvBtn');
+        copyToClipboard(csv, btn);
+    }
+
+    /**
+     * Generate CSV from ITC (edge) data and copy to clipboard
+     */
+    function copyItcToCsv() {
+        if (edges.length === 0) {
+            window.app?.showToast('No connection data to copy', 'warning');
+            return;
+        }
+
+        // CSV header
+        const headers = ['ID1', 'ID2', 'Center_Distance_um', 'Edge_Distance_um'];
+        const rows = [headers.join(',')];
+
+        // Data rows
+        edges.forEach(edge => {
+            const row = [
+                edge.id1,
+                edge.id2,
+                edge.center_distance_um.toFixed(3),
+                edge.edge_distance_um.toFixed(3)
+            ];
+            rows.push(row.join(','));
+        });
+
+        const csv = rows.join('\n');
+        const btn = document.getElementById('copyItcCsvBtn');
+        copyToClipboard(csv, btn);
+    }
+
     // Initialize
     function init() {
         // Load saved column visibility
@@ -557,6 +652,23 @@ window.data = (function() {
         const recalculateBtn = document.getElementById('recalculateBtn');
         if (recalculateBtn) {
             recalculateBtn.addEventListener('click', handleRecalculate);
+        }
+
+        // CSV copy button handlers
+        const copyTubBtn = document.getElementById('copyTubCsvBtn');
+        if (copyTubBtn) {
+            copyTubBtn.addEventListener('click', (e) => {
+                e.stopPropagation();  // Prevent collapsible toggle
+                copyTubToCsv();
+            });
+        }
+
+        const copyItcBtn = document.getElementById('copyItcCsvBtn');
+        if (copyItcBtn) {
+            copyItcBtn.addEventListener('click', (e) => {
+                e.stopPropagation();  // Prevent collapsible toggle
+                copyItcToCsv();
+            });
         }
 
         // Listen for overlay selection events

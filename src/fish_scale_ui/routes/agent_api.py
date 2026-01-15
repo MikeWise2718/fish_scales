@@ -605,10 +605,13 @@ def _monitor_edit_agent_process(session_id: str, process: subprocess.Popen,
                                 status['cost_usd'] = float(usage_match.group(3))
 
                         # Parse LLM prompt/response for debugging
-                        if line_str.startswith('LLM-Prompt:'):
-                            status['last_prompt'] = line_str[11:].replace(' | ', '\n')
-                        elif line_str.startswith('LLM-Response:'):
-                            status['last_response'] = line_str[13:].replace(' | ', '\n')
+                        # Note: log lines have timestamp prefix like "[10:15:32] LLM-Prompt:"
+                        if 'LLM-Prompt:' in line_str:
+                            idx = line_str.index('LLM-Prompt:')
+                            status['last_prompt'] = line_str[idx + 11:].replace(' | ', '\n')
+                        elif 'LLM-Response:' in line_str:
+                            idx = line_str.index('LLM-Response:')
+                            status['last_response'] = line_str[idx + 13:].replace(' | ', '\n')
 
                         _write_status(status_file, status)
 

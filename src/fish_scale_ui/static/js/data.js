@@ -201,8 +201,14 @@ window.data = (function() {
 
         // Update column visibility in header
         updateColumnVisibility();
+        // Update X/Y column headers based on calibration
+        updateCoordinateHeaders();
 
         const colCount = 6 + (columnVisibility.source ? 1 : 0);
+
+        // Get calibration for coordinate conversion
+        const calibration = window.calibration?.getCurrentCalibration();
+        const hasCalibration = calibration && calibration.um_per_px;
 
         if (tubercles.length === 0) {
             const row = document.createElement('tr');
@@ -218,10 +224,21 @@ window.data = (function() {
             const sourceStr = tub.source || 'extracted';
             const sourceClass = columnVisibility.source ? '' : 'col-optional';
             const sourceVisible = columnVisibility.source ? 'visible' : '';
+
+            // Convert coordinates to µm if calibrated
+            let xDisplay, yDisplay;
+            if (hasCalibration) {
+                xDisplay = (tub.centroid_x * calibration.um_per_px).toFixed(1);
+                yDisplay = (tub.centroid_y * calibration.um_per_px).toFixed(1);
+            } else {
+                xDisplay = tub.centroid_x.toFixed(1);
+                yDisplay = tub.centroid_y.toFixed(1);
+            }
+
             row.innerHTML = `
                 <td>${tub.id}</td>
-                <td>${tub.centroid_x.toFixed(1)}</td>
-                <td>${tub.centroid_y.toFixed(1)}</td>
+                <td>${xDisplay}</td>
+                <td>${yDisplay}</td>
                 <td>${tub.diameter_um.toFixed(2)}</td>
                 <td>${(tub.circularity * 100).toFixed(1)}%</td>
                 <td>${boundaryStr}</td>
@@ -235,6 +252,21 @@ window.data = (function() {
             });
             tbody.appendChild(row);
         });
+    }
+
+    /**
+     * Update X/Y column headers based on calibration status
+     */
+    function updateCoordinateHeaders() {
+        const calibration = window.calibration?.getCurrentCalibration();
+        const hasCalibration = calibration && calibration.um_per_px;
+        const unit = hasCalibration ? 'µm' : 'px';
+
+        const xHeader = document.getElementById('tubColX');
+        const yHeader = document.getElementById('tubColY');
+
+        if (xHeader) xHeader.textContent = `X (${unit})`;
+        if (yHeader) yHeader.textContent = `Y (${unit})`;
     }
 
     /**
@@ -544,6 +576,7 @@ window.data = (function() {
         document.addEventListener('calibrationChanged', () => {
             renderImageLevelData();
             renderSetCalibration();
+            renderTubercleTable();  // Re-render to update X/Y coordinates and headers
         });
 
         // Listen for set changes to update panels

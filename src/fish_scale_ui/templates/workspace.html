@@ -153,6 +153,10 @@
                 <input type="checkbox" id="toggleScale">
                 <span>Scale</span>
             </label>
+            <label class="overlay-toggle" title="Show/hide coordinate grid">
+                <input type="checkbox" id="toggleGrid">
+                <span>Grid</span>
+            </label>
             <label class="overlay-toggle" title="Show fitted ellipses instead of circles">
                 <input type="checkbox" id="showEllipses">
                 <span>Ellipses</span>
@@ -956,8 +960,8 @@
                                         <thead>
                                             <tr>
                                                 <th data-col="id">ID</th>
-                                                <th data-col="x">X</th>
-                                                <th data-col="y">Y</th>
+                                                <th data-col="x" id="tubColX">X (px)</th>
+                                                <th data-col="y" id="tubColY">Y (px)</th>
                                                 <th data-col="diam">Diam (µm)</th>
                                                 <th data-col="circ">Circ</th>
                                                 <th data-col="bdry">Bdry</th>
@@ -1194,6 +1198,22 @@
                                 <div class="color-input-row">
                                     <input type="color" id="connectionColorPicker" value="#ffff00">
                                     <input type="text" id="connectionColorText" value="#ffff00" maxlength="7">
+                                </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <label class="setting-label-text">Grid color</label>
+                                <div class="color-input-row">
+                                    <input type="color" id="gridColorPicker" value="#ff88ff">
+                                    <input type="text" id="gridColorText" value="#ff88ff" maxlength="7">
+                                </div>
+                            </div>
+
+                            <div class="setting-item">
+                                <label class="setting-label-text">Grid opacity</label>
+                                <div class="slider-row">
+                                    <input type="range" id="gridOpacitySlider" min="0.1" max="1.0" step="0.05" value="0.35">
+                                    <span id="gridOpacityValue" class="slider-value">35%</span>
                                 </div>
                             </div>
 

@@ -1,6 +1,6 @@
 """Fish Scale MCP Server - Model Context Protocol server for fish-scale-ui."""
 
-__version__ = "0.2.13"
+__version__ = "0.2.16"
 __version_date__ = "2026-01-15"
 
 from .server import FishScaleMCPServer

@@ -16,6 +16,8 @@ window.settings = (function() {
         tubercleColor: '#00ffff',
         boundaryTubercleColor: '#ff8800', // Orange for boundary nodes
         connectionColor: '#ffff00', // Yellow for ITC (intertubercular connections)
+        gridColor: '#ff88ff', // Light magenta for coordinate grid
+        gridOpacity: 0.35, // Grid line opacity (0.0 - 1.0)
         connectionEndpoint: 'center', // 'center' or 'edge'
         tubercleColorMode: 'source', // 'uniform', 'source', 'boundary'
         // Calibration scale display
@@ -135,7 +137,7 @@ window.settings = (function() {
         // Re-render overlay if display setting changed
         // Note: showTubercleIds and showCalibrationScale only affect defaults for new images
         // The toggle checkboxes under the image control current visibility
-        if (['idTextSize', 'tubercleColor', 'connectionColor', 'connectionEndpoint', 'scalePosition'].includes(key)) {
+        if (['idTextSize', 'tubercleColor', 'connectionColor', 'gridColor', 'gridOpacity', 'connectionEndpoint', 'scalePosition'].includes(key)) {
             if (window.overlay && window.overlay.render) {
                 window.overlay.render();
             }
@@ -431,6 +433,42 @@ window.settings = (function() {
             });
         }
 
+        // Grid color
+        const gridColorPicker = document.getElementById('gridColorPicker');
+        const gridColorText = document.getElementById('gridColorText');
+        if (gridColorPicker) {
+            gridColorPicker.addEventListener('input', function() {
+                if (gridColorText) {
+                    gridColorText.value = this.value;
+                }
+                set('gridColor', this.value);
+            });
+        }
+        if (gridColorText) {
+            gridColorText.addEventListener('change', function() {
+                const color = this.value;
+                if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                    if (gridColorPicker) {
+                        gridColorPicker.value = color;
+                    }
+                    set('gridColor', color);
+                }
+            });
+        }
+
+        // Grid opacity slider
+        const gridOpacitySlider = document.getElementById('gridOpacitySlider');
+        const gridOpacityValue = document.getElementById('gridOpacityValue');
+        if (gridOpacitySlider) {
+            gridOpacitySlider.addEventListener('input', function() {
+                const opacity = parseFloat(this.value);
+                if (gridOpacityValue) {
+                    gridOpacityValue.textContent = Math.round(opacity * 100) + '%';
+                }
+                set('gridOpacity', opacity);
+            });
+        }
+
         // Connection endpoint radio buttons
         const connectionToCenterEl = document.getElementById('connectionToCenter');
         const connectionToEdgeEl = document.getElementById('connectionToEdge');
@@ -718,6 +756,26 @@ window.settings = (function() {
         }
         if (connectionColorText) {
             connectionColorText.value = current.connectionColor;
+        }
+
+        // Grid color
+        const gridColorPicker = document.getElementById('gridColorPicker');
+        const gridColorText = document.getElementById('gridColorText');
+        if (gridColorPicker) {
+            gridColorPicker.value = current.gridColor;
+        }
+        if (gridColorText) {
+            gridColorText.value = current.gridColor;
+        }
+
+        // Grid opacity
+        const gridOpacitySlider = document.getElementById('gridOpacitySlider');
+        const gridOpacityValue = document.getElementById('gridOpacityValue');
+        if (gridOpacitySlider) {
+            gridOpacitySlider.value = current.gridOpacity;
+        }
+        if (gridOpacityValue) {
+            gridOpacityValue.textContent = Math.round(current.gridOpacity * 100) + '%';
         }
 
         // Connection endpoint

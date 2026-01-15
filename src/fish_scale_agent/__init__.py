@@ -4,7 +4,7 @@ This package implements an agentic workflow where an LLM controls the
 fish-scale-ui application to detect tubercles in SEM images of fish scales.
 """
 
-__version__ = "0.2.13"
+__version__ = "0.2.16"
 __version_date__ = "2026-01-15"
 
 from .runner import TubercleDetectionAgent

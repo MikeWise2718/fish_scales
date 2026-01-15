@@ -31,6 +31,7 @@ window.overlay = (function() {
         itcIds: false,     // ITC IDs
         links: true,       // ITCs (connection lines)
         scale: false,
+        grid: false,       // Coordinate grid
         ellipses: false
     };
 
@@ -106,11 +107,13 @@ window.overlay = (function() {
         const tubesEl = document.getElementById('toggleTubes');
         const linksEl = document.getElementById('toggleLinks');
         const scaleEl = document.getElementById('toggleScale');
+        const gridEl = document.getElementById('toggleGrid');
 
         if (numbersEl) numbersEl.checked = toggleState.numbers;
         if (tubesEl) tubesEl.checked = toggleState.tubes;
         if (linksEl) linksEl.checked = toggleState.links;
         if (scaleEl) scaleEl.checked = toggleState.scale;
+        if (gridEl) gridEl.checked = toggleState.grid;
     }
 
     // Bind toggle checkbox event handlers
@@ -142,6 +145,13 @@ window.overlay = (function() {
         if (scaleEl) {
             scaleEl.addEventListener('change', function() {
                 toggleState.scale = this.checked;
+                render();
+            });
+        }
+        const gridEl = document.getElementById('toggleGrid');
+        if (gridEl) {
+            gridEl.addEventListener('change', function() {
+                toggleState.grid = this.checked;
                 render();
             });
         }
@@ -298,6 +308,11 @@ window.overlay = (function() {
         // Draw calibration scale if enabled (uses toggle state, not Settings)
         if (toggleState.scale) {
             drawCalibrationScale();
+        }
+
+        // Draw coordinate grid if enabled
+        if (toggleState.grid) {
+            drawCoordinateGrid();
         }
 
         // Draw debug shapes (always visible when present)
@@ -609,6 +624,130 @@ window.overlay = (function() {
         ctx.textBaseline = 'bottom';
         ctx.fillStyle = '#ffffff';
         ctx.fillText(label, x + scalePx / 2, y - 4);
+    }
+
+    // Draw coordinate grid overlay
+    function drawCoordinateGrid() {
+        if (!canvas || !ctx) return;
+
+        // Get calibration
+        const calibration = window.calibration && window.calibration.getCurrentCalibration();
+        const umPerPx = calibration ? calibration.um_per_px : null;
+        const hasCalibration = umPerPx !== null;
+
+        // Calculate image dimensions
+        const imageWidth = canvas.width;
+        const imageHeight = canvas.height;
+
+        // Determine coordinate system (µm if calibrated, px otherwise)
+        const widthUnits = hasCalibration ? imageWidth * umPerPx : imageWidth;
+        const heightUnits = hasCalibration ? imageHeight * umPerPx : imageHeight;
+        const unitLabel = hasCalibration ? 'µm' : 'px';
+
+        // Choose nice grid spacing
+        const niceValues = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+        const targetLines = 6; // Aim for ~6 lines per axis
+        const targetSpacing = Math.max(widthUnits, heightUnits) / targetLines;
+
+        let gridSpacing = niceValues[niceValues.length - 1];
+        for (const val of niceValues) {
+            if (val >= targetSpacing) {
+                gridSpacing = val;
+                break;
+            }
+        }
+
+        // Convert spacing to pixels
+        const spacingPx = hasCalibration ? gridSpacing / umPerPx : gridSpacing;
+
+        // Draw settings - get color and opacity from settings
+        const baseColor = (window.settings && window.settings.get('gridColor')) || '#ff88ff';
+        const gridOpacity = (window.settings && window.settings.get('gridOpacity')) || 0.35;
+        // Parse hex color to RGB for transparent version
+        const r = parseInt(baseColor.slice(1, 3), 16);
+        const g = parseInt(baseColor.slice(3, 5), 16);
+        const b = parseInt(baseColor.slice(5, 7), 16);
+        const gridLineColor = `rgba(${r}, ${g}, ${b}, ${gridOpacity})`;
+        const labelColor = baseColor;
+        const labelShadow = '#000000';
+        const fontSize = 11;
+        const labelPadding = 4;
+
+        ctx.save();
+
+        // Draw vertical grid lines and X-axis labels
+        ctx.strokeStyle = gridLineColor;
+        ctx.lineWidth = 1;
+        ctx.font = `${fontSize}px sans-serif`;
+
+        for (let xPx = 0; xPx <= imageWidth; xPx += spacingPx) {
+            const coordValue = hasCalibration ? xPx * umPerPx : xPx;
+
+            // Draw vertical line
+            ctx.beginPath();
+            ctx.moveTo(xPx, 0);
+            ctx.lineTo(xPx, imageHeight);
+            ctx.stroke();
+
+            // Draw X label at top
+            if (xPx > 0 && xPx < imageWidth - 30) {
+                const label = formatGridLabel(coordValue);
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                // Draw with shadow for visibility
+                ctx.fillStyle = labelShadow;
+                ctx.fillText(label, xPx + 1, labelPadding + 1);
+                ctx.fillStyle = labelColor;
+                ctx.fillText(label, xPx, labelPadding);
+            }
+        }
+
+        // Draw horizontal grid lines and Y-axis labels
+        for (let yPx = 0; yPx <= imageHeight; yPx += spacingPx) {
+            const coordValue = hasCalibration ? yPx * umPerPx : yPx;
+
+            // Draw horizontal line
+            ctx.beginPath();
+            ctx.moveTo(0, yPx);
+            ctx.lineTo(imageWidth, yPx);
+            ctx.stroke();
+
+            // Draw Y label at left
+            if (yPx > 15 && yPx < imageHeight - 10) {
+                const label = formatGridLabel(coordValue);
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = labelShadow;
+                ctx.fillText(label, labelPadding + 1, yPx + 1);
+                ctx.fillStyle = labelColor;
+                ctx.fillText(label, labelPadding, yPx);
+            }
+        }
+
+        // Draw origin label with unit indicator
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        const originLabel = `0 ${unitLabel}`;
+        // Background box for origin label
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        const metrics = ctx.measureText(originLabel);
+        ctx.fillRect(labelPadding - 2, labelPadding - 2, metrics.width + 4, fontSize + 4);
+        // Label text
+        ctx.fillStyle = labelShadow;
+        ctx.fillText(originLabel, labelPadding + 1, labelPadding + 1);
+        ctx.fillStyle = labelColor;
+        ctx.fillText(originLabel, labelPadding, labelPadding);
+
+        ctx.restore();
+    }
+
+    // Format coordinate grid label (remove unnecessary decimals)
+    function formatGridLabel(value) {
+        if (value === 0) return '0';
+        if (value >= 100) return Math.round(value).toString();
+        if (value >= 10) return value.toFixed(0);
+        if (value >= 1) return value.toFixed(1);
+        return value.toFixed(2);
     }
 
     // Draw a single tubercle (as circle or ellipse)

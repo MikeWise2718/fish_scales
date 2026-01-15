@@ -15,10 +15,11 @@ from PIL import Image, ImageDraw, ImageFont
 COLORS = {
     'tubercle_outline': (0, 255, 255),      # Cyan - extracted tubercles
     'tubercle_manual': (0, 255, 0),         # Green - manually added tubercles
+    'tubercle_debug_seed': (255, 0, 255),   # Magenta - debug seed tubercles
     'tubercle_fill': (0, 255, 255, 50),     # Cyan with alpha
-    'tubercle_selected': (255, 0, 255),     # Magenta for selection
+    'tubercle_selected': (255, 255, 0),     # Yellow for selection (changed from magenta)
     'connection': (255, 255, 0),            # Yellow
-    'connection_selected': (255, 0, 255),   # Magenta
+    'connection_selected': (255, 255, 0),   # Yellow
     'text': (255, 255, 255),                # White
     'text_bg': (0, 0, 0, 180),              # Black with alpha
 }
@@ -36,7 +37,8 @@ def render_screenshot(
     selected_tub_id: Optional[int] = None,
     selected_edge_idx: Optional[int] = None,
     debug_shapes: Optional[list] = None,
-) -> str:
+    max_size: Optional[tuple] = None,
+) -> str | tuple:
     """Render image with overlay and return as base64 PNG.
 
     Args:
@@ -51,9 +53,11 @@ def render_screenshot(
         selected_tub_id: ID of selected tubercle (highlighted yellow)
         selected_edge_idx: Index of selected edge (highlighted yellow)
         debug_shapes: Optional list of debug shapes (rectangles, etc.)
+        max_size: Optional tuple (max_width, max_height) to resize for VLM.
+                  If provided, returns (base64_str, scale_factor) tuple.
 
     Returns:
-        Base64-encoded PNG image string
+        Base64-encoded PNG image string, or (base64_str, scale_factor) if max_size is set
     """
     # Load image
     img_path = Path(image_path)
@@ -91,17 +95,32 @@ def render_screenshot(
 
                 # Determine colors based on selection and source
                 is_selected = tub_id == selected_tub_id
+                is_debug_seed = source == 'debug_seed'
+
                 if is_selected:
                     outline_color = COLORS['tubercle_selected']
+                    width = 3
+                elif is_debug_seed:
+                    outline_color = COLORS['tubercle_debug_seed']
+                    width = 4  # Thicker outline for debug seeds
                 elif source == 'manual':
                     outline_color = COLORS['tubercle_manual']
+                    width = 2
                 else:
                     outline_color = COLORS['tubercle_outline']
-                width = 3 if is_selected else 2
+                    width = 2
 
                 # Draw circle outline
                 bbox = [cx - radius, cy - radius, cx + radius, cy + radius]
                 draw.ellipse(bbox, outline=outline_color, width=width)
+
+                # Draw cross-hairs for debug seeds (additional visual marker)
+                if is_debug_seed:
+                    cross_size = radius * 0.5
+                    draw.line([(cx - cross_size, cy), (cx + cross_size, cy)],
+                              fill=outline_color, width=2)
+                    draw.line([(cx, cy - cross_size), (cx, cy + cross_size)],
+                              fill=outline_color, width=2)
 
                 # Draw ID number if enabled
                 if show_numbers:
@@ -148,12 +167,30 @@ def render_screenshot(
         # Convert to RGB for PNG output (no alpha needed in final)
         result = result.convert('RGB')
 
+        # Resize for VLM if max_size specified
+        scale_factor = 1.0
+        if max_size:
+            orig_width, orig_height = result.size
+            max_w, max_h = max_size
+            # Calculate scale to fit within max_size while preserving aspect ratio
+            scale_w = max_w / orig_width
+            scale_h = max_h / orig_height
+            scale_factor = min(scale_w, scale_h, 1.0)  # Don't upscale
+            if scale_factor < 1.0:
+                new_width = int(orig_width * scale_factor)
+                new_height = int(orig_height * scale_factor)
+                result = result.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
         # Encode as base64 PNG
         buffer = io.BytesIO()
         result.save(buffer, format='PNG', optimize=True)
         buffer.seek(0)
 
-        return base64.b64encode(buffer.read()).decode('utf-8')
+        image_b64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+        if max_size:
+            return image_b64, scale_factor
+        return image_b64
 
 
 DEBUG_COLORS = {

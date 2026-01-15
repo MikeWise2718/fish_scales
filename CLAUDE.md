@@ -49,6 +49,30 @@ uv run fish-scale-agent run --calibration 0.1  # Set calibration (µm/px)
 uv run fish-scale-agent run -v                 # Verbose mode
 ```
 
+## Version Management
+
+**IMPORTANT:** The version number MUST be updated with every code change.
+
+Version is tracked in these locations (all must be updated together):
+- `pyproject.toml` - line 3: `version = "X.Y.Z"  # Updated: YYYY-MM-DD`
+- `src/fish_scale_analysis/__init__.py` - `__version__` and `__version_date__`
+- `src/fish_scale_ui/__init__.py` - `__version__` and `__version_date__`
+- `src/fish_scale_mcp/__init__.py` - `__version__` and `__version_date__`
+- `src/fish_scale_agent/__init__.py` - `__version__` and `__version_date__`
+
+**Format:**
+```python
+__version__ = "0.1.1"
+__version_date__ = "2026-01-14"
+```
+
+**Versioning scheme:**
+- Patch (0.0.X): Bug fixes, minor changes, refactoring
+- Minor (0.X.0): New features, significant enhancements
+- Major (X.0.0): Breaking changes, major architectural changes
+
+When making code changes, increment the patch version and update the date to today's date in all locations.
+
 ## Project Structure
 
 ```
@@ -75,7 +99,7 @@ fish_scales/
 │   │   ├── routes/
 │   │   │   ├── main.py                # Page routes
 │   │   │   ├── api.py                 # API endpoints (extraction, save/load, etc.)
-│   │   │   └── mcp_api.py             # MCP server API endpoints
+│   │   │   └── tools_api.py            # Tool endpoints for agents (/api/tools/*)
 │   │   ├── services/
 │   │   │   ├── extraction.py          # Wrapper around CLI extraction
 │   │   │   ├── persistence.py         # Annotation save/load
@@ -268,6 +292,56 @@ export GEMINI_API_KEY=your_key_here
 uv run fish-scale-agent run image.tif --provider gemini
 ```
 
+### Debug Seeds (Coordinate Verification)
+
+Debug seeds are markers placed at known positions to diagnose whether the VLM correctly understands the image coordinate system. This feature helps identify issues like:
+- VLM generating idealized patterns instead of detecting actual features
+- Coordinate transformation problems
+- VLM hallucinating content
+
+**CLI Usage:**
+```bash
+# Run with corner seeds (5 points at corners + center)
+uv run fish-scale-agent edit image.tif --debug-seeds corners --calibration 0.14 -v
+
+# Run with 3x3 grid seeds (9 points)
+uv run fish-scale-agent edit image.tif --debug-seeds grid3x3 --calibration 0.14
+
+# Run with cross pattern (5 points in + shape)
+uv run fish-scale-agent edit image.tif --debug-seeds cross --calibration 0.14
+
+# Custom seed positions (x,y pairs separated by semicolons)
+uv run fish-scale-agent edit image.tif --debug-seeds "100,100;350,255;600,400"
+
+# Custom seed radius (default: 15px)
+uv run fish-scale-agent edit image.tif --debug-seeds corners --debug-seed-radius 20
+```
+
+**UI Usage:**
+In the AgenticEdit tab, use the "Debug Seeds" dropdown to select a pattern (Corners, Grid 3×3, Cross) before starting the agent. Analysis results appear in the "Debug Seed Analysis" section after agent completion.
+
+**Seed Patterns:**
+| Pattern | Points | Description |
+|---------|--------|-------------|
+| `corners` | 5 | 4 corners (15% margin) + center |
+| `grid3x3` | 9 | 3×3 grid at 20%, 50%, 80% of width/height |
+| `cross` | 5 | Center + 4 cardinal directions |
+| custom | N | User-specified x,y coordinates |
+
+**Analysis Results:**
+- **Mean Position Error**: How accurately VLM reports seed positions
+- **Systematic Offset**: Consistent (dx, dy) shift indicating coordinate transform issue
+- **Overlapping Tubercles**: VLM adding tubercles on top of seeds (not seeing them)
+- **Regular Grid Detected**: VLM hallucinating idealized pattern instead of detecting features
+
+**Diagnostic Outcomes:**
+| Observation | Diagnosis |
+|-------------|-----------|
+| VLM reports seeds accurately (< 10px error) | Coordinates working correctly |
+| VLM reports seeds with consistent offset | Coordinate transformation bug |
+| VLM adds tubercles on top of seeds | VLM not perceiving overlay |
+| VLM adds regular grid ignoring seeds | VLM hallucinating ideal pattern |
+
 ## Extraction Parameter Optimization Agent
 
 A separate LLM-powered agent for finding optimal extraction parameters, complementing the pattern completion agent above.
@@ -409,7 +483,7 @@ Hexagonalness = 0.40 × Spacing Uniformity + 0.45 × Degree Score + 0.15 × Edge
 - `none`: <4 nodes (insufficient data)
 
 **Implementation:**
-- Single source of truth: `fish_scale_ui/routes/mcp_api.py` → `_calculate_hexagonalness_from_dicts()`
+- Single source of truth: `fish_scale_ui/routes/tools_api.py` → `_calculate_hexagonalness_from_dicts()`
 - API endpoint: `GET /api/hexagonalness` (supports custom weights via query params)
 - JavaScript modules call the API endpoint for all hexagonalness calculations
 

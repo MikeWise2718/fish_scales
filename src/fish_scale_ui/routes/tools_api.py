@@ -1,13 +1,16 @@
-"""MCP API routes for Fish Scale UI.
+"""Tools API routes for Fish Scale UI.
 
-These endpoints are designed to be called by the MCP server to control
-the fish-scale-ui application programmatically.
+These endpoints provide programmatic control of the fish-scale-ui application.
+They are called directly by agents (fish-scale-agent) via HTTP, and can also
+be wrapped by the MCP server for MCP protocol compatibility.
+
+Endpoints are mounted at /api/tools/* (e.g., /api/tools/screenshot, /api/tools/state).
 """
 
 from flask import Blueprint, request, jsonify, current_app
 from pathlib import Path
 
-mcp_bp = Blueprint('mcp', __name__)
+tools_bp = Blueprint('tools', __name__)
 
 
 def get_state_refs():
@@ -16,7 +19,7 @@ def get_state_refs():
     return _current_image, _extraction_data
 
 
-@mcp_bp.route('/screenshot', methods=['GET'])
+@tools_bp.route('/screenshot', methods=['GET'])
 def get_screenshot():
     """Capture current view as base64 PNG with optional overlay.
 
@@ -24,13 +27,18 @@ def get_screenshot():
         overlay: bool - Whether to include tubercle/connection overlay (default: true)
         numbers: bool - Whether to show tubercle ID numbers (default: false)
         scale_bar: bool - Whether to show scale bar (default: false)
+        max_width: int - Max width for VLM (optional, for coordinate scaling)
+        max_height: int - Max height for VLM (optional, for coordinate scaling)
 
     Returns:
         {
             "success": true,
             "image_b64": "base64-encoded PNG...",
-            "width": int,
-            "height": int
+            "width": int,  # Original image width
+            "height": int,  # Original image height
+            "scaled_width": int,  # Actual image width (if scaled)
+            "scaled_height": int,  # Actual image height (if scaled)
+            "scale_factor": float  # Scale factor (1.0 if not scaled)
         }
     """
     from fish_scale_mcp.screenshot import render_screenshot
@@ -45,13 +53,23 @@ def get_screenshot():
     show_numbers = request.args.get('numbers', 'false').lower() == 'true'
     show_scale_bar = request.args.get('scale_bar', 'false').lower() == 'true'
 
+    # Optional max size for VLM scaling
+    max_width = request.args.get('max_width', type=int)
+    max_height = request.args.get('max_height', type=int)
+    max_size = None
+    if max_width and max_height:
+        max_size = (max_width, max_height)
+
     try:
-        # Get image dimensions
+        # Get original image dimensions
         with Image.open(_current_image['web_path']) as img:
-            width, height = img.size
+            orig_width, orig_height = img.size
+
+        scale_factor = 1.0
+        scaled_width, scaled_height = orig_width, orig_height
 
         if show_overlay:
-            image_b64 = render_screenshot(
+            result = render_screenshot(
                 image_path=_current_image['web_path'],
                 tubercles=_extraction_data.get('tubercles', []),
                 connections=_extraction_data.get('edges', []),
@@ -61,14 +79,24 @@ def get_screenshot():
                 show_numbers=show_numbers,
                 show_scale_bar=show_scale_bar,
                 debug_shapes=_extraction_data.get('debug_shapes', []),
+                max_size=max_size,
             )
+            if max_size and isinstance(result, tuple):
+                image_b64, scale_factor = result
+                scaled_width = int(orig_width * scale_factor)
+                scaled_height = int(orig_height * scale_factor)
+            else:
+                image_b64 = result
         else:
             # Just return the image without overlay
-            from fish_scale_mcp.screenshot import render_thumbnail
             import base64
             import io
 
             with Image.open(_current_image['web_path']) as img:
+                if max_size:
+                    img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    scaled_width, scaled_height = img.size
+                    scale_factor = scaled_width / orig_width
                 buffer = io.BytesIO()
                 img.save(buffer, format='PNG')
                 buffer.seek(0)
@@ -77,19 +105,25 @@ def get_screenshot():
         return jsonify({
             'success': True,
             'image_b64': image_b64,
-            'width': width,
-            'height': height,
+            'width': orig_width,
+            'height': orig_height,
+            'scaled_width': scaled_width,
+            'scaled_height': scaled_height,
+            'scale_factor': scale_factor,
         })
 
     except Exception as e:
         return jsonify({'error': f'Failed to capture screenshot: {str(e)}'}), 500
 
 
-@mcp_bp.route('/state', methods=['GET'])
-def get_state():
-    """Get complete current state.
+@tools_bp.route('/state', methods=['GET', 'POST'])
+def handle_state():
+    """Get or set current state.
 
-    Returns:
+    GET returns complete current state.
+    POST syncs client state to server (for set switching before agent operations).
+
+    GET Returns:
         {
             "image": {
                 "loaded": bool,
@@ -109,10 +143,59 @@ def get_state():
             "parameters": {...},
             "dirty": bool
         }
+
+    POST body:
+        {
+            "tubercles": [...],
+            "edges": [...],
+            "parameters": {...} (optional)
+        }
+
+    POST Returns:
+        {"success": true, "n_tubercles": int, "n_edges": int}
     """
     from PIL import Image
 
     _current_image, _extraction_data = get_state_refs()
+
+    if request.method == 'POST':
+        # Sync client state to server
+        data = request.get_json() or {}
+
+        # Update tubercles and edges
+        if 'tubercles' in data:
+            _extraction_data['tubercles'] = data['tubercles']
+        if 'edges' in data:
+            _extraction_data['edges'] = data['edges']
+        if 'parameters' in data:
+            _extraction_data['parameters'] = data['parameters']
+
+        # Recalculate statistics
+        tubercles = _extraction_data.get('tubercles', [])
+        edges = _extraction_data.get('edges', [])
+
+        # Update basic stats
+        _extraction_data['statistics'] = {
+            'n_tubercles': len(tubercles),
+            'n_edges': len(edges),
+        }
+
+        # Calculate hexagonalness
+        hex_result = _calculate_hexagonalness_from_dicts(tubercles, edges)
+        _extraction_data['statistics'].update({
+            'hexagonalness_score': hex_result.get('hexagonalness_score', 0),
+            'spacing_uniformity': hex_result.get('spacing_uniformity', 0),
+            'degree_score': hex_result.get('degree_score', 0),
+            'edge_ratio_score': hex_result.get('edge_ratio_score', 0),
+        })
+
+        return jsonify({
+            'success': True,
+            'n_tubercles': len(tubercles),
+            'n_edges': len(edges),
+        })
+
+    # GET request - return current state
 
     # Get image info
     image_info = {'loaded': False}
@@ -143,7 +226,7 @@ def get_state():
     })
 
 
-@mcp_bp.route('/params', methods=['GET', 'POST'])
+@tools_bp.route('/params', methods=['GET', 'POST'])
 def handle_params():
     """Get or set extraction parameters.
 
@@ -195,13 +278,14 @@ def handle_params():
     })
 
 
-@mcp_bp.route('/tubercle', methods=['POST', 'PUT', 'DELETE'])
+@tools_bp.route('/tubercle', methods=['POST', 'PUT', 'DELETE'])
 def handle_tubercle():
     """Add, move, or delete a tubercle.
 
     POST (add):
-        {"x": float, "y": float, "radius": float}
+        {"x": float, "y": float, "radius": float, "source": str (optional)}
         Returns: {"success": true, "tubercle": {...}, "id": int}
+        Note: source defaults to "manual", can be "debug_seed" for debug seeds
 
     PUT (move):
         {"id": int, "x": float, "y": float}
@@ -227,9 +311,15 @@ def handle_tubercle():
         x = data.get('x')
         y = data.get('y')
         radius = data.get('radius')
+        source = data.get('source', 'manual')  # Allow custom source (e.g., 'debug_seed')
 
         if x is None or y is None:
             return jsonify({'error': 'x and y coordinates required'}), 400
+
+        # Validate source
+        valid_sources = ('manual', 'extracted', 'debug_seed')
+        if source not in valid_sources:
+            source = 'manual'
 
         # Auto-calculate radius if not provided (use mean of existing)
         if radius is None:
@@ -252,14 +342,14 @@ def handle_tubercle():
             'diameter_px': float(diameter_px),
             'diameter_um': float(diameter_um),
             'circularity': 1.0,  # Perfect circle for manual additions
-            'source': 'manual',  # Track origin for coloring
+            'source': source,  # Track origin for coloring
         }
 
         tubercles.append(new_tub)
         _extraction_data['tubercles'] = tubercles
         _extraction_data['dirty'] = True
 
-        log_event('mcp_tubercle_added', {'id': new_id, 'x': x, 'y': y, 'radius': radius})
+        log_event('tools_tubercle_added', {'id': new_id, 'x': x, 'y': y, 'radius': radius})
 
         return jsonify({
             'success': True,
@@ -285,7 +375,7 @@ def handle_tubercle():
                     tub['centroid_y'] = float(new_y)
 
                 _extraction_data['dirty'] = True
-                log_event('mcp_tubercle_moved', {'id': tub_id, 'x': new_x, 'y': new_y})
+                log_event('tools_tubercle_moved', {'id': tub_id, 'x': new_x, 'y': new_y})
 
                 return jsonify({
                     'success': True,
@@ -316,12 +406,12 @@ def handle_tubercle():
         _extraction_data['edges'] = edges
         _extraction_data['dirty'] = True
 
-        log_event('mcp_tubercle_deleted', {'id': tub_id})
+        log_event('tools_tubercle_deleted', {'id': tub_id})
 
         return jsonify({'success': True})
 
 
-@mcp_bp.route('/connection', methods=['POST', 'DELETE'])
+@tools_bp.route('/connection', methods=['POST', 'DELETE'])
 def handle_connection():
     """Add or delete a connection between tubercles.
 
@@ -395,7 +485,7 @@ def handle_connection():
         _extraction_data['edges'] = edges
         _extraction_data['dirty'] = True
 
-        log_event('mcp_connection_added', {'id1': id1, 'id2': id2})
+        log_event('tools_connection_added', {'id1': id1, 'id2': id2})
 
         return jsonify({
             'success': True,
@@ -420,12 +510,12 @@ def handle_connection():
         _extraction_data['edges'] = edges
         _extraction_data['dirty'] = True
 
-        log_event('mcp_connection_deleted', {'id1': id1, 'id2': id2})
+        log_event('tools_connection_deleted', {'id1': id1, 'id2': id2})
 
         return jsonify({'success': True})
 
 
-@mcp_bp.route('/connections/clear', methods=['POST'])
+@tools_bp.route('/connections/clear', methods=['POST'])
 def clear_connections():
     """Remove all connections.
 
@@ -441,7 +531,7 @@ def clear_connections():
     _extraction_data['edges'] = []
     _extraction_data['dirty'] = True if count > 0 else _extraction_data.get('dirty', False)
 
-    log_event('mcp_connections_cleared', {'count': count})
+    log_event('tools_connections_cleared', {'count': count})
 
     return jsonify({
         'success': True,
@@ -449,7 +539,7 @@ def clear_connections():
     })
 
 
-@mcp_bp.route('/auto-connect', methods=['POST'])
+@tools_bp.route('/auto-connect', methods=['POST'])
 def auto_connect():
     """Auto-generate connections using specified graph method.
 
@@ -550,7 +640,7 @@ def auto_connect():
         hex_metrics = _calculate_hexagonalness_from_dicts(tubercles, edges)
         _extraction_data['statistics'].update(hex_metrics)
 
-        log_event('mcp_auto_connect', {
+        log_event('tools_auto_connect', {
             'method': method,
             'n_edges': len(edges),
             'hexagonalness_score': hex_metrics.get('hexagonalness_score'),
@@ -567,7 +657,7 @@ def auto_connect():
         return jsonify({'error': f'Auto-connect failed: {str(e)}'}), 500
 
 
-@mcp_bp.route('/calibration', methods=['GET', 'POST'])
+@tools_bp.route('/calibration', methods=['GET', 'POST'])
 def handle_calibration():
     """Get or set calibration.
 
@@ -606,7 +696,7 @@ def handle_calibration():
     else:
         return jsonify({'error': 'Provide um_per_px or scale_um and scale_px'}), 400
 
-    log_event('mcp_calibration_set', _current_image['calibration'])
+    log_event('tools_calibration_set', _current_image['calibration'])
 
     return jsonify({
         'success': True,
@@ -614,7 +704,7 @@ def handle_calibration():
     })
 
 
-@mcp_bp.route('/save', methods=['POST'])
+@tools_bp.route('/save', methods=['POST'])
 def save_annotations():
     """Save current state to annotations file.
 
@@ -652,7 +742,7 @@ def save_annotations():
             _current_image['annotations_saved'] = True
             _extraction_data['dirty'] = False
 
-            log_event('mcp_annotations_saved', {
+            log_event('tools_annotations_saved', {
                 'filename': _current_image['filename'],
                 'n_tubercles': len(tubercles),
                 'n_edges': len(edges),
@@ -664,7 +754,7 @@ def save_annotations():
         return jsonify({'error': f'Save failed: {str(e)}'}), 500
 
 
-@mcp_bp.route('/load-image', methods=['POST'])
+@tools_bp.route('/load-image', methods=['POST'])
 def load_image():
     """Load an image file for processing.
 
@@ -718,7 +808,7 @@ def load_image():
             with Image.open(web_path) as img:
                 width, height = img.size
 
-            log_event('mcp_image_already_loaded', {
+            log_event('tools_image_already_loaded', {
                 'filename': image_path.name,
                 'width': width,
                 'height': height,
@@ -749,7 +839,20 @@ def load_image():
         # Update state
         _current_image['path'] = str(save_path)
         _current_image['web_path'] = str(web_path)
-        _current_image['filename'] = image_path.name
+
+        # Extract original filename, stripping GUID prefix if present
+        # GUID prefix format: {32-char-hex}_{original-filename}
+        filename = image_path.name
+        if '_' in filename:
+            parts = filename.split('_', 1)
+            # Check if first part looks like a GUID (32 hex chars)
+            if len(parts) == 2 and len(parts[0]) == 32:
+                try:
+                    int(parts[0], 16)  # Validate it's hex
+                    filename = parts[1]  # Use the part after GUID prefix
+                except ValueError:
+                    pass  # Not a valid hex GUID, keep original name
+        _current_image['filename'] = filename
         _current_image['rotation'] = 0
         _current_image['calibration'] = None
         _current_image['slo_saved'] = False
@@ -771,7 +874,7 @@ def load_image():
             # File is NOT in uploads - safe to add
             add_recent_image(str(image_path), image_path.name)
 
-        log_event('mcp_image_loaded', {
+        log_event('tools_image_loaded', {
             'filename': image_path.name,
             'width': width,
             'height': height,
@@ -788,7 +891,7 @@ def load_image():
         return jsonify({'error': f'Failed to load image: {str(e)}'}), 500
 
 
-@mcp_bp.route('/debug-shapes', methods=['GET', 'POST', 'DELETE'])
+@tools_bp.route('/debug-shapes', methods=['GET', 'POST', 'DELETE'])
 def handle_debug_shapes():
     """Manage debug shapes (rectangles, markers) for visualization.
 
@@ -854,7 +957,7 @@ def handle_debug_shapes():
             }
 
             shapes.append(shape)
-            log_event('mcp_debug_shape_added', shape)
+            log_event('tools_debug_shape_added', shape)
 
             return jsonify({
                 'success': True,
@@ -874,16 +977,16 @@ def handle_debug_shapes():
             _extraction_data['debug_shapes'] = [s for s in shapes if s.get('id') != shape_id]
             if len(_extraction_data['debug_shapes']) == original_count:
                 return jsonify({'error': f'Shape {shape_id} not found'}), 404
-            log_event('mcp_debug_shape_deleted', {'id': shape_id})
+            log_event('tools_debug_shape_deleted', {'id': shape_id})
         else:
             # Delete all shapes
             _extraction_data['debug_shapes'] = []
-            log_event('mcp_debug_shapes_cleared', {'count': len(shapes)})
+            log_event('tools_debug_shapes_cleared', {'count': len(shapes)})
 
         return jsonify({'success': True})
 
 
-@mcp_bp.route('/statistics', methods=['GET'])
+@tools_bp.route('/statistics', methods=['GET'])
 def get_statistics():
     """Get current statistics including hexagonalness metrics.
 
@@ -1076,7 +1179,7 @@ def _calculate_hexagonalness_from_dicts(
     return result
 
 
-@mcp_bp.route('/user', methods=['GET'])
+@tools_bp.route('/user', methods=['GET'])
 def get_user():
     """Get the current user name for history tracking.
 
@@ -1094,7 +1197,7 @@ def get_user():
     })
 
 
-@mcp_bp.route('/history', methods=['POST'])
+@tools_bp.route('/history', methods=['POST'])
 def add_history_event():
     """Add a history event to the current set.
 

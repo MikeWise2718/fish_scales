@@ -4,10 +4,10 @@ Tests for hexagonalness calculation consistency.
 Hexagonalness is calculated in two Python locations:
 1. Python (core): fish_scale_analysis/core/measurement.py - calculate_hexagonalness()
    Used by CLI and core processing, works with Tubercle/NeighborEdge objects.
-2. Python (MCP API): fish_scale_ui/routes/mcp_api.py - _calculate_hexagonalness_from_dicts()
+2. Python (Tools API): fish_scale_ui/routes/tools_api.py - _calculate_hexagonalness_from_dicts()
    Single source of truth for web UI, works with dict representations.
 
-JavaScript modules call the /api/hexagonalness endpoint which delegates to the MCP API
+JavaScript modules call the /api/hexagonalness endpoint which delegates to the Tools API
 implementation, so there's no longer any JavaScript implementation to verify.
 
 These tests ensure the two Python implementations produce consistent results.
@@ -21,11 +21,11 @@ from fish_scale_analysis.models import Tubercle, NeighborEdge, CalibrationData
 from fish_scale_analysis.core.measurement import calculate_hexagonalness
 
 
-# Import the MCP API's implementation
+# Import the Tools API's implementation
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from fish_scale_ui.routes.mcp_api import _calculate_hexagonalness_from_dicts
+from fish_scale_ui.routes.tools_api import _calculate_hexagonalness_from_dicts
 
 
 class TestHexagonalnessConsistency:

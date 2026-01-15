@@ -16,6 +16,7 @@ def get_version_info():
     import scipy
     import skimage
     import flask
+    from fish_scale_ui import __version__, __version_date__
 
     # Get git info
     git_hash = 'unknown'
@@ -40,7 +41,8 @@ def get_version_info():
         pass
 
     return {
-        'app_version': '0.1.0',
+        'app_version': __version__,
+        'app_version_date': __version_date__,
         'python_version': sys.version.split()[0],
         'numpy_version': numpy.__version__,
         'scipy_version': scipy.__version__,

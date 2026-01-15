@@ -135,6 +135,92 @@ def create_parser() -> argparse.ArgumentParser:
         help="Verbose output",
     )
 
+    # Edit command (visual pattern completion)
+    edit_parser = subparsers.add_parser(
+        "edit",
+        help="Run visual pattern completion agent to add missing tubercles",
+    )
+    edit_parser.add_argument(
+        "image",
+        nargs="?",
+        help="Path to image file (optional if already loaded in UI)",
+    )
+    edit_parser.add_argument(
+        "--calibration",
+        type=float,
+        help="Calibration in micrometers per pixel (optional if already set)",
+    )
+    edit_parser.add_argument(
+        "--provider",
+        choices=["claude", "gemini", "openrouter"],
+        default="claude",
+        help="LLM provider (default: claude)",
+    )
+    edit_parser.add_argument(
+        "--model",
+        help="Specific model name (default depends on provider)",
+    )
+    edit_parser.add_argument(
+        "--api-key",
+        help="API key (or use ANTHROPIC_API_KEY/GEMINI_API_KEY/OPENROUTER_API_KEY env var)",
+    )
+    edit_parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=30,
+        help="Maximum iterations (default: 30)",
+    )
+    edit_parser.add_argument(
+        "--plateau-threshold",
+        type=int,
+        default=3,
+        help="Stop after N iterations without improvement (default: 3)",
+    )
+    edit_parser.add_argument(
+        "--no-auto-connect",
+        action="store_true",
+        help="Don't run auto-connect at the end",
+    )
+    edit_parser.add_argument(
+        "--auto-connect-method",
+        choices=["delaunay", "gabriel", "rng"],
+        default="gabriel",
+        help="Graph algorithm for auto-connect (default: gabriel)",
+    )
+    edit_parser.add_argument(
+        "--ui-url",
+        default="http://localhost:5010",
+        help="URL of fish-scale-ui (default: http://localhost:5010)",
+    )
+    edit_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Verbose output",
+    )
+    edit_parser.add_argument(
+        "--debug-seeds",
+        metavar="PATTERN",
+        help=(
+            "Enable debug seed tubercles for coordinate verification. "
+            "Seeds are placed at known positions to diagnose VLM coordinate accuracy. "
+            "Patterns: 'corners' (5 points at corners + center), "
+            "'grid3x3' (9 points in 3x3 grid), 'cross' (5 points in + shape), "
+            "or custom coords 'x1,y1;x2,y2;...' (semicolon-separated). "
+            "After completion, analysis shows: mean position error, systematic offset, "
+            "overlapping tubercles, and regular grid detection. "
+            "Example: --debug-seeds corners --calibration 0.14"
+        ),
+    )
+    edit_parser.add_argument(
+        "--debug-seed-radius",
+        type=float,
+        default=15.0,
+        help=(
+            "Radius for debug seed tubercles in pixels (default: 15). "
+            "Larger seeds are more visible but may interfere with detection."
+        ),
+    )
+
     return parser
 
 
@@ -304,6 +390,135 @@ def cmd_providers(args):
     )
 
 
+def cmd_edit(args):
+    """Run visual pattern completion agent."""
+    from .editing_agent import EditingAgent, EditingState
+    from .debug_seeds import validate_pattern
+
+    # Check if UI is available
+    if not check_ui_available(args.ui_url):
+        console.print(
+            Panel(
+                f"[red]fish-scale-ui not available at {args.ui_url}[/red]\n\n"
+                "Please start the UI first:\n"
+                "  [cyan]uv run fish-scale-ui[/cyan]",
+                title="Connection Error",
+            )
+        )
+        sys.exit(1)
+
+    # Validate image path if provided
+    image_path = None
+    if args.image:
+        image_path = Path(args.image)
+        if not image_path.exists():
+            console.print(f"[red]Error:[/red] Image not found: {image_path}")
+            sys.exit(1)
+
+    # Validate debug seeds pattern if provided
+    debug_seeds = getattr(args, 'debug_seeds', None)
+    debug_seed_radius = getattr(args, 'debug_seed_radius', 15.0)
+    if debug_seeds and not validate_pattern(debug_seeds):
+        console.print(
+            f"[red]Error:[/red] Invalid debug seeds pattern: {debug_seeds}\n"
+            "Use 'corners', 'grid3x3', 'cross', or custom coords 'x1,y1;x2,y2;...'"
+        )
+        sys.exit(1)
+
+    # Get provider
+    provider = get_provider(args.provider, args.model, getattr(args, 'api_key', None))
+
+    # Print header
+    console.print()
+    console.print("[bold]Fish Scale Editing Agent[/bold]")
+    console.print("=" * 27)
+    if image_path:
+        console.print(f"Image: [cyan]{image_path.name}[/cyan]")
+    else:
+        console.print("Image: [cyan]already loaded in UI[/cyan]")
+    console.print(f"Provider: [cyan]{args.provider}[/cyan] ({provider.model_name})")
+    console.print(f"Max iterations: [cyan]{args.max_iterations}[/cyan]")
+    console.print(f"Plateau threshold: [cyan]{args.plateau_threshold}[/cyan]")
+    if args.calibration:
+        console.print(f"Calibration: [cyan]{args.calibration} um/px[/cyan]")
+    if debug_seeds:
+        console.print(f"Debug seeds: [magenta]{debug_seeds}[/magenta] (radius: {debug_seed_radius}px)")
+    console.print()
+
+    # Track iteration progress
+    def on_iteration(state: EditingState):
+        """Callback for each iteration."""
+        delta = state.current_tubercle_count - state.initial_tubercle_count
+        print(
+            f"Iteration {state.iteration}: "
+            f"Hexagonalness: {state.current_hexagonalness:.3f}, "
+            f"Coverage: {state.current_coverage:.1f}%, "
+            f"Tubercles: {state.current_tubercle_count} ({delta:+d}), "
+            f"Plateau: {state.plateau_count}/{state.plateau_threshold}",
+            flush=True
+        )
+
+    # Create agent
+    agent = EditingAgent(
+        provider=provider,
+        ui_base_url=args.ui_url,
+        verbose=args.verbose,
+    )
+
+    # Run agent
+    try:
+        console.print("[dim]Starting pattern completion...[/dim]")
+
+        result = agent.run_sync(
+            image_path=str(image_path.resolve()) if image_path else None,
+            calibration=args.calibration,
+            max_iterations=args.max_iterations,
+            plateau_threshold=args.plateau_threshold,
+            auto_connect=not args.no_auto_connect,
+            auto_connect_method=args.auto_connect_method,
+            on_iteration=on_iteration,
+            debug_seeds=debug_seeds,
+            debug_seed_radius=debug_seed_radius,
+        )
+
+        # Print final summary
+        console.print()
+        console.print("[bold]Editing Complete[/bold]")
+        console.print("-" * 16)
+        delta = result.current_tubercle_count - result.initial_tubercle_count
+        console.print(f"Tubercles: {result.initial_tubercle_count} -> [green]{result.current_tubercle_count}[/green] ({delta:+d})")
+        console.print(f"Hexagonalness: {result.initial_hexagonalness:.3f} -> [green]{result.current_hexagonalness:.3f}[/green]")
+        console.print(f"Coverage: {result.initial_coverage:.1f}% -> [green]{result.current_coverage:.1f}%[/green]")
+        console.print(f"Iterations: {result.iteration}")
+
+        # Print usage stats if available
+        if hasattr(provider, "get_usage"):
+            usage = provider.get_usage()
+            input_tokens = usage.get("input_tokens", 0)
+            output_tokens = usage.get("output_tokens", 0)
+            cost = usage.get("cost_usd", 0)
+            estimated = usage.get("cost_estimated", False)
+
+            console.print()
+            cost_str = f"~${cost:.2f}" if estimated else f"${cost:.2f}"
+            console.print(
+                f"[dim]Usage: {input_tokens:,} input + {output_tokens:,} output tokens "
+                f"({cost_str})[/dim]"
+            )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Agent interrupted by user[/yellow]")
+        sys.exit(130)
+    except Exception as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+    finally:
+        agent.close()
+
+
 def cmd_optimize(args):
     """Optimize extraction parameters using LLM agent."""
     from .extraction_optimizer import ExtractionOptimizer, OptimizationState
@@ -456,6 +671,8 @@ def main():
         cmd_providers(args)
     elif args.command == "optimize":
         cmd_optimize(args)
+    elif args.command == "edit":
+        cmd_edit(args)
     else:
         parser.print_help()
         sys.exit(1)

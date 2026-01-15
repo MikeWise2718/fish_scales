@@ -407,19 +407,18 @@ window.setUI = (function() {
 
     /**
      * Update the save button state
-     * Save is enabled when there's any data to save (not just unsaved changes)
+     * Save is always enabled - overwrite protection is handled by the save dialog
      */
     function updateSaveButton() {
-        const hasData = window.sets.hasAnyData();
+        // Save buttons are always enabled
+        // Overwrite protection with comparison dialog is shown when saving
         const saveBtn = document.getElementById('saveSetBtn');
         if (saveBtn) {
-            // Enable save when there's data, not just when dirty
-            saveBtn.disabled = !hasData;
+            saveBtn.disabled = false;
         }
         const saveAsBtn = document.getElementById('saveAsBtn');
         if (saveAsBtn) {
-            // Enable Save As when there's data
-            saveAsBtn.disabled = !hasData;
+            saveAsBtn.disabled = false;
         }
     }
 

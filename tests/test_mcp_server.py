@@ -147,9 +147,9 @@ class TestApiUrlBuilder:
 
         server = FishScaleMCPServer(ui_base_url="http://localhost:5010")
 
-        assert server._api_url('/screenshot') == "http://localhost:5010/api/mcp/screenshot"
-        assert server._api_url('state') == "http://localhost:5010/api/mcp/state"
-        assert server._api_url('/tubercle') == "http://localhost:5010/api/mcp/tubercle"
+        assert server._api_url('/screenshot') == "http://localhost:5010/api/tools/screenshot"
+        assert server._api_url('state') == "http://localhost:5010/api/tools/state"
+        assert server._api_url('/tubercle') == "http://localhost:5010/api/tools/tubercle"
 
 
 class TestServerInstructions:

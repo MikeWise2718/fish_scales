@@ -375,9 +375,9 @@ window.extraction = (function() {
                 window.app.showToast('Warning: Annotations were saved for a different image', 'warning');
             }
 
-            // Check for v2 format (has sets array)
-            if (result.data?.version === 2 && result.data?.sets) {
-                // V2 format - load multiple sets
+            // Check for v2/v3 format (has sets array)
+            if (result.data?.version >= 2 && result.data?.sets) {
+                // V2/V3 format - load multiple sets
                 window.sets.importFromLoad(result.data);
             } else if (result.data?.tubercles) {
                 // V1 format - convert to single set
@@ -514,12 +514,87 @@ window.extraction = (function() {
         }
     }
 
-    // Show overwrite confirmation dialog
-    function showOverwriteDialog(files) {
+    // Show overwrite confirmation dialog with comparison
+    async function showOverwriteDialog(files) {
+        // Fetch existing file info for comparison
+        let existingInfo = null;
+        try {
+            const resp = await fetch('/api/annotation-info');
+            existingInfo = await resp.json();
+        } catch (e) {
+            console.warn('Could not fetch annotation info:', e);
+        }
+
+        // Get current data info
+        const currentSets = window.sets?.getSetList() || [];
+        let currentTotalTub = 0;
+        let currentTotalEdge = 0;
+        currentSets.forEach(s => {
+            const set = window.sets?.getSet(s.id);
+            if (set) {
+                currentTotalTub += (set.tubercles?.length || 0);
+                currentTotalEdge += (set.edges?.length || 0);
+            }
+        });
+
+        // Build comparison HTML
+        let html = '<div class="overwrite-comparison" style="display: flex; gap: 20px; flex-wrap: wrap;">';
+
+        // Current data (what will be saved)
+        html += '<div class="comparison-section" style="flex: 1; min-width: 200px; padding: 10px; background: #e8f5e9; border-radius: 4px;">';
+        html += '<h4 style="margin-top: 0; color: #2e7d32;">Data to Save</h4>';
+        html += `<p><strong>Sets:</strong> ${currentSets.length}</p>`;
+        if (currentSets.length > 0) {
+            html += '<ul style="margin: 5px 0; padding-left: 20px;">';
+            currentSets.forEach(s => {
+                const set = window.sets?.getSet(s.id);
+                const nTub = set?.tubercles?.length || 0;
+                const nEdge = set?.edges?.length || 0;
+                html += `<li>${s.name}: ${nTub} tub, ${nEdge} conn</li>`;
+            });
+            html += '</ul>';
+        }
+        html += `<p><strong>Total:</strong> ${currentTotalTub} tubercles, ${currentTotalEdge} connections</p>`;
+        html += '</div>';
+
+        // Existing file data (what will be overwritten)
+        html += '<div class="comparison-section" style="flex: 1; min-width: 200px; padding: 10px; background: #ffebee; border-radius: 4px;">';
+        html += '<h4 style="margin-top: 0; color: #c62828;">Will Be Overwritten</h4>';
+        if (existingInfo?.exists && !existingInfo.error) {
+            const modified = new Date(existingInfo.modified).toLocaleString();
+            const sizeKB = (existingInfo.file_size / 1024).toFixed(1);
+            html += `<p><strong>File:</strong> ${existingInfo.path}</p>`;
+            html += `<p><strong>Modified:</strong> ${modified}</p>`;
+            html += `<p><strong>Size:</strong> ${sizeKB} KB</p>`;
+            html += `<p><strong>Sets:</strong> ${existingInfo.n_sets}</p>`;
+            if (existingInfo.sets && existingInfo.sets.length > 0) {
+                html += '<ul style="margin: 5px 0; padding-left: 20px;">';
+                existingInfo.sets.forEach(s => {
+                    html += `<li>${s.name}: ${s.n_tubercles} tub, ${s.n_edges} conn</li>`;
+                });
+                html += '</ul>';
+            }
+            html += `<p><strong>Total:</strong> ${existingInfo.total_tubercles} tubercles, ${existingInfo.total_edges} connections</p>`;
+        } else {
+            html += '<p><em>Could not read file details</em></p>';
+            html += `<p>Files: ${files.join(', ')}</p>`;
+        }
+        html += '</div>';
+
+        html += '</div>';
+
+        // Add warning if losing data
+        if (existingInfo?.exists && existingInfo.total_tubercles > currentTotalTub) {
+            const diff = existingInfo.total_tubercles - currentTotalTub;
+            html += `<p style="color: #c00; margin-top: 15px; font-weight: bold;">`;
+            html += `Warning: You will lose ${diff} tubercle${diff !== 1 ? 's' : ''} by overwriting.`;
+            html += '</p>';
+        }
+
         return new Promise((resolve) => {
             window.app.showModal(
-                'Overwrite Files?',
-                `<p>The following files already exist:</p><ul>${files.map(f => `<li>${f}</li>`).join('')}</ul><p>Do you want to overwrite them?</p>`,
+                'Overwrite Existing Annotations?',
+                html,
                 [
                     { text: 'Cancel', action: () => resolve(false) },
                     { text: 'Overwrite', primary: true, action: () => resolve(true) },

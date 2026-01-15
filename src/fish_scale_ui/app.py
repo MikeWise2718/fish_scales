@@ -57,12 +57,12 @@ def create_app(config=None):
     # Register blueprints
     from fish_scale_ui.routes.main import main_bp
     from fish_scale_ui.routes.api import api_bp
-    from fish_scale_ui.routes.mcp_api import mcp_bp  # Tool endpoints for automation
+    from fish_scale_ui.routes.tools_api import tools_bp  # Tool endpoints for agents
     from fish_scale_ui.routes.agent_api import agent_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(mcp_bp, url_prefix='/api/tools')  # Renamed from /api/mcp
+    app.register_blueprint(tools_bp, url_prefix='/api/tools')
     app.register_blueprint(agent_bp, url_prefix='/api/agent')
 
     # Initialize logging service

@@ -180,13 +180,13 @@
             <button class="tab-header" data-tab="agent-extraction">AgenticExtraction</button>
             {% endif %}
             <button class="tab-header" data-tab="edit">Edit</button>
+            {% if agent_tabs.editing %}
+            <button class="tab-header" data-tab="agent-editing">AgenticEdit</button>
+            {% endif %}
             <button class="tab-header" data-tab="data">Data</button>
             <button class="tab-header" data-tab="log">Log</button>
             <button class="tab-header" data-tab="settings">Settings</button>
             <button class="tab-header" data-tab="about">About</button>
-            {% if agent_tabs.editing %}
-            <button class="tab-header" data-tab="agent-editing">Agent Editing</button>
-            {% endif %}
         </div>
 
         <div class="tab-content">
@@ -1822,21 +1822,386 @@
             {% endif %}
 
             {% if agent_tabs.editing %}
-            <!-- Agent Editing Tab -->
+            <!-- AgenticEdit Tab -->
             <div class="tab-pane" data-tab="agent-editing">
-                <h2>Agent Editing</h2>
-                <p class="tab-description">LLM-assisted editing and refinement of detected tubercles.</p>
+                <h2>AgenticEdit</h2>
+                <p class="tab-description">LLM-powered pattern completion to fill gaps and improve hexagonalness.</p>
 
-                <div class="config-section">
-                    <h3>Coming Soon</h3>
-                    <p class="hint">Agent-assisted editing features will be available in a future update.</p>
-                    <p class="hint">Planned features:</p>
-                    <ul class="feature-list">
-                        <li>Automatic pattern completion</li>
-                        <li>Outlier detection and removal</li>
-                        <li>Edge case refinement</li>
-                        <li>Quality assessment</li>
-                    </ul>
+                <!-- Configuration Section -->
+                <div class="config-section agent-section edit-agent-section" data-section="edit-config">
+                    <h3 class="edit-agent-section-header">
+                        <span class="agent-section-title">Configuration</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
+                    <div class="agent-config-form">
+                        <div class="param-row agent-config-row">
+                            <label for="editAgentProvider">Provider</label>
+                            <select id="editAgentProvider" class="param-input param-select">
+                                <option value="claude">Claude (Anthropic)</option>
+                                <option value="gemini">Gemini (Google)</option>
+                                <option value="openrouter">OpenRouter</option>
+                            </select>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="editAgentModel">Model</label>
+                            <select id="editAgentModel" class="param-input param-select">
+                                <option value="">-- Select Model --</option>
+                            </select>
+                        </div>
+                        <div class="param-row agent-config-row model-cost-row">
+                            <label></label>
+                            <div id="editModelCostInfo" class="model-cost-info" style="display: none;"></div>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="editAgentMaxIterations">Max Iterations</label>
+                            <input type="number" id="editAgentMaxIterations" class="param-input param-number"
+                                   min="5" max="100" step="5" value="30">
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="editAgentPlateauThreshold">Plateau Threshold</label>
+                            <input type="number" id="editAgentPlateauThreshold" class="param-input param-number"
+                                   min="1" max="10" step="1" value="3">
+                            <span class="param-hint">Stop after N iterations without improvement</span>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label class="agent-checkbox-label">
+                                <input type="checkbox" id="editAgentAutoConnect" checked>
+                                <span>Auto-connect after completion</span>
+                            </label>
+                            <select id="editAgentAutoConnectMethod" class="param-input param-select" style="width: 120px; margin-left: 10px;">
+                                <option value="gabriel" selected>Gabriel</option>
+                                <option value="delaunay">Delaunay</option>
+                                <option value="rng">RNG</option>
+                            </select>
+                        </div>
+
+                        <div class="param-row agent-config-row">
+                            <label for="editAgentDebugSeeds">Debug Seeds</label>
+                            <select id="editAgentDebugSeeds" class="param-input param-select">
+                                <option value="" selected>None</option>
+                                <option value="corners">Corners (5 points)</option>
+                                <option value="grid3x3">Grid 3×3 (9 points)</option>
+                                <option value="cross">Cross (5 points)</option>
+                            </select>
+                            <span class="param-hint">Coordinate calibration markers</span>
+                        </div>
+
+                        <div class="param-row agent-config-row" id="editAgentDebugSeedRadiusRow" style="display: none;">
+                            <label for="editAgentDebugSeedRadius">Seed Radius (px)</label>
+                            <input type="number" id="editAgentDebugSeedRadius" class="param-input param-number"
+                                   min="5" max="50" step="1" value="15">
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Status Section -->
+                <div class="config-section agent-section edit-agent-section" data-section="edit-status">
+                    <h3 class="edit-agent-section-header">
+                        <span class="agent-section-title">Status</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
+                    <div class="agent-status-section">
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">State:</span>
+                            <span id="editAgentState" class="agent-status-value status-idle">Idle</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Phase:</span>
+                            <span id="editAgentPhase" class="agent-status-value">-</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Iteration:</span>
+                            <span id="editAgentIteration" class="agent-status-value">0/30</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Tubercles:</span>
+                            <span id="editAgentTubercleCount" class="agent-status-value">0 (+0)</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Hexagonalness:</span>
+                            <span id="editAgentHexagonalness" class="agent-status-value">0.000</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Coverage:</span>
+                            <span id="editAgentCoverage" class="agent-status-value">0%</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Elapsed:</span>
+                            <span id="editAgentElapsed" class="agent-status-value">0:00</span>
+                        </div>
+                        <div class="agent-status-row">
+                            <span class="agent-status-label">Plateau:</span>
+                            <span id="editAgentPlateau" class="agent-status-value">0/3</span>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Progress Chart Section -->
+                <div class="config-section agent-section edit-agent-section collapsed" data-section="edit-progress">
+                    <h3 class="edit-agent-section-header">
+                        <span class="agent-section-title">Progress Chart</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
+                    <div class="agent-chart-container">
+                        <canvas id="editAgentChart" width="400" height="200"></canvas>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Costs Section -->
+                <div class="config-section agent-section edit-agent-section collapsed" data-section="edit-costs">
+                    <h3 class="edit-agent-section-header">
+                        <span class="agent-section-title">Costs</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
+                        <div class="agent-costs-panel">
+                            <div class="agent-cost-row">
+                                <span class="agent-cost-label">Model:</span>
+                                <span id="editAgentCostModel" class="agent-cost-value">-</span>
+                            </div>
+                            <div class="agent-cost-row">
+                                <span class="agent-cost-label">Input Tokens:</span>
+                                <span id="editAgentCostInputTokens" class="agent-cost-value">0</span>
+                            </div>
+                            <div class="agent-cost-row">
+                                <span class="agent-cost-label">Output Tokens:</span>
+                                <span id="editAgentCostOutputTokens" class="agent-cost-value">0</span>
+                            </div>
+                            <div class="agent-cost-row agent-cost-total">
+                                <span class="agent-cost-label">Estimated Cost:</span>
+                                <span id="editAgentCostEstimate" class="agent-cost-value">$0.0000</span>
+                            </div>
+                            <div class="agent-cost-row">
+                                <span class="agent-cost-label">Last Step:</span>
+                                <span id="editAgentCostLastStep" class="agent-cost-value">$0.0000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LLM Communication Section -->
+                <div class="config-section agent-section edit-agent-section collapsed" data-section="edit-llm">
+                    <h3 class="edit-agent-section-header">
+                        <span class="agent-section-title">LLM Communication</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
+
+                    <!-- Last Prompt -->
+                    <div class="agent-collapsible edit-agent-collapsible collapsed">
+                        <div class="agent-collapsible-header edit-agent-collapsible-header">
+                            <h4>Last Prompt Sent</h4>
+                            <div class="agent-collapsible-actions">
+                                <button type="button" class="btn btn-small btn-copy" id="copyEditPromptBtn" title="Copy to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <span class="agent-collapsible-toggle">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <pre id="editAgentPrompt">(Waiting for first LLM call...)</pre>
+                        </div>
+                    </div>
+
+                    <!-- Last Response -->
+                    <div class="agent-collapsible edit-agent-collapsible collapsed">
+                        <div class="agent-collapsible-header edit-agent-collapsible-header">
+                            <h4>Last LLM Response</h4>
+                            <div class="agent-collapsible-actions">
+                                <button type="button" class="btn btn-small btn-copy" id="copyEditResponseBtn" title="Copy to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <span class="agent-collapsible-toggle">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <pre id="editAgentResponse">(Waiting for agent actions...)</pre>
+                        </div>
+                    </div>
+
+                    <!-- Action Summary -->
+                    <div class="agent-collapsible edit-agent-collapsible collapsed">
+                        <div class="agent-collapsible-header edit-agent-collapsible-header">
+                            <h4>Action Summary</h4>
+                            <div class="agent-collapsible-actions">
+                                <button type="button" class="btn btn-small btn-copy" id="copyEditActionsBtn" title="Copy to clipboard">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <button type="button" class="btn btn-small" id="clearEditActionsBtn" title="Clear actions">
+                                    Clear
+                                </button>
+                                <span class="agent-collapsible-toggle">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="agent-collapsible-content">
+                            <textarea id="editAgentActionLog" class="action-log" readonly>No actions yet.</textarea>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Debug Seed Analysis Section -->
+                <div class="config-section agent-section edit-agent-section collapsed" data-section="edit-seed-analysis" id="editSeedAnalysisSection" style="display: none;">
+                    <h3 class="edit-agent-section-header">
+                        <span class="agent-section-title">🔬 Debug Seed Analysis</span>
+                        <span class="agent-section-toggle">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </h3>
+                    <div class="agent-section-content">
+                        <div class="seed-analysis-summary">
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Diagnosis:</span>
+                                <span id="seedAnalysisDiagnosis" class="seed-analysis-value">-</span>
+                            </div>
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Confidence:</span>
+                                <span id="seedAnalysisConfidence" class="seed-analysis-value">-</span>
+                            </div>
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Seeds Placed:</span>
+                                <span id="seedAnalysisSeedsPlaced" class="seed-analysis-value">-</span>
+                            </div>
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Mean Position Error:</span>
+                                <span id="seedAnalysisMeanError" class="seed-analysis-value">-</span>
+                            </div>
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Systematic Offset:</span>
+                                <span id="seedAnalysisOffset" class="seed-analysis-value">-</span>
+                            </div>
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Overlapping Tubercles:</span>
+                                <span id="seedAnalysisOverlaps" class="seed-analysis-value">-</span>
+                            </div>
+                            <div class="seed-analysis-row">
+                                <span class="seed-analysis-label">Regular Grid Detected:</span>
+                                <span id="seedAnalysisGridDetected" class="seed-analysis-value">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Full Analysis Report -->
+                        <div class="agent-collapsible edit-agent-collapsible collapsed">
+                            <div class="agent-collapsible-header edit-agent-collapsible-header">
+                                <h4>Full Analysis Report</h4>
+                                <div class="agent-collapsible-actions">
+                                    <button type="button" class="btn btn-small btn-copy" id="copySeedAnalysisBtn" title="Copy to clipboard">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                        Copy
+                                    </button>
+                                    <span class="agent-collapsible-toggle">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="agent-collapsible-content">
+                                <pre id="seedAnalysisReport">(Analysis will appear after agent completion...)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions Section -->
+                <div class="extraction-actions agent-section">
+                    <h3>Controls</h3>
+                    <div class="extraction-buttons agent-controls">
+                        <button type="button" class="btn btn-primary" id="startEditAgentBtn">
+                            <span class="icon">&#9658;</span> Start
+                        </button>
+                        <button type="button" class="btn btn-danger" id="stopEditAgentBtn" disabled>
+                            <span class="icon">&#9632;</span> Stop
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="resetEditAgentBtn">
+                            <span class="icon">&#8634;</span> Reset
+                        </button>
+                        <button type="button" class="btn btn-success" id="acceptEditResultBtn" disabled>
+                            <span class="icon">&#10003;</span> Accept Result
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Line -->
+                <div class="agent-status-line">
+                    <span class="status-line-item">
+                        <span class="status-line-label">Hex:</span>
+                        <span id="editStatusLineHex" class="status-line-value">-</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">Cov:</span>
+                        <span id="editStatusLineCov" class="status-line-value">-</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">TUB:</span>
+                        <span id="editStatusLineTub" class="status-line-value">-</span>
+                    </span>
+                    <span class="status-line-separator">|</span>
+                    <span class="status-line-item">
+                        <span class="status-line-label">Plateau:</span>
+                        <span id="editStatusLinePlateau" class="status-line-value">-</span>
+                    </span>
                 </div>
             </div>
             {% endif %}
@@ -1876,6 +2241,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="{{ url_for('static', filename='js/agent_extraction.js') }}"></script>
+<script src="{{ url_for('static', filename='js/agent_editing.js') }}"></script>
 <script>
     // MCP state polling for auto-refresh (disabled - MCP endpoints removed)
     let mcpPollingEnabled = false;

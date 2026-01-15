@@ -47,12 +47,13 @@ window.overlay = (function() {
         return {
             tubercle: tubercleColor,           // Extracted tubercles (cyan)
             manualTubercle: manualTubercleColor, // Manually added (green)
+            debugSeedTubercle: '#ff00ff',      // Debug seed tubercles (magenta)
             boundaryTubercle: boundaryTubercleColor, // Boundary nodes (orange)
             edge: connectionColor,
-            selectedTubercle: '#ff00ff', // Magenta for selection (distinct from yellow ITCs)
-            selectedEdge: '#ff00ff',
-            multiSelectedTubercle: '#ff00ff',  // Magenta for multi-selection
-            multiSelectedEdge: '#ff00ff',
+            selectedTubercle: '#ffff00', // Yellow for selection (changed from magenta)
+            selectedEdge: '#ffff00',
+            multiSelectedTubercle: '#ffff00',  // Yellow for multi-selection
+            multiSelectedEdge: '#ffff00',
             highlightedEdge: '#ff8800',  // Orange for chain mode navigation preview
             areaSelectStroke: '#00ffff',  // Cyan for area selection rectangle
             areaSelectFill: 'rgba(0, 255, 255, 0.1)',
@@ -63,6 +64,10 @@ window.overlay = (function() {
     function getTubercleColor(tub, colors, isSelected) {
         if (isSelected) {
             return colors.selectedTubercle;
+        }
+        // Debug seeds always use magenta regardless of color mode
+        if (tub.source === 'debug_seed') {
+            return colors.debugSeedTubercle;
         }
         if (colorMode === 'source') {
             return tub.source === 'manual' ? colors.manualTubercle : colors.tubercle;
@@ -627,8 +632,21 @@ window.overlay = (function() {
         }
 
         ctx.strokeStyle = getTubercleColor(tub, colors, isSelected);
-        ctx.lineWidth = isSelected ? 3 : 2;
+        const isDebugSeed = tub.source === 'debug_seed';
+        ctx.lineWidth = isSelected ? 3 : (isDebugSeed ? 4 : 2);
         ctx.stroke();
+
+        // Draw cross-hairs for debug seeds (additional visual marker)
+        if (isDebugSeed) {
+            const crossSize = radius * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x - crossSize, y);
+            ctx.lineTo(x + crossSize, y);
+            ctx.moveTo(x, y - crossSize);
+            ctx.lineTo(x, y + crossSize);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
     }
 
     // Draw tubercle ID text

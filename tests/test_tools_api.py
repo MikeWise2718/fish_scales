@@ -1,4 +1,4 @@
-"""Tests for MCP API Flask endpoints."""
+"""Tests for Tools API Flask endpoints (/api/tools/*)."""
 
 import json
 import pytest
@@ -34,11 +34,11 @@ def reset_state():
 
 
 class TestStateEndpoint:
-    """Tests for /api/mcp/state endpoint."""
+    """Tests for /api/tools/state endpoint."""
 
     def test_state_no_image(self, client):
         """State endpoint returns loaded=False when no image."""
-        response = client.get('/api/mcp/state')
+        response = client.get('/api/tools/state')
         assert response.status_code == 200
         data = response.get_json()
         assert data['image']['loaded'] is False
@@ -48,12 +48,12 @@ class TestStateEndpoint:
     def test_state_with_image(self, client, synthetic_test_image):
         """State endpoint returns complete state with loaded image."""
         # Load an image first
-        response = client.post('/api/mcp/load-image',
+        response = client.post('/api/tools/load-image',
                                json={'path': str(synthetic_test_image)})
         assert response.status_code == 200
 
         # Now check state
-        response = client.get('/api/mcp/state')
+        response = client.get('/api/tools/state')
         assert response.status_code == 200
         data = response.get_json()
         assert data['image']['loaded'] is True
@@ -62,11 +62,11 @@ class TestStateEndpoint:
 
 
 class TestScreenshotEndpoint:
-    """Tests for /api/mcp/screenshot endpoint."""
+    """Tests for /api/tools/screenshot endpoint."""
 
     def test_screenshot_no_image_loaded(self, client):
         """Screenshot returns 400 when no image loaded."""
-        response = client.get('/api/mcp/screenshot')
+        response = client.get('/api/tools/screenshot')
         assert response.status_code == 400
         data = response.get_json()
         assert 'error' in data
@@ -74,10 +74,10 @@ class TestScreenshotEndpoint:
     def test_screenshot_with_image(self, client, synthetic_test_image):
         """Screenshot returns base64 PNG when image loaded."""
         # Load image
-        client.post('/api/mcp/load-image', json={'path': str(synthetic_test_image)})
+        client.post('/api/tools/load-image', json={'path': str(synthetic_test_image)})
 
         # Get screenshot
-        response = client.get('/api/mcp/screenshot')
+        response = client.get('/api/tools/screenshot')
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
@@ -88,32 +88,32 @@ class TestScreenshotEndpoint:
 
     def test_screenshot_overlay_options(self, client, synthetic_test_image):
         """Screenshot respects overlay options."""
-        client.post('/api/mcp/load-image', json={'path': str(synthetic_test_image)})
+        client.post('/api/tools/load-image', json={'path': str(synthetic_test_image)})
 
         # Test with overlay disabled
-        response = client.get('/api/mcp/screenshot?overlay=false')
+        response = client.get('/api/tools/screenshot?overlay=false')
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
 
         # Test with numbers enabled
-        response = client.get('/api/mcp/screenshot?numbers=true')
+        response = client.get('/api/tools/screenshot?numbers=true')
         assert response.status_code == 200
 
 
 class TestCalibrationEndpoint:
-    """Tests for /api/mcp/calibration endpoint."""
+    """Tests for /api/tools/calibration endpoint."""
 
     def test_calibration_get_none(self, client):
         """Calibration GET returns None when not set."""
-        response = client.get('/api/mcp/calibration')
+        response = client.get('/api/tools/calibration')
         assert response.status_code == 200
         data = response.get_json()
         assert data['calibration'] is None
 
     def test_calibration_set_um_per_px(self, client):
         """Calibration can be set directly as um_per_px."""
-        response = client.post('/api/mcp/calibration',
+        response = client.post('/api/tools/calibration',
                                json={'um_per_px': 0.165})
         assert response.status_code == 200
         data = response.get_json()
@@ -123,7 +123,7 @@ class TestCalibrationEndpoint:
 
     def test_calibration_set_scale_bar(self, client):
         """Calibration can be set from scale bar measurements."""
-        response = client.post('/api/mcp/calibration',
+        response = client.post('/api/tools/calibration',
                                json={'scale_um': 100, 'scale_px': 200})
         assert response.status_code == 200
         data = response.get_json()
@@ -133,23 +133,23 @@ class TestCalibrationEndpoint:
 
     def test_calibration_missing_params(self, client):
         """Calibration returns 400 with missing params."""
-        response = client.post('/api/mcp/calibration', json={})
+        response = client.post('/api/tools/calibration', json={})
         assert response.status_code == 400
 
 
 class TestParamsEndpoint:
-    """Tests for /api/mcp/params endpoint."""
+    """Tests for /api/tools/params endpoint."""
 
     def test_params_get_default(self, client):
         """Params GET returns current parameters."""
-        response = client.get('/api/mcp/params')
+        response = client.get('/api/tools/params')
         assert response.status_code == 200
         data = response.get_json()
         assert 'parameters' in data
 
     def test_params_set_partial(self, client):
         """Params POST updates only provided values."""
-        response = client.post('/api/mcp/params',
+        response = client.post('/api/tools/params',
                                json={'threshold': 0.1, 'method': 'log'})
         assert response.status_code == 200
         data = response.get_json()
@@ -170,7 +170,7 @@ class TestParamsEndpoint:
             'blur_sigma': 1.5,
             'neighbor_graph': 'gabriel',
         }
-        response = client.post('/api/mcp/params', json=params)
+        response = client.post('/api/tools/params', json=params)
         assert response.status_code == 200
         data = response.get_json()
         for key, value in params.items():
@@ -178,11 +178,11 @@ class TestParamsEndpoint:
 
 
 class TestTubercleEndpoint:
-    """Tests for /api/mcp/tubercle endpoint."""
+    """Tests for /api/tools/tubercle endpoint."""
 
     def test_tubercle_add_no_calibration(self, client):
         """Adding tubercle without calibration returns 400."""
-        response = client.post('/api/mcp/tubercle',
+        response = client.post('/api/tools/tubercle',
                                json={'x': 100, 'y': 100, 'radius': 10})
         assert response.status_code == 400
         assert 'Calibration' in response.get_json()['error']
@@ -190,9 +190,9 @@ class TestTubercleEndpoint:
     def test_tubercle_add_with_radius(self, client):
         """Add tubercle with explicit radius."""
         # Set calibration first
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
 
-        response = client.post('/api/mcp/tubercle',
+        response = client.post('/api/tools/tubercle',
                                json={'x': 100.0, 'y': 100.0, 'radius': 15.0})
         assert response.status_code == 200
         data = response.get_json()
@@ -205,12 +205,12 @@ class TestTubercleEndpoint:
     def test_tubercle_add_auto_radius(self, client, sample_tubercles):
         """Add tubercle with auto-calculated radius from existing."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
 
         # Add some existing tubercles
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/tubercle',
+        response = client.post('/api/tools/tubercle',
                                json={'x': 200.0, 'y': 200.0})
         assert response.status_code == 200
         data = response.get_json()
@@ -219,17 +219,17 @@ class TestTubercleEndpoint:
 
     def test_tubercle_add_missing_coords(self, client):
         """Add tubercle without coords returns 400."""
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
-        response = client.post('/api/mcp/tubercle', json={'radius': 10})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
+        response = client.post('/api/tools/tubercle', json={'radius': 10})
         assert response.status_code == 400
 
     def test_tubercle_move(self, client, sample_tubercles):
         """Move an existing tubercle."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.put('/api/mcp/tubercle',
+        response = client.put('/api/tools/tubercle',
                               json={'id': 1, 'x': 200.0, 'y': 200.0})
         assert response.status_code == 200
         data = response.get_json()
@@ -239,19 +239,19 @@ class TestTubercleEndpoint:
 
     def test_tubercle_move_not_found(self, client):
         """Move non-existent tubercle returns 404."""
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
-        response = client.put('/api/mcp/tubercle',
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
+        response = client.put('/api/tools/tubercle',
                               json={'id': 999, 'x': 200.0, 'y': 200.0})
         assert response.status_code == 404
 
     def test_tubercle_delete(self, client, sample_tubercles, sample_edges):
         """Delete tubercle and its connections."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
         api._extraction_data['edges'] = sample_edges.copy()
 
-        response = client.delete('/api/mcp/tubercle', json={'id': 1})
+        response = client.delete('/api/tools/tubercle', json={'id': 1})
         assert response.status_code == 200
         assert response.get_json()['success'] is True
 
@@ -263,21 +263,21 @@ class TestTubercleEndpoint:
 
     def test_tubercle_delete_not_found(self, client):
         """Delete non-existent tubercle returns 404."""
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
-        response = client.delete('/api/mcp/tubercle', json={'id': 999})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
+        response = client.delete('/api/tools/tubercle', json={'id': 999})
         assert response.status_code == 404
 
 
 class TestConnectionEndpoint:
-    """Tests for /api/mcp/connection endpoint."""
+    """Tests for /api/tools/connection endpoint."""
 
     def test_connection_add(self, client, sample_tubercles):
         """Add connection between two tubercles."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/connection',
+        response = client.post('/api/tools/connection',
                                json={'id1': 1, 'id2': 2})
         assert response.status_code == 200
         data = response.get_json()
@@ -290,11 +290,11 @@ class TestConnectionEndpoint:
     def test_connection_add_duplicate(self, client, sample_tubercles, sample_edges):
         """Add duplicate connection returns 400."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
         api._extraction_data['edges'] = sample_edges.copy()
 
-        response = client.post('/api/mcp/connection',
+        response = client.post('/api/tools/connection',
                                json={'id1': 1, 'id2': 2})
         assert response.status_code == 400
         assert 'already exists' in response.get_json()['error']
@@ -302,21 +302,21 @@ class TestConnectionEndpoint:
     def test_connection_add_missing_tubercle(self, client, sample_tubercles):
         """Add connection with missing tubercle returns 404."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/connection',
+        response = client.post('/api/tools/connection',
                                json={'id1': 1, 'id2': 999})
         assert response.status_code == 404
 
     def test_connection_delete(self, client, sample_tubercles, sample_edges):
         """Delete an existing connection."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
         api._extraction_data['edges'] = sample_edges.copy()
 
-        response = client.delete('/api/mcp/connection',
+        response = client.delete('/api/tools/connection',
                                  json={'id1': 1, 'id2': 2})
         assert response.status_code == 200
         assert response.get_json()['success'] is True
@@ -324,23 +324,23 @@ class TestConnectionEndpoint:
     def test_connection_delete_not_found(self, client, sample_tubercles):
         """Delete non-existent connection returns 404."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.delete('/api/mcp/connection',
+        response = client.delete('/api/tools/connection',
                                  json={'id1': 1, 'id2': 2})
         assert response.status_code == 404
 
 
 class TestConnectionsClearEndpoint:
-    """Tests for /api/mcp/connections/clear endpoint."""
+    """Tests for /api/tools/connections/clear endpoint."""
 
     def test_connections_clear(self, client, sample_edges):
         """Clear all connections."""
         from fish_scale_ui.routes import api
         api._extraction_data['edges'] = sample_edges.copy()
 
-        response = client.post('/api/mcp/connections/clear')
+        response = client.post('/api/tools/connections/clear')
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
@@ -349,36 +349,36 @@ class TestConnectionsClearEndpoint:
 
     def test_connections_clear_empty(self, client):
         """Clear when no connections returns 0 removed."""
-        response = client.post('/api/mcp/connections/clear')
+        response = client.post('/api/tools/connections/clear')
         assert response.status_code == 200
         data = response.get_json()
         assert data['removed_count'] == 0
 
 
 class TestAutoConnectEndpoint:
-    """Tests for /api/mcp/auto-connect endpoint."""
+    """Tests for /api/tools/auto-connect endpoint."""
 
     def test_auto_connect_no_calibration(self, client):
         """Auto-connect without calibration returns 400."""
-        response = client.post('/api/mcp/auto-connect', json={'method': 'gabriel'})
+        response = client.post('/api/tools/auto-connect', json={'method': 'gabriel'})
         assert response.status_code == 400
 
     def test_auto_connect_insufficient_tubercles(self, client):
         """Auto-connect with <2 tubercles returns 400."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = [{'id': 1, 'centroid_x': 100, 'centroid_y': 100}]
 
-        response = client.post('/api/mcp/auto-connect', json={'method': 'gabriel'})
+        response = client.post('/api/tools/auto-connect', json={'method': 'gabriel'})
         assert response.status_code == 400
 
     def test_auto_connect_gabriel(self, client, sample_tubercles):
         """Auto-connect with Gabriel graph."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/auto-connect', json={'method': 'gabriel'})
+        response = client.post('/api/tools/auto-connect', json={'method': 'gabriel'})
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
@@ -388,10 +388,10 @@ class TestAutoConnectEndpoint:
     def test_auto_connect_delaunay(self, client, sample_tubercles):
         """Auto-connect with Delaunay triangulation."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/auto-connect', json={'method': 'delaunay'})
+        response = client.post('/api/tools/auto-connect', json={'method': 'delaunay'})
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
@@ -401,10 +401,10 @@ class TestAutoConnectEndpoint:
     def test_auto_connect_rng(self, client, sample_tubercles):
         """Auto-connect with RNG graph."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/auto-connect', json={'method': 'rng'})
+        response = client.post('/api/tools/auto-connect', json={'method': 'rng'})
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
@@ -412,19 +412,19 @@ class TestAutoConnectEndpoint:
     def test_auto_connect_invalid_method(self, client, sample_tubercles):
         """Auto-connect with invalid method returns 400."""
         from fish_scale_ui.routes import api
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
         api._extraction_data['tubercles'] = sample_tubercles.copy()
 
-        response = client.post('/api/mcp/auto-connect', json={'method': 'invalid'})
+        response = client.post('/api/tools/auto-connect', json={'method': 'invalid'})
         assert response.status_code == 400
 
 
 class TestStatisticsEndpoint:
-    """Tests for /api/mcp/statistics endpoint."""
+    """Tests for /api/tools/statistics endpoint."""
 
     def test_statistics_empty(self, client):
         """Statistics with no data."""
-        response = client.get('/api/mcp/statistics')
+        response = client.get('/api/tools/statistics')
         assert response.status_code == 200
         data = response.get_json()
         assert data['n_tubercles'] == 0
@@ -436,7 +436,7 @@ class TestStatisticsEndpoint:
         api._extraction_data['tubercles'] = sample_tubercles.copy()
         api._extraction_data['edges'] = sample_edges.copy()
 
-        response = client.get('/api/mcp/statistics')
+        response = client.get('/api/tools/statistics')
         assert response.status_code == 200
         data = response.get_json()
         assert data['n_tubercles'] == 3
@@ -452,18 +452,18 @@ class TestStatisticsEndpoint:
         api._extraction_data['tubercles'] = sample_tubercles.copy()
         api._extraction_data['edges'] = sample_edges.copy()
 
-        response = client.get('/api/mcp/statistics')
+        response = client.get('/api/tools/statistics')
         data = response.get_json()
         assert 'suggested_genus' in data
         assert 'classification_confidence' in data
 
 
 class TestLoadImageEndpoint:
-    """Tests for /api/mcp/load-image endpoint."""
+    """Tests for /api/tools/load-image endpoint."""
 
     def test_load_image_success(self, client, synthetic_test_image):
         """Load image successfully."""
-        response = client.post('/api/mcp/load-image',
+        response = client.post('/api/tools/load-image',
                                json={'path': str(synthetic_test_image)})
         assert response.status_code == 200
         data = response.get_json()
@@ -474,28 +474,28 @@ class TestLoadImageEndpoint:
 
     def test_load_image_not_found(self, client):
         """Load non-existent image returns 404."""
-        response = client.post('/api/mcp/load-image',
+        response = client.post('/api/tools/load-image',
                                json={'path': '/nonexistent/image.png'})
         assert response.status_code == 404
 
     def test_load_image_missing_path(self, client):
         """Load image without path returns 400."""
-        response = client.post('/api/mcp/load-image', json={})
+        response = client.post('/api/tools/load-image', json={})
         assert response.status_code == 400
 
 
 class TestSaveEndpoint:
-    """Tests for /api/mcp/save endpoint."""
+    """Tests for /api/tools/save endpoint."""
 
     def test_save_no_image(self, client):
         """Save without image returns 400."""
-        response = client.post('/api/mcp/save')
+        response = client.post('/api/tools/save')
         assert response.status_code == 400
 
     def test_save_no_data(self, client, synthetic_test_image):
         """Save without tubercle data returns 400."""
-        client.post('/api/mcp/load-image', json={'path': str(synthetic_test_image)})
-        response = client.post('/api/mcp/save')
+        client.post('/api/tools/load-image', json={'path': str(synthetic_test_image)})
+        response = client.post('/api/tools/save')
         assert response.status_code == 400
 
     def test_save_success(self, client, synthetic_test_image, sample_tubercles, tmp_path):
@@ -503,17 +503,17 @@ class TestSaveEndpoint:
         from fish_scale_ui.routes import api
 
         # Load image
-        client.post('/api/mcp/load-image', json={'path': str(synthetic_test_image)})
+        client.post('/api/tools/load-image', json={'path': str(synthetic_test_image)})
 
         # Set calibration
-        client.post('/api/mcp/calibration', json={'um_per_px': 0.165})
+        client.post('/api/tools/calibration', json={'um_per_px': 0.165})
 
         # Add tubercles
         api._extraction_data['tubercles'] = sample_tubercles.copy()
         api._extraction_data['statistics'] = {'n_tubercles': 3}
 
         # Save
-        response = client.post('/api/mcp/save')
+        response = client.post('/api/tools/save')
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True

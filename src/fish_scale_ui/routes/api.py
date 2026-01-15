@@ -1160,9 +1160,9 @@ def load_annotations():
                 if loaded_name and loaded_name != _current_image['filename']:
                     name_match = False
 
-            # Update extraction data - handle both v1 and v2 formats
-            if annotations_data.get('version') == 2 and annotations_data.get('sets'):
-                # V2 format: get data from active set
+            # Update extraction data - handle both v1 and v2/v3 formats
+            if annotations_data.get('version', 1) >= 2 and annotations_data.get('sets'):
+                # V2/V3 format: get data from active set
                 active_set_id = annotations_data.get('activeSetId')
                 active_set = None
                 for s in annotations_data['sets']:
@@ -1223,6 +1223,112 @@ def list_annotations():
 
     files = list_annotation_files(annotations_dir, image_name)
     return jsonify({'files': files})
+
+
+@api_bp.route('/annotation-info', methods=['GET'])
+def get_annotation_info():
+    """Get metadata about existing annotation file for current image.
+
+    Returns info about what would be overwritten if user saves.
+
+    Query params:
+        image: Optional image name (uses current image if not provided)
+
+    Returns:
+        {
+            "exists": true,
+            "path": "annotations/image_annotations.json",
+            "file_size": 12345,
+            "modified": "2026-01-15T10:30:00",
+            "version": 3,
+            "n_sets": 2,
+            "sets": [
+                {"name": "Base", "n_tubercles": 0, "n_edges": 0},
+                {"name": "Extraction1", "n_tubercles": 45, "n_edges": 89}
+            ],
+            "total_tubercles": 45,
+            "total_edges": 89
+        }
+    or if no file exists:
+        {"exists": false}
+    """
+    import json
+    from datetime import datetime
+
+    image_name = request.args.get('image')
+    if not image_name:
+        image_name = _current_image.get('filename')
+
+    if not image_name:
+        return jsonify({'exists': False, 'error': 'No image specified'})
+
+    annotations_dir = current_app.config['APP_ROOT'] / 'annotations'
+    base_name = Path(image_name).stem
+    annotations_path = annotations_dir / f"{base_name}_annotations.json"
+
+    # Also check legacy path
+    if not annotations_path.exists():
+        annotations_path = annotations_dir / f"{base_name}_slo.json"
+
+    if not annotations_path.exists():
+        return jsonify({'exists': False})
+
+    try:
+        stat = annotations_path.stat()
+        file_size = stat.st_size
+        modified = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+        with open(annotations_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Extract metadata
+        version = data.get('version', 1)
+        if version == '3.0':
+            version = 3
+        elif version == '2.0':
+            version = 2
+
+        sets_info = []
+        total_tubercles = 0
+        total_edges = 0
+
+        if version >= 2 and 'sets' in data:
+            for s in data.get('sets', []):
+                n_tub = len(s.get('tubercles', []))
+                n_edge = len(s.get('edges', []))
+                sets_info.append({
+                    'name': s.get('name', 'Unnamed'),
+                    'n_tubercles': n_tub,
+                    'n_edges': n_edge,
+                })
+                total_tubercles += n_tub
+                total_edges += n_edge
+        else:
+            # V1 format
+            n_tub = len(data.get('tubercles', []))
+            n_edge = len(data.get('edges', []))
+            sets_info.append({
+                'name': 'Default',
+                'n_tubercles': n_tub,
+                'n_edges': n_edge,
+            })
+            total_tubercles = n_tub
+            total_edges = n_edge
+
+        return jsonify({
+            'exists': True,
+            'path': str(annotations_path.name),
+            'file_size': file_size,
+            'modified': modified,
+            'version': version,
+            'n_sets': len(sets_info),
+            'sets': sets_info,
+            'total_tubercles': total_tubercles,
+            'total_edges': total_edges,
+        })
+
+    except Exception as e:
+        return jsonify({'exists': True, 'error': f'Could not read file: {str(e)}'})
 
 
 @api_bp.route('/dirty-state', methods=['GET', 'POST'])
@@ -1512,7 +1618,7 @@ def calculate_hexagonalness():
 
     Returns component scores and weighted hexagonalness score.
     """
-    from fish_scale_ui.routes.mcp_api import _calculate_hexagonalness_from_dicts
+    from fish_scale_ui.routes.tools_api import _calculate_hexagonalness_from_dicts
 
     # Handle both GET and POST
     if request.method == 'POST':
@@ -1531,7 +1637,7 @@ def calculate_hexagonalness():
         tubercles = _extraction_data.get('tubercles', [])
         edges = _extraction_data.get('edges', [])
 
-    # Use the canonical implementation from mcp_api
+    # Use the canonical implementation from tools_api
     result = _calculate_hexagonalness_from_dicts(tubercles, edges)
 
     # Recalculate composite score with custom weights (if different from defaults)

@@ -2235,16 +2235,19 @@
                 <div class="extraction-actions agent-section">
                     <h3>Controls</h3>
                     <div class="extraction-buttons agent-controls">
-                        <button type="button" class="btn btn-primary" id="startEditAgentBtn">
+                        <button type="button" class="btn btn-primary" id="startEditAgentBtn" title="Launch the LLM agent to begin pattern completion">
                             <span class="icon">&#9658;</span> Start
                         </button>
-                        <button type="button" class="btn btn-danger" id="stopEditAgentBtn" disabled>
+                        <button type="button" class="btn btn-danger" id="stopEditAgentBtn" disabled title="Interrupt the running agent session">
                             <span class="icon">&#9632;</span> Stop
                         </button>
-                        <button type="button" class="btn btn-secondary" id="resetEditAgentBtn">
-                            <span class="icon">&#8634;</span> Reset
+                        <button type="button" class="btn btn-secondary" id="resetEditAgentBtn" title="Clear agent state and UI displays (keeps annotations)">
+                            <span class="icon">&#8634;</span> Reset Agent
                         </button>
-                        <button type="button" class="btn btn-success" id="acceptEditResultBtn" disabled>
+                        <button type="button" class="btn btn-warning" id="clearEditAnnotationsBtn" title="Remove all tubercles and connections from current set">
+                            <span class="icon">&#10005;</span> Clear Annotations
+                        </button>
+                        <button type="button" class="btn btn-success" id="acceptEditResultBtn" disabled title="Confirm and keep the agent's additions">
                             <span class="icon">&#10003;</span> Accept Result
                         </button>
                     </div>

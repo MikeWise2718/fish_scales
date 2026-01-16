@@ -662,6 +662,72 @@ window.agentEditing = (function() {
     }
 
     /**
+     * Clear all annotations (tubercles and connections) from current set
+     */
+    async function clearAnnotations() {
+        if (state.isRunning) {
+            window.app?.showToast('Cannot clear while agent is running', 'warning');
+            return;
+        }
+
+        const currentCount = state.currentTubercleCount || window.overlay?.getData()?.tubercles?.length || 0;
+        if (currentCount === 0) {
+            window.app?.showToast('No annotations to clear', 'info');
+            return;
+        }
+
+        // Confirm with user
+        if (!confirm(`Clear all ${currentCount} tubercles and their connections?`)) {
+            return;
+        }
+
+        try {
+            // Clear server state
+            const response = await fetch('/api/tools/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tubercles: [],
+                    edges: [],
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to clear server state');
+            }
+
+            // Clear overlay
+            window.overlay?.setData([], []);
+
+            // Clear current set data
+            if (window.sets) {
+                window.sets.setCurrentData([], []);
+                window.sets.markDirty();
+            }
+
+            // Update data panel
+            if (window.data) {
+                window.data.setData([], [], {});
+            }
+
+            // Reset state counters
+            state.currentTubercleCount = 0;
+            state.currentHexagonalness = 0;
+            state.currentCoverage = 0;
+
+            updateStatus('Annotations cleared');
+            updateUI();
+            addAction('Cleared all annotations');
+            window.app?.showToast(`Cleared ${currentCount} tubercles`, 'success');
+            logToServer('edit_agent_clear_annotations', { cleared_count: currentCount });
+
+        } catch (err) {
+            console.error('Failed to clear annotations:', err);
+            window.app?.showToast(`Failed to clear: ${err.message}`, 'error');
+        }
+    }
+
+    /**
      * Format elapsed time as MM:SS or HH:MM:SS
      */
     function formatElapsed(ms) {
@@ -1340,6 +1406,7 @@ window.agentEditing = (function() {
         const startBtn = document.getElementById('startEditAgentBtn');
         const stopBtn = document.getElementById('stopEditAgentBtn');
         const resetBtn = document.getElementById('resetEditAgentBtn');
+        const clearBtn = document.getElementById('clearEditAnnotationsBtn');
         const acceptBtn = document.getElementById('acceptEditResultBtn');
 
         if (startBtn) {
@@ -1350,6 +1417,9 @@ window.agentEditing = (function() {
         }
         if (resetBtn) {
             resetBtn.disabled = state.isRunning;
+        }
+        if (clearBtn) {
+            clearBtn.disabled = state.isRunning;
         }
         if (acceptBtn) {
             acceptBtn.disabled = state.isRunning || state.currentTubercleCount === 0;
@@ -1448,6 +1518,7 @@ window.agentEditing = (function() {
         document.getElementById('startEditAgentBtn')?.addEventListener('click', startAgent);
         document.getElementById('stopEditAgentBtn')?.addEventListener('click', stopAgent);
         document.getElementById('resetEditAgentBtn')?.addEventListener('click', reset);
+        document.getElementById('clearEditAnnotationsBtn')?.addEventListener('click', clearAnnotations);
         document.getElementById('acceptEditResultBtn')?.addEventListener('click', acceptResult);
 
         // Provider change - also save config
@@ -1551,6 +1622,7 @@ window.agentEditing = (function() {
         startAgent,
         stopAgent,
         reset,
+        clearAnnotations,
         acceptResult,
         getState: () => ({ ...state }),
         loadProviders,

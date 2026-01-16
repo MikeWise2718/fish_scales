@@ -378,15 +378,44 @@ Find exactly {spot_count} of the brightest circular spots in this image and mark
 4. **Only real features** - do NOT mark background noise or artifacts
 5. **Accurate positions** - place markers at the CENTER of each bright spot
 
+## Using Grid Lines for Position Estimation
+
+The image may display a COORDINATE GRID OVERLAY to help you estimate positions accurately:
+
+- **Grid lines** appear as thin colored lines (often cyan or yellow) at regular intervals
+- **Grid spacing** is typically 100 pixels between lines
+- **Labels** may appear along the edges showing pixel coordinates
+
+### How to Use the Grid
+
+1. **First, check if a grid is visible** in the screenshot
+2. **If grid lines are present**, use them as reference points:
+   - Identify which grid lines are closest to a bright spot
+   - Estimate the spot's position relative to those lines
+   - Example: "This spot is about 30 pixels right of the x=200 line and 45 pixels below the y=300 line" → position is approximately (230, 345)
+3. **Count grid squares** to improve accuracy:
+   - If grid spacing is 100px, a spot halfway between lines at x=200 and x=300 is at x≈250
+4. **Cross-check your estimates** by verifying positions make sense relative to multiple grid lines
+
+### Grid Reading Example
+
+If you see a bright spot and the nearest grid lines are at x=400 and y=200:
+- The spot appears ~25% of the way from x=400 toward x=500 → x ≈ 425
+- The spot appears ~60% of the way from y=200 toward y=300 → y ≈ 260
+- Estimated position: (425, 260)
+
+**Note**: If no grid is visible, estimate positions based on image dimensions and relative positions of features.
+
 ## Strategy
 
 1. Get a screenshot to see the image
-2. Identify the {spot_count} brightest circular spots
-3. For each spot (starting with brightest):
-   - Estimate the center coordinates (x, y)
+2. **Check for grid overlay** - note grid line positions if visible
+3. Identify the {spot_count} brightest circular spots
+4. For each spot (starting with brightest):
+   - Use grid lines (if present) to estimate the center coordinates (x, y)
    - Call add_tubercle(x, y)
-4. Get a final screenshot to verify placements
-5. Call finish() when all {spot_count} spots are marked
+5. Get a final screenshot to verify placements
+6. Call finish() when all {spot_count} spots are marked
 
 ## Coordinate System
 
@@ -395,6 +424,7 @@ Find exactly {spot_count} of the brightest circular spots in this image and mark
 - Y increases DOWNWARD
 - Image dimensions: {image_width} x {image_height} pixels
 - Calibration: {calibration} um/pixel
+- Grid lines (if visible) are spaced at regular pixel intervals
 
 ## Example
 

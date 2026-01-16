@@ -699,6 +699,11 @@ window.agentEditing = (function() {
             // Clear overlay
             window.overlay?.setData([], []);
 
+            // Clear editor data (maintains its own copy)
+            if (window.editor) {
+                window.editor.setData([], []);
+            }
+
             // Clear current set data
             if (window.sets) {
                 window.sets.setCurrentData([], []);

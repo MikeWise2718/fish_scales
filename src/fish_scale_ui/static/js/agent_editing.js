@@ -696,8 +696,10 @@ window.agentEditing = (function() {
                 throw new Error('Failed to clear server state');
             }
 
-            // Clear overlay
-            window.overlay?.setData([], []);
+            // Clear overlay using clear() for complete visual reset
+            if (window.overlay) {
+                window.overlay.clear();
+            }
 
             // Clear editor data (maintains its own copy)
             if (window.editor) {
@@ -710,15 +712,23 @@ window.agentEditing = (function() {
                 window.sets.markDirty();
             }
 
-            // Update data panel
+            // Clear data panel
             if (window.data) {
-                window.data.setData([], [], {});
+                window.data.clear();
+            }
+
+            // Clear undo manager
+            if (window.undoManager) {
+                window.undoManager.clear();
             }
 
             // Reset state counters
             state.currentTubercleCount = 0;
+            state.initialTubercleCount = 0;
             state.currentHexagonalness = 0;
+            state.initialHexagonalness = 0;
             state.currentCoverage = 0;
+            state.initialCoverage = 0;
 
             updateStatus('Annotations cleared');
             updateUI();

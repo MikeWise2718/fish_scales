@@ -670,7 +670,7 @@ window.agentEditing = (function() {
             return;
         }
 
-        const currentCount = state.currentTubercleCount || window.overlay?.getData()?.tubercles?.length || 0;
+        const currentCount = state.currentTubercleCount || window.overlay?.getTubercles()?.length || 0;
         if (currentCount === 0) {
             window.app?.showToast('No annotations to clear', 'info');
             return;

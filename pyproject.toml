@@ -1,6 +1,6 @@
 [project]
 name = "fish-scale-analysis"
-version = "0.2.25"  # Updated: 2026-01-16
+version = "0.2.26"  # Updated: 2026-01-17
 description = "Extract tubercle metrics from fish scale SEM images for species identification"
 requires-python = ">=3.10"
 dependencies = [

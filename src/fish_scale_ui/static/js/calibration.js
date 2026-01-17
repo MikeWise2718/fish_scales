@@ -99,6 +99,8 @@ window.calibration = (function() {
                 updateDisplay();
                 window.app.showToast('Calibration applied', 'success');
                 window.app.loadLog();
+                // Mark state as dirty - calibration is saved in annotations
+                window.extraction?.markDirty();
                 // Notify other modules that calibration changed
                 document.dispatchEvent(new CustomEvent('calibrationChanged', {
                     detail: { calibration: currentCalibration }

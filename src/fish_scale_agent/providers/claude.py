@@ -247,8 +247,34 @@ class ClaudeAgentProvider(AgentLLMProvider):
             if on_iteration:
                 on_iteration(agent_iter)
 
-            # If no tool calls, we're done
+            # If no tool calls, check if this is a conversational response that needs re-prompting
             if done:
+                # Detect conversational responses that ask for confirmation instead of acting
+                conversational_indicators = [
+                    "would you like",
+                    "shall i",
+                    "do you want",
+                    "should i",
+                    "let me know",
+                    "please confirm",
+                    "proceed with",
+                    "?",  # Questions often indicate asking for permission
+                ]
+                text_lower = text_response.lower() if text_response else ""
+                is_conversational = any(ind in text_lower for ind in conversational_indicators)
+
+                # Only re-prompt if this looks conversational and we haven't made progress
+                # (first few iterations where model might be asking instead of doing)
+                if is_conversational and iteration <= 3:
+                    # Add assistant response and follow-up to nudge the model to act
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append({
+                        "role": "user",
+                        "content": "Please proceed immediately. Execute the tool calls now without asking for confirmation. You are an autonomous agent - act directly.",
+                    })
+                    # Continue the loop instead of returning
+                    continue
+
                 return text_response
 
             # Add assistant message to history

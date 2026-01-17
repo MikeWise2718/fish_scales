@@ -292,6 +292,48 @@ export GEMINI_API_KEY=your_key_here
 uv run fish-scale-agent run image.tif --provider gemini
 ```
 
+### Agent Run Logs
+
+Agent runs are logged to multiple locations for debugging:
+
+**Session logs (JSONL format):**
+```
+log/YYYY-MM-DD_HHMMSS.jsonl    # UI session logs with agent events
+```
+
+**Detailed agent logs (per-run):**
+```
+C:\Users\<user>\AppData\Local\Temp\fish-scale-agent\agent-<type>-<session-id>.log
+```
+
+Where `<type>` is:
+- `edit` - Editing agent (pattern completion, bright spots)
+- `optimize` - Extraction optimizer agent
+
+**Markdown run summaries:**
+```
+agent_logs\YYYY-MM-DDTHH-MM-SS_extraction.md
+```
+
+The detailed `.log` files contain:
+- Full LLM prompts sent (with base64 truncated)
+- Full LLM responses (text + tool calls)
+- Token usage per call with cost estimates
+- Tool execution results
+- STATUS lines for UI parsing
+
+**Example log analysis:**
+```bash
+# View latest agent log
+ls -lt /c/Users/$USER/AppData/Local/Temp/fish-scale-agent/*.log | head -5
+
+# Search for LLM responses in a log
+grep "LLM-Response" agent-edit-*.log
+
+# Find conversational responses (model asking instead of acting)
+grep -i "would you like" agent-*.log
+```
+
 ### Debug Seeds (Coordinate Verification)
 
 Debug seeds are markers placed at known positions to diagnose whether the VLM correctly understands the image coordinate system. This feature helps identify issues like:

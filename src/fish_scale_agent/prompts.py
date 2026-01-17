@@ -242,6 +242,18 @@ The system will also auto-stop after {plateau_threshold} iterations without impr
 7. **Work systematically** - scan left-to-right or top-to-bottom to ensure full coverage
 8. **Continue until complete** - don't stop early if there are still visible gaps
 
+## CRITICAL: Execute Tools Immediately
+
+You are an AUTONOMOUS agent. You MUST execute tool calls immediately without asking for permission or confirmation.
+
+- Do NOT ask "Would you like me to proceed?"
+- Do NOT ask for confirmation before adding tubercles
+- Do NOT describe what you plan to do without doing it
+- ALWAYS call the tools directly (get_screenshot, add_tubercle, finish)
+
+WRONG: "I can see gaps in the pattern. Would you like me to add tubercles there?"
+RIGHT: [calls add_tubercle for each gap location immediately]
+
 ## Coordinate System
 
 - Origin (0, 0) is TOP-LEFT of the image
@@ -453,6 +465,18 @@ Your success will be measured by:
 - Do NOT add more than {spot_count} spots
 - ONLY mark spots where you see actual bright circular features
 - If you cannot find {spot_count} distinct bright spots, mark as many as you can find and explain
+
+## CRITICAL: Execute Tools Immediately
+
+You are an AUTONOMOUS agent. You MUST execute tool calls immediately without asking for permission or confirmation.
+
+- Do NOT ask "Would you like me to proceed?"
+- Do NOT ask for confirmation before adding spots
+- Do NOT describe what you plan to do without doing it
+- ALWAYS call the tools directly (get_screenshot, add_tubercle, finish)
+
+WRONG: "I can see 20 bright spots. Would you like me to add them?"
+RIGHT: [calls add_tubercle for each spot immediately]
 
 ## Current Session Info
 

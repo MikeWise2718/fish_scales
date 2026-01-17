@@ -264,8 +264,39 @@ class GeminiAgentProvider(AgentLLMProvider):
             if on_iteration:
                 on_iteration(agent_iter)
 
-            # If no function calls, we're done
+            # If no function calls, check if this is a conversational response that needs re-prompting
             if done:
+                # Detect conversational responses that ask for confirmation instead of acting
+                conversational_indicators = [
+                    "would you like",
+                    "shall i",
+                    "do you want",
+                    "should i",
+                    "let me know",
+                    "please confirm",
+                    "proceed with",
+                    "?",  # Questions often indicate asking for permission
+                ]
+                text_lower = text_response.lower() if text_response else ""
+                is_conversational = any(ind in text_lower for ind in conversational_indicators)
+
+                # Only re-prompt if this looks conversational and we haven't made progress
+                # (first few iterations where model might be asking instead of doing)
+                if is_conversational and iteration <= 3:
+                    # Add model response and follow-up to nudge the model to act
+                    history.append(response.candidates[0].content)
+                    history.append(types.Content(
+                        role="user",
+                        parts=[types.Part(text="Please proceed immediately. Execute the tool calls now without asking for confirmation. You are an autonomous agent - act directly.")]
+                    ))
+                    # Send follow-up and continue the loop
+                    response = self._client.models.generate_content(
+                        model=self._model_name,
+                        contents=history,
+                        config=config,
+                    )
+                    continue
+
                 return text_response
 
             # Add model response to history

@@ -76,7 +76,8 @@ window.agentEditing = (function() {
     let savedConfig = { ...configDefaults };
 
     /**
-     * Load configuration from localStorage and apply to UI
+     * Load configuration from localStorage
+     * Note: applyConfigToUI() is called from loadProviders() after providers are loaded
      */
     function loadConfig() {
         try {
@@ -88,11 +89,8 @@ window.agentEditing = (function() {
         } catch (e) {
             console.warn('Failed to load edit agent config:', e);
         }
-
-        // Apply to UI elements (after a short delay to ensure providers are loaded)
-        setTimeout(() => {
-            applyConfigToUI();
-        }, 100);
+        // Note: Don't call applyConfigToUI() here - it's called from loadProviders()
+        // after the provider list is fetched, which ensures proper timing
     }
 
     /**
@@ -225,6 +223,8 @@ window.agentEditing = (function() {
             state.providers = data.providers || [];
             populateProviderSelect();
             populateModelSelect();
+            // After providers are loaded, apply saved config to restore user's selections
+            applyConfigToUI();
         } catch (err) {
             console.error('Failed to load providers:', err);
         }
@@ -1524,10 +1524,11 @@ window.agentEditing = (function() {
     function init() {
         console.log('Initializing AgenticEdit module');
 
-        loadProviders();
-
-        // Load saved configuration after providers are loaded
+        // Load saved config first (sync) so it's available when providers finish loading
         loadConfig();
+
+        // Load providers (async) - will call applyConfigToUI() when done
+        loadProviders();
 
         // Button handlers
         document.getElementById('startEditAgentBtn')?.addEventListener('click', startAgent);
@@ -1603,11 +1604,17 @@ window.agentEditing = (function() {
             saveConfig();
         });
 
-        // Goal dropdown change - show/hide bright spots parameters and save config
+        // Goal dropdown change - show/hide bright spots parameters, update auto-connect, and save config
         document.getElementById('editAgentGoal')?.addEventListener('change', (e) => {
             const brightSpotsParams = document.getElementById('editAgentBrightSpotsParams');
             if (brightSpotsParams) {
                 brightSpotsParams.style.display = e.target.value === 'bright_spots' ? 'block' : 'none';
+            }
+            // Auto-connect should be off for bright spots (just finding spots, no pattern)
+            // and on for hex pattern (pattern completion needs connections)
+            const autoConnectEl = document.getElementById('editAgentAutoConnect');
+            if (autoConnectEl) {
+                autoConnectEl.checked = e.target.value !== 'bright_spots';
             }
             saveConfig();
         });

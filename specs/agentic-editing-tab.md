@@ -170,9 +170,14 @@ Start the pattern completion agent as a subprocess.
     "model": "claude-sonnet-4-20250514",  // Optional: specific model
     "max_iterations": 30,           // Optional, default 30
     "plateau_threshold": 3,         // Optional, default 3 - stop after N iterations without improvement
-    "auto_connect": true,           // Optional, default true
+    "auto_connect": true,           // Optional, default true (false for bright_spots goal)
     "auto_connect_method": "gabriel", // Optional: delaunay|gabriel|rng
-    "cleanup_boundary": true,       // Optional, default true
+    "goal": "hex_pattern",          // Optional: hex_pattern|bright_spots
+    "spot_count": 20,               // Optional: number of spots for bright_spots goal
+    "min_separation": 30,           // Optional: minimum px between spots for bright_spots goal
+    "debug_seeds": "corners",       // Optional: corners|grid3x3|cross|"x,y;x,y;..."
+    "debug_seed_radius": 15,        // Optional: radius for debug seed markers
+    "log_images": false,            // Optional: save screenshots to disk
     "verbose": true                 // Optional, default true
 }
 ```
@@ -210,13 +215,19 @@ Get current status from the running agent.
     "log_lines": ["[14:32:05] ...", "..."],
     "last_prompt": "{ ... }",       // JSON string, base64 truncated
     "last_response": "{ ... }",     // JSON string
-    "costs": {
-        "provider": "claude",
-        "model": "claude-sonnet-4-20250514",
-        "input_tokens": 125432,
-        "output_tokens": 3891,
-        "estimated_cost": 0.43,
-        "last_step_cost": 0.038
+    "model": "claude-sonnet-4-20250514",
+    "input_tokens": 125432,
+    "output_tokens": 3891,
+    "cost_usd": 0.43,
+    "seed_analysis": {              // Present if debug_seeds was enabled
+        "diagnosis": "Coordinates working correctly",
+        "confidence": "high",
+        "seeds_placed": 5,
+        "mean_position_error": 3.2,
+        "systematic_offset": [0, 0],
+        "tubercles_overlapping_seeds": 0,
+        "is_regular_grid": false,
+        "report": "Full analysis text..."
     }
 }
 ```
@@ -1475,11 +1486,52 @@ uv run fish-scale-agent edit --help  # See all options
   - Added script include for agent_editing.js
 - Reuses existing CSS classes from AgenticExtraction tab
 
-### Phase 4: Integration & Polish
-- [ ] Test end-to-end workflow
-- [ ] Verify CSS styling works
-- [ ] Handle edge cases and errors
-- [ ] Update CLAUDE.md documentation
+### Phase 4: Integration & Polish - COMPLETED (2026-01-17, v0.2.28)
+- [x] Test end-to-end workflow
+- [x] Verify CSS styling works
+- [x] Handle edge cases and errors
+- [x] Update CLAUDE.md documentation
+
+**Additional Features Implemented:**
+
+#### Selectable Agent Goals (v0.2.20)
+Two goal modes available:
+- **hex_pattern** (default): Complete the hexagonal tubercle pattern
+- **bright_spots**: Find N brightest circular spots (simpler test mode for VLM validation)
+
+When goal changes:
+- Auto-connect checkbox automatically toggles (true for hex_pattern, false for bright_spots)
+- Bright spots mode shows additional parameters: spot count (N) and minimum separation (px)
+
+#### Debug Seeds (v0.2.22)
+Markers placed at known positions to diagnose VLM coordinate understanding:
+- Patterns: corners, grid3x3, cross, or custom coordinates
+- Analysis shows: mean position error, systematic offset, overlaps, grid detection
+- Helps identify VLM hallucination vs actual feature detection
+
+#### Settings Persistence (v0.2.28)
+All AgenticEdit configuration is saved to localStorage and restored on page reload:
+- Provider and model selection
+- Max iterations, plateau threshold
+- Auto-connect settings
+- Goal selection and bright spots parameters
+- Debug seed configuration
+
+Key: `editAgentConfig` in localStorage.
+
+#### Conversational VLM Re-prompting (v0.2.27)
+Some VLMs (e.g., Pixtral) return conversational responses asking for confirmation instead of executing tools. The agent now:
+1. Detects conversational indicators ("would you like", "shall i", "?", etc.)
+2. Sends a follow-up nudge: "Please proceed immediately. Execute the tool calls now."
+3. Only re-prompts in first 3 iterations to avoid infinite loops
+
+System prompts also include explicit "Execute Tools Immediately" instructions.
+
+#### Agent Run Logs
+Detailed logs for debugging:
+- Session logs: `log/YYYY-MM-DD_HHMMSS.jsonl`
+- Detailed agent logs: `%TEMP%\fish-scale-agent\agent-edit-<session-id>.log`
+- Contains: LLM prompts, responses, tool calls, usage/costs
 
 ---
 

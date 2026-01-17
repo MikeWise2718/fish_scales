@@ -594,3 +594,71 @@ This feature was implemented in version **0.2.13**.
 - UI display of bright spot analysis results (analysis module exists but not wired to UI)
 - STATUS line output of analysis metrics
 - Integration with run logger for cross-run comparison
+
+---
+
+## Updates (2026-01-17, v0.2.28)
+
+### Auto-Connect Default Based on Goal
+
+When the goal dropdown changes, the auto-connect checkbox now automatically toggles:
+- **hex_pattern**: Auto-connect enabled (connections make sense for pattern completion)
+- **bright_spots**: Auto-connect disabled (just finding spots, no pattern to connect)
+
+This is a UX improvement - users don't need to remember to disable auto-connect when switching to bright spots mode.
+
+**Implementation in `agent_editing.js`:**
+```javascript
+document.getElementById('editAgentGoal')?.addEventListener('change', (e) => {
+    // ... existing bright spots params visibility toggle ...
+
+    // Auto-connect should be off for bright spots
+    const autoConnectEl = document.getElementById('editAgentAutoConnect');
+    if (autoConnectEl) {
+        autoConnectEl.checked = e.target.value !== 'bright_spots';
+    }
+    saveConfig();
+});
+```
+
+### Conversational VLM Re-prompting (v0.2.27)
+
+Some VLMs (notably Pixtral) return conversational responses asking for confirmation instead of executing tools autonomously. For example:
+
+```
+VLM Response: "I can see 20 bright spots in this image. Would you like me to add markers for them?"
+Tool Calls: []
+```
+
+This caused the agent loop to exit immediately with 0 tubercles placed.
+
+**Fix implemented in all providers (claude.py, gemini.py, openrouter.py):**
+
+1. **Prompt enhancement**: Added explicit "Execute Tools Immediately" section to both `EDITING_AGENT_SYSTEM_PROMPT` and `BRIGHT_SPOT_SYSTEM_PROMPT`:
+   ```
+   ## CRITICAL: Execute Tools Immediately
+
+   You are an AUTONOMOUS agent. You MUST execute tool calls immediately without asking for permission.
+
+   WRONG: "I can see 20 bright spots. Would you like me to add them?"
+   RIGHT: [calls add_tubercle for each spot immediately]
+   ```
+
+2. **Re-prompting logic**: When model returns text without tool calls and text contains conversational indicators ("would you like", "shall i", "?", etc.), send a follow-up:
+   ```
+   "Please proceed immediately. Execute the tool calls now without asking for confirmation. You are an autonomous agent - act directly."
+   ```
+
+   Only re-prompts in first 3 iterations to avoid infinite loops.
+
+### Settings Persistence
+
+All AgenticEdit configuration is now saved to localStorage and restored on page reload:
+- Provider and model selection
+- Max iterations, plateau threshold
+- Auto-connect and method
+- Goal selection and bright spots parameters
+- Debug seeds configuration
+- Log images checkbox
+
+Key: `editAgentConfig` in localStorage.

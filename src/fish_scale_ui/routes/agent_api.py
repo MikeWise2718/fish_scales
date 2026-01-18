@@ -174,20 +174,22 @@ def start_agent():
     calibration = data.get('calibration')
 
     # Validate provider
-    valid_providers = ['claude', 'gemini', 'openrouter']
+    valid_providers = ['claude', 'gemini', 'openrouter', 'ollama']
     if provider not in valid_providers:
         return jsonify({
             'error': f'Invalid provider: {provider}. Must be one of: {valid_providers}'
         }), 400
 
-    # Check for API key
+    # Check for API key (Ollama doesn't require one by default)
     api_key_env = {
         'claude': 'ANTHROPIC_API_KEY',
         'gemini': 'GEMINI_API_KEY',
         'openrouter': 'OPENROUTER_API_KEY',
+        'ollama': 'OLLAMA_API_KEY',  # Optional for Ollama
     }
     env_var = api_key_env.get(provider)
-    if not os.environ.get(env_var):
+    # Ollama doesn't require an API key - it's optional for authenticated instances
+    if provider != 'ollama' and not os.environ.get(env_var):
         return jsonify({
             'error': f'API key not set. Set {env_var} environment variable.'
         }), 400
@@ -720,20 +722,22 @@ def start_edit_agent():
     log_images = data.get('log_images', False)
 
     # Validate provider
-    valid_providers = ['claude', 'gemini', 'openrouter']
+    valid_providers = ['claude', 'gemini', 'openrouter', 'ollama']
     if provider not in valid_providers:
         return jsonify({
             'error': f'Invalid provider: {provider}. Must be one of: {valid_providers}'
         }), 400
 
-    # Check for API key
+    # Check for API key (Ollama doesn't require one by default)
     api_key_env = {
         'claude': 'ANTHROPIC_API_KEY',
         'gemini': 'GEMINI_API_KEY',
         'openrouter': 'OPENROUTER_API_KEY',
+        'ollama': 'OLLAMA_API_KEY',  # Optional for Ollama
     }
     env_var = api_key_env.get(provider)
-    if not os.environ.get(env_var):
+    # Ollama doesn't require an API key - it's optional for authenticated instances
+    if provider != 'ollama' and not os.environ.get(env_var):
         return jsonify({
             'error': f'API key not set. Set {env_var} environment variable.'
         }), 400
@@ -1097,6 +1101,40 @@ def list_providers():
             'env_var': 'OPENROUTER_API_KEY',
             'configured': bool(os.environ.get('OPENROUTER_API_KEY')),
             'available_models': openrouter_models,
+        },
+        {
+            'name': 'ollama',
+            'display_name': 'Ollama (Local)',
+            'default_model': 'llama3.2-vision',
+            'env_var': 'OLLAMA_HOST',  # Not an API key, but the host URL
+            'env_var_optional': True,  # Ollama doesn't require config by default
+            'configured': True,  # Always "configured" since it uses localhost by default
+            'available_models': [
+                {
+                    'id': 'llama3.2-vision',
+                    'name': 'Llama 3.2 Vision',
+                    'vendor': 'meta',
+                    'input_cost': 0.0,
+                    'output_cost': 0.0,
+                    'is_free': True,
+                },
+                {
+                    'id': 'llava',
+                    'name': 'LLaVA',
+                    'vendor': 'llava',
+                    'input_cost': 0.0,
+                    'output_cost': 0.0,
+                    'is_free': True,
+                },
+                {
+                    'id': 'bakllava',
+                    'name': 'BakLLaVA',
+                    'vendor': 'llava',
+                    'input_cost': 0.0,
+                    'output_cost': 0.0,
+                    'is_free': True,
+                },
+            ],
         },
     ]
 

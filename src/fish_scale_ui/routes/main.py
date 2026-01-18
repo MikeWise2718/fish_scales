@@ -16,11 +16,12 @@ def get_version_info():
     import scipy
     import skimage
     import flask
+    from datetime import datetime, timezone
     from fish_scale_ui import __version__, __version_date__
 
     # Get git info
     git_hash = 'unknown'
-    git_date = 'unknown'
+    build_datetime = 'unknown'
     try:
         result = subprocess.run(
             ['git', 'rev-parse', '--short', 'HEAD'],
@@ -30,13 +31,18 @@ def get_version_info():
         if result.returncode == 0:
             git_hash = result.stdout.strip()
 
+        # Get commit datetime in ISO 8601 format, then convert to UTC
         result = subprocess.run(
-            ['git', 'log', '-1', '--format=%ci'],
+            ['git', 'log', '-1', '--format=%cI'],
             capture_output=True, text=True, timeout=5,
             cwd=current_app.config['APP_ROOT']
         )
         if result.returncode == 0:
-            git_date = result.stdout.strip()[:10]  # Just the date part
+            # Parse ISO 8601 format like "2026-01-17T21:36:14+01:00"
+            commit_dt = datetime.fromisoformat(result.stdout.strip())
+            # Convert to UTC
+            commit_utc = commit_dt.astimezone(timezone.utc)
+            build_datetime = commit_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
     except Exception:
         pass
 
@@ -49,7 +55,7 @@ def get_version_info():
         'skimage_version': skimage.__version__,
         'flask_version': flask.__version__,
         'git_hash': git_hash,
-        'git_date': git_date,
+        'build_datetime': build_datetime,
     }
 
 

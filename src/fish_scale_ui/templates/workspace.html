@@ -1515,8 +1515,8 @@
                             <td>{{ version_info.git_hash }}</td>
                         </tr>
                         <tr>
-                            <td>Build Date</td>
-                            <td>{{ version_info.git_date }}</td>
+                            <td>Build Datetime (from commit)</td>
+                            <td>{{ version_info.build_datetime }}</td>
                         </tr>
                     </table>
                 </div>
@@ -1546,6 +1546,7 @@
                                 <option value="claude">Claude (Anthropic)</option>
                                 <option value="gemini">Gemini (Google)</option>
                                 <option value="openrouter">OpenRouter</option>
+                                <option value="ollama">Ollama (Local)</option>
                             </select>
                         </div>
 
@@ -1879,6 +1880,7 @@
                                 <option value="claude">Claude (Anthropic)</option>
                                 <option value="gemini">Gemini (Google)</option>
                                 <option value="openrouter">OpenRouter</option>
+                                <option value="ollama">Ollama (Local)</option>
                             </select>
                         </div>
 

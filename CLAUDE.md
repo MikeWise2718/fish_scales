@@ -273,6 +273,7 @@ The LLM Agent (`fish-scale-agent`) provides automated tubercle detection using v
 | Claude | claude-sonnet-4-20250514 | `ANTHROPIC_API_KEY` | **Default** - with vision support |
 | Gemini | gemini-2.0-flash | `GEMINI_API_KEY` | Implemented |
 | OpenRouter | anthropic/claude-sonnet-4 | `OPENROUTER_API_KEY` | Implemented - access to many models |
+| Ollama | llama3.2-vision | `OLLAMA_HOST` (optional) | Implemented - local LLM inference |
 
 ### Running the Agent
 
@@ -290,6 +291,10 @@ uv run fish-scale-agent run image.tif --calibration 0.1 --max-iterations 30 -v
 # Use Gemini instead
 export GEMINI_API_KEY=your_key_here
 uv run fish-scale-agent run image.tif --provider gemini
+
+# Use Ollama (local LLM - no API key required)
+export OLLAMA_HOST=http://localhost:11434  # Optional, this is the default
+uv run fish-scale-agent edit image.tif --provider ollama --model llama3.2-vision --calibration 0.14
 ```
 
 ### Agent Run Logs

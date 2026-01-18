@@ -645,7 +645,7 @@ wheels = [
 
 [[package]]
 name = "fish-scale-analysis"
-version = "0.2.12"
+version = "0.2.29"
 source = { editable = "." }
 dependencies = [
     { name = "flask" },

@@ -33,7 +33,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument(
         "--provider",
-        choices=["claude", "gemini", "openrouter"],
+        choices=["claude", "gemini", "openrouter", "ollama"],
         default="claude",
         help="LLM provider (default: claude)",
     )
@@ -90,7 +90,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     optimize_parser.add_argument(
         "--provider",
-        choices=["claude", "gemini", "openrouter"],
+        choices=["claude", "gemini", "openrouter", "ollama"],
         default="claude",
         help="LLM provider (default: claude)",
     )
@@ -152,7 +152,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     edit_parser.add_argument(
         "--provider",
-        choices=["claude", "gemini", "openrouter"],
+        choices=["claude", "gemini", "openrouter", "ollama"],
         default="claude",
         help="LLM provider (default: claude)",
     )
@@ -305,6 +305,19 @@ def get_provider(provider_name: str, model: str | None, api_key: str | None):
             model=model or "anthropic/claude-sonnet-4",
         )
 
+    elif provider_name == "ollama":
+        from .providers.ollama import OllamaAgentProvider
+
+        # Ollama doesn't require an API key by default
+        key = api_key or os.environ.get("OLLAMA_API_KEY")
+        host = os.environ.get("OLLAMA_HOST")
+
+        return OllamaAgentProvider(
+            api_key=key,  # Optional, can be None
+            model=model or "llama3.2-vision",
+            base_url=host,  # Optional, defaults to http://localhost:11434
+        )
+
     else:
         console.print(f"[red]Unknown provider:[/red] {provider_name}")
         sys.exit(1)
@@ -412,7 +425,12 @@ def cmd_providers(args):
             "[green]openrouter[/green] - OpenRouter (default: anthropic/claude-sonnet-4)\n"
             "  Env var: OPENROUTER_API_KEY\n"
             "  Models: anthropic/claude-*, openai/gpt-4o*, google/gemini-*, meta-llama/*, etc.\n"
-            "  See https://openrouter.ai/docs#models for full list",
+            "  See https://openrouter.ai/docs#models for full list\n\n"
+            "[green]ollama[/green] - Ollama local LLM (default: llama3.2-vision)\n"
+            "  Env var: OLLAMA_HOST (default: http://localhost:11434)\n"
+            "  Env var: OLLAMA_API_KEY (optional, for authenticated instances)\n"
+            "  Models: llama3.2-vision, llava, bakllava, etc.\n"
+            "  See https://ollama.ai/library for available models",
             title="Available Providers",
         )
     )
